@@ -39,64 +39,17 @@ export async function probeOllama() {
 }
 
 /**
- * Defensive cleaner for local voice output.
+ * Phase 1A response adapter.
  *
- * Qwen3 supports an explicit /no_think mode, but some local templates/builds
- * may still leak <think> blocks. Never send those blocks to the HUD or TTS.
- * This is only a safety net; normal operation should already be non-thinking.
+ * We intentionally buffer the local model's answer instead of streaming raw
+ * tokens. Qwen3 can expose reasoning in English before its final Spanish answer
+ * on some local templates. The voice assistant must never speak or display that
+ * internal reasoning, so Ollama is asked for one strict JSON object and only the
+ * validated "respuesta" field is released to the HUD/TTS.
+ *
+ * Once the local tool loop is stable we can reintroduce safe streaming with a
+ * provider-specific final-answer channel.
  */
-function createSpokenFilter(onText) {
-  let inThink = false
-  let carry = ''
-
-  return {
-    push(delta) {
-      let text = carry + String(delta ?? '')
-      carry = ''
-
-      // Keep a short suffix in case a tag is split across stream chunks.
-      if (text.length > 16) {
-        carry = text.slice(-16)
-        text = text.slice(0, -16)
-      } else {
-        carry = text
-        return ''
-      }
-
-      let visible = ''
-      let i = 0
-      while (i < text.length) {
-        if (!inThink) {
-          const open = text.indexOf('<think>', i)
-          if (open === -1) {
-            visible += text.slice(i)
-            break
-          }
-          visible += text.slice(i, open)
-          inThink = true
-          i = open + 7
-        } else {
-          const close = text.indexOf('</think>', i)
-          if (close === -1) break
-          inThink = false
-          i = close + 8
-        }
-      }
-
-      if (visible) onText(visible)
-      return visible
-    },
-    flush() {
-      if (!carry) return ''
-      const tail = carry
-      carry = ''
-      if (inThink || tail.includes('<think>') || tail.includes('</think>')) return ''
-      onText(tail)
-      return tail
-    },
-  }
-}
-
 export async function streamOllama({
   prompt,
   history,
@@ -105,9 +58,18 @@ export async function streamOllama({
   onText,
 }) {
   const messages = [
-    { role: 'system', content: systemPrompt },
+    {
+      role: 'system',
+      content:
+        systemPrompt +
+        '\nDevuelve exclusivamente un objeto JSON válido con esta forma exacta: ' +
+        '{"respuesta":"texto final para pronunciar"}. ' +
+        'El valor de respuesta debe estar completamente en español latinoamericano, ' +
+        'salvo que el usuario pida explícitamente otro idioma. No incluyas análisis, ' +
+        'traducciones, explicaciones del idioma ni texto fuera del JSON.',
+    },
     ...history,
-    { role: 'user', content: `${prompt}\n\n/no_think` },
+    { role: 'user', content: prompt },
   ]
 
   const res = await fetch(`${OLLAMA_URL}/api/chat`, {
@@ -116,10 +78,11 @@ export async function streamOllama({
     body: JSON.stringify({
       model: OLLAMA_MODEL,
       messages,
-      stream: true,
+      stream: false,
       think: false,
+      format: 'json',
       options: {
-        temperature: 0.4,
+        temperature: 0.2,
       },
     }),
     signal,
@@ -131,42 +94,31 @@ export async function streamOllama({
       `Ollama returned ${res.status}${detail ? `: ${detail.slice(0, 240)}` : ''}`,
     )
   }
-  if (!res.body) throw new Error('Ollama returned no response stream.')
 
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let text = ''
-  const spoken = createSpokenFilter((delta) => {
-    text += delta
-    onText(delta)
-  })
+  const packet = await res.json()
+  const raw = String(packet?.message?.content ?? '').trim()
+  if (!raw) throw new Error('Ollama returned an empty final answer.')
 
-  const consumeLine = (line) => {
-    if (!line.trim()) return
-    const packet = JSON.parse(line)
-    const delta = packet?.message?.content ?? ''
-    if (delta) spoken.push(delta)
-    if (packet?.error) throw new Error(String(packet.error))
-  }
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    let nl
-    while ((nl = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, nl)
-      buffer = buffer.slice(nl + 1)
-      consumeLine(line)
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    // Defensive recovery for a model that wraps the JSON despite format=json.
+    const first = raw.indexOf('{')
+    const last = raw.lastIndexOf('}')
+    if (first < 0 || last <= first) {
+      throw new Error('Ollama did not return the required Spanish response object.')
     }
+    parsed = JSON.parse(raw.slice(first, last + 1))
   }
 
-  buffer += decoder.decode()
-  if (buffer.trim()) consumeLine(buffer)
-  spoken.flush()
+  const text = String(parsed?.respuesta ?? '').trim()
+  if (!text) {
+    throw new Error('Ollama response did not include a usable "respuesta" field.')
+  }
 
-  return text.trim()
+  onText(text)
+  return text
 }
 
 /**
@@ -238,7 +190,7 @@ export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_P
         send({
           type: 'error',
           ask,
-          message: `Local AI failed: ${String(err?.message ?? err)}`,
+          message: `La IA local falló: ${String(err?.message ?? err)}`,
         })
       } finally {
         if (active === controller) active = null
