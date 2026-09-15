@@ -23,6 +23,33 @@ Esta es la Fase 1A: todavía no tienes herramientas. Nunca finjas que abriste, c
 Si una petición requiere una herramienta, indica brevemente que esa acción todavía no está habilitada en esta fase.
 No reveles razonamiento interno ni emitas etiquetas de pensamiento. Entrega únicamente la respuesta final que debe pronunciarse.`
 
+let warmPromise = null
+
+export function warmOllama() {
+  if (warmPromise) return warmPromise
+
+  warmPromise = (async () => {
+    try {
+      const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: OLLAMA_MODEL,
+          prompt: '',
+          stream: false,
+          keep_alive: '30m',
+        }),
+        signal: AbortSignal.timeout(20_000),
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  })()
+
+  return warmPromise
+}
+
 export async function probeOllama() {
   try {
     const res = await fetch(`${OLLAMA_URL}/api/tags`, {
@@ -58,6 +85,9 @@ export async function streamOllama({
   signal,
   onText,
 }) {
+  // Reuse the startup warm-up request if it is still loading the model.
+  // This avoids two concurrent cold loads on the first spoken turn.
+  await warmOllama()
   const messages = [
     {
       role: 'system',
