@@ -59,7 +59,7 @@ const FOLLOW_UP_MS = 11000
  * SpeechRecognition after TTS has technically ended. Keep the app in guard mode
  * briefly so those delayed echo results are discarded instead of becoming a
  * brand-new user turn that makes L.U.M.I.A. answer herself in a loop. */
-const POST_SPEECH_GUARD_MS = 1800
+const POST_SPEECH_GUARD_MS = 2600
 
 /** crypto.randomUUID needs a secure context, which a LAN address over plain
  *  http is not. Not worth failing a whole turn over an id. */
