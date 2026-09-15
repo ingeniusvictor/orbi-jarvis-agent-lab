@@ -163,7 +163,7 @@ const MAX_UNSPOKEN = 220
 // Voice selection
 // ---------------------------------------------------------------------------
 
-const VOICE_PREF_KEY = 'jarvis.voice'
+const VOICE_PREF_KEY = 'lumia.voice'
 
 /**
  * Rank installed voices by how close they are to the character: a British
@@ -199,9 +199,11 @@ function score(v: SpeechSynthesisVoice): number {
   if (n.includes('google')) s += 10
   if (n.includes('microsoft')) s += 8
 
-  // Prefer known male-presenting Spanish voices when available, but locale and
-  // quality are more important than gender.
-  if (/\b(pablo|lorenzo|jorge|diego|raul|raúl|enrique|alvaro|álvaro)\b/.test(n)) s += 18
+  // L.U.M.I.A. has her own voice identity. Prefer commonly exposed Spanish
+  // female voices on Windows/Chrome, while still letting locale and quality
+  // dominate when those exact names are unavailable.
+  if (/\b(sabina|helena|laura|elvira|paloma|dalia|isabella|sofia|sofía|monica|mónica)\b/.test(n)) s += 32
+  if (/\b(pablo|lorenzo|jorge|diego|raul|raúl|enrique|alvaro|álvaro)\b/.test(n)) s -= 8
 
   return s
 }
