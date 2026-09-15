@@ -1082,7 +1082,7 @@ wss.on('connection', (socket) => {
   // conversation is certified, Phase 1B will place MCP/tools behind the same
   // permission gate rather than bypassing it for convenience.
   if (PROVIDER === 'ollama') {
-    attachOllamaSession(socket, { systemPrompt: ORBI_LOCAL_SYSTEM_PROMPT })
+    attachOllamaSession(socket)
     return
   }
 
