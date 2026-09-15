@@ -235,7 +235,7 @@ Current implementation:
 
 ### C1-C — Knowledge envelope
 
-**IMPLEMENTED — local validation pending.**
+**SMOKE CERTIFIED — knowledge envelope PASS; lint/build revalidation pending.**
 
 Current implementation:
 
@@ -303,3 +303,11 @@ npm run certify:c1:knowledge
 npm run lint
 npm run build
 ```
+
+
+## C1-C local smoke validation — 2026-09-15
+
+- `npm run certify:c1:knowledge` — PASS
+- bounded context confirmed: <= 3 entries / <= 1200 chars
+- grounding confirmed: deterministic local-static provenance
+- full lint/build revalidation still pending after the C1-C integration
