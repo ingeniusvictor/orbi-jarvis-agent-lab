@@ -124,6 +124,29 @@ Validated on the ORBI development laptop without modifying JARVIS behavior.
 
 The next certification step is **Phase 0B — runtime visual/voice baseline**, starting the original application in read-only mode and validating the holographic UI, microphone path, wake/listening behavior, diagnostics and available camera/gesture features before any local-AI refactor.
 
+
+## Phase 0B certification — runtime visual / voice baseline
+
+Validated interactively on the ORBI development laptop using the original application in read-only mode.
+
+Observed results:
+
+- Application runtime starts successfully with `npm start`.
+- Holographic boot / reactor interface renders correctly in Chrome.
+- Three.js / React Three Fiber scene is fluid and visually intact.
+- Particle field, concentric rings, reactor glow and HUD render correctly.
+- Microphone/listening state works.
+- Diagnostics panel (`D`) works.
+- Audio self-test (`T`) works.
+- No write-enabled mode was used.
+- The interface is suitable as the visual shell for future LUMI integration.
+- The central reactor area is a strong candidate for hosting the existing LUMI GLB while retaining the surrounding rings, particles and HUD.
+- The current LUMI GLB has no embedded animations; first integration should therefore use procedural motion (idle float, subtle rotation, state-driven transforms) rather than rig-dependent animation.
+
+### Phase 0B result
+
+**PASS.** The original visual/audio runtime is operational and the holographic UI is accepted as a strong candidate for reuse/adaptation in LUMI.
+
 ## Phase 1 proposed first milestone
 
 **Goal:** run the JARVIS interface and conversation loop with a local Ollama/Qwen provider instead of Claude, without yet integrating LUMI.
