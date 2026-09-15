@@ -25,9 +25,15 @@ type Prepared = {
  * aligning the antenna + appendages as one silhouette.
  */
 const OPTICAL_LIFT = 0.095
-/** Small optical correction for the lightweight GLB: its right-side ear/arm
- * carries more visual mass, so the face reads a few pixels right of centre. */
-const OPTICAL_SHIFT_X = -0.366
+/**
+ * Optical correction expressed directly in CSS pixels.
+ *
+ * World-space tuning proved misleading because a "small" model-space delta can
+ * map to a very different number of screen pixels depending on camera/framing.
+ * The current reference screenshot places the avatar's visual mass about 28 px
+ * to the right of the reactor centre, so correct that in screen space.
+ */
+const OPTICAL_SHIFT_PX = -28
 
 function cloneMaterial(
   material: THREE.Material,
@@ -64,6 +70,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
   const motionStartedAt = useRef<number | null>(null)
   const { scene } = useGLTF(MODEL_URL)
   const viewport = useThree((s) => s.viewport)
+  const canvasWidth = useThree((s) => s.size.width)
 
   const prepared = useMemo<Prepared>(() => {
     const reactive: THREE.MeshStandardMaterial[] = []
@@ -133,8 +140,9 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
               : 0
 
     root.current.scale.setScalar(modelScale * voicePulse)
+    const worldPerPixelX = viewport.width / Math.max(canvasWidth, 1)
     root.current.position.set(
-      targetHeight * OPTICAL_SHIFT_X,
+      OPTICAL_SHIFT_PX * worldPerPixelX,
       Math.sin(t * 0.82) * floatAmount,
       0.12,
     )
