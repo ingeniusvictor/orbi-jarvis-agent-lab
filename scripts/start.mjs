@@ -45,7 +45,8 @@ function vendorWasm() {
 }
 
 const writes = process.argv.includes('--writes')
-const local = process.argv.includes('--local')
+const lumia = process.argv.includes('--lumia')
+const local = process.argv.includes('--local') || lumia
 
 // A dim label per process, so the interleaved logs stay readable.
 const paint = (tag, colour) => (line) =>
@@ -109,6 +110,7 @@ const port = process.env.PORT
 const bridgeEnv = {
   ...(writes ? { JARVIS_ALLOW_WRITES: '1' } : {}),
   ...(local ? { JARVIS_PROVIDER: 'ollama' } : {}),
+  ...(lumia ? { JARVIS_OLLAMA_MODEL: process.env.ORBIA_LUMIA_MODEL ?? 'orbia-lumia:4b' } : {}),
 }
 if (port) {
   bridgeEnv.JARVIS_ALLOWED_ORIGINS = `http://localhost:${port},http://127.0.0.1:${port}`
@@ -117,7 +119,10 @@ if (port) {
 
 vendorWasm()
 
-console.log(`\nJ.A.R.V.I.S. starting — the brain and the face${local ? ' · ORBI LOCAL' : ''}.\n`)
+console.log(
+  `\n${lumia ? 'O.R.B.I.A. / L.U.M.I.A.' : 'J.A.R.V.I.S.'} starting — the brain and the face` +
+    `${local ? ' · ORBI LOCAL' : ''}${lumia ? ' · LUMIA' : ''}.\n`,
+)
 run('bridge', 'node', ['bridge/server.mjs'], '36', bridgeEnv)
 // npm is a shell script on most systems; call the vite binary directly so we do
 // not need shell:true (which would break the argument handling above).
@@ -125,5 +130,5 @@ run('face', process.execPath, ['node_modules/vite/bin/vite.js'], '35', {})
 
 console.log(
   '\nWhen it says the dev server is ready, open the URL it prints in Chrome,\n' +
-    'click INITIALISE, and say "Hey Jarvis". Ctrl-C stops everything.\n',
+    `click INITIALISE, and say "${lumia ? 'Lumi' : 'Hey Jarvis'}". Ctrl-C stops everything.\n`,
 )
