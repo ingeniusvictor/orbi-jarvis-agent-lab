@@ -217,19 +217,21 @@ voice-runtime projection to the current Companion provider.
 
 ### C1-A — Identity contract
 
-**Implement now.**
+**IMPLEMENTED — runtime validation pending.**
 
 Replace the hard-coded local provider identity text with the canonical LUMI
 identity composer while preserving the current voice-specific restrictions.
 
 ### C1-B — Conversation identity
 
-Next:
+**IMPLEMENTED — runtime validation pending.**
 
-- create stable `conversationId`;
-- stop treating socket lifetime as the canonical identity;
-- adapt current history into canonical turns;
-- keep persistence disabled initially.
+Current implementation:
+
+- browser session creates a stable `conversationId`;
+- reconnects reuse that identity while the bridge process remains alive;
+- Ollama history is stored in a bounded process-local canonical store;
+- persistence remains intentionally disabled for C1.
 
 ### C1-C — Knowledge envelope
 
@@ -269,3 +271,14 @@ Not part of C1:
 - L.U.M.I.A. Kids implementation.
 
 Those remain preserved for later phases.
+
+
+## C1 certification command
+
+Run:
+
+```bash
+npm run certify:c1
+```
+
+This smoke test validates the canonical identity projection, conversation store, KnowledgeContext, ToolRequest/ToolResult, PermissionDecision and RuntimeState contracts. It does not replace lint/build/runtime voice testing.
