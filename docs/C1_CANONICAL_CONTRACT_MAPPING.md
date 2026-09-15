@@ -247,7 +247,7 @@ Current implementation:
 
 ### C1-D — Tool contract
 
-**FOUNDATION IMPLEMENTED — local certification pending.**
+**SMOKE CERTIFIED — Tool Engine PASS; lint/build revalidation pending.**
 
 Current implementation:
 
@@ -338,3 +338,12 @@ npm run certify:c1:tools
 npm run lint
 npm run build
 ```
+
+
+## C1-D local smoke validation — 2026-09-15
+
+- `npm run certify:c1:tools` — PASS
+- deterministic registry/executor confirmed
+- explicit allowlist permission boundary confirmed
+- 3 initial read-only diagnostic tools confirmed
+- full lint/build revalidation pending before runtime integration
