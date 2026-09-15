@@ -100,6 +100,30 @@ Phase 0 is complete when:
 - Security and permission behavior is documented.
 - A Phase 1 plan exists for Ollama/Qwen integration.
 
+
+## Phase 0A certification — local environment
+
+Validated on the ORBI development laptop without modifying JARVIS behavior.
+
+- Node.js: `v26.7.0`
+- npm: `11.19.0`
+- `npm ci`: PASS — 260 packages installed
+- `npm run lint`: PASS — 0 errors, 2 upstream warnings
+- `npm run build`: PASS — Vite production build completed
+- Modules transformed: 615
+- Preflight: Node ready; Claude CLI absent; no local Claude MCP config; no ElevenLabs key
+- Current local testing policy: do not install Claude or ElevenLabs merely to satisfy the upstream default path
+- Security note: npm reported 8 dependency vulnerabilities (3 moderate, 5 high); no automatic audit fix applied during baseline certification
+- Supply-chain note: npm reported install scripts for esbuild, onnxruntime-node, protobufjs and sharp as not yet approved under the local npm policy; no blind approvals performed
+- Build warnings about browser externalization of `node:fs` / `node:path` originate from the Anthropic SDK direct-browser dependency path and did not fail the build
+- Large production chunks are expected from Kokoro / ONNX / Three.js and are optimization work, not a Phase 0 blocker
+
+### Phase 0A result
+
+**PASS.** The upstream codebase installs, lints and builds successfully on the current ORBI workstation.
+
+The next certification step is **Phase 0B — runtime visual/voice baseline**, starting the original application in read-only mode and validating the holographic UI, microphone path, wake/listening behavior, diagnostics and available camera/gesture features before any local-AI refactor.
+
 ## Phase 1 proposed first milestone
 
 **Goal:** run the JARVIS interface and conversation loop with a local Ollama/Qwen provider instead of Claude, without yet integrating LUMI.
