@@ -21,7 +21,7 @@ import { displayServer } from './panels.mjs'
 import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
-import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, ORBI_LOCAL_SYSTEM_PROMPT, probeOllama } from './ollama.mjs'
+import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, ORBI_LOCAL_SYSTEM_PROMPT, probeOllama, warmOllama } from './ollama.mjs'
 import { homedir, tmpdir } from 'node:os'
 import { readFileSync, realpathSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
@@ -1027,6 +1027,15 @@ if (PROVIDER === 'ollama') {
         ? `[jarvis] Ollama ready · ${OLLAMA_MODEL} installed`
         : `[jarvis] Ollama reachable, but ${OLLAMA_MODEL} is not installed`,
     )
+    if (models.includes(OLLAMA_MODEL)) {
+      void warmOllama().then((warm) => {
+        console.log(
+          warm
+            ? `[jarvis] local model warm · ${OLLAMA_MODEL} kept resident`
+            : '[jarvis] local model warm-up did not complete — first answer may be slower',
+        )
+      })
+    }
   })
 } else {
   console.log(`[jarvis] model ${MODEL} · effort ${EFFORT}`)
