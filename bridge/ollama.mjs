@@ -7,6 +7,10 @@
  */
 
 import { composeLumiaVoiceSystemPrompt } from './orbia/lumia-identity.mjs'
+import {
+  appendConversationExchange,
+  getConversationHistory,
+} from './orbia/conversation.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 const DEFAULT_MODEL = 'qwen3:4b'
@@ -235,7 +239,8 @@ export async function streamOllama({
  * expected by src/lib/bridge.ts.
  */
 export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_PROMPT } = {}) {
-  const history = []
+  const socketConversationId =
+    `lumia-socket-${Date.now()}-${Math.random().toString(16).slice(2)}`
   let active = null
   let closed = false
 
@@ -273,6 +278,10 @@ export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_P
     active = controller
 
     const ask = typeof msg.id === 'string' ? msg.id : null
+    const conversationId =
+      typeof msg.conversationId === 'string' && msg.conversationId.trim()
+        ? msg.conversationId.trim().slice(0, 160)
+        : socketConversationId
     const prompt = msg.text.trim()
     if (!prompt) {
       send({ type: 'done', ask, text: '' })
@@ -282,6 +291,7 @@ export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_P
     void (async () => {
       let answer = ''
       try {
+        const history = getConversationHistory(conversationId)
         answer = await streamOllama({
           prompt,
           history,
@@ -292,15 +302,9 @@ export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_P
 
         if (closed || controller.signal.aborted) return
 
-        history.push(
-          { role: 'user', content: prompt },
-          { role: 'assistant', content: answer },
-        )
-        // Keep enough conversational continuity for voice use without letting
-        // a small local model drown in an ever-growing context.
-        if (history.length > 16) history.splice(0, history.length - 16)
+        appendConversationExchange(conversationId, prompt, answer)
 
-        send({ type: 'done', ask, text: answer })
+        send({ type: 'done', ask, conversationId, text: answer })
       } catch (err) {
         if (controller.signal.aborted || closed) return
         send({
