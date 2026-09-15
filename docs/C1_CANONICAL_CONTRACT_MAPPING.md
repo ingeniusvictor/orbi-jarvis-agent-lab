@@ -247,7 +247,7 @@ Current implementation:
 
 ### C1-D — Tool contract
 
-**SMOKE CERTIFIED — Tool Engine PASS; lint/build revalidation pending.**
+**CERTIFIED FOUNDATION — Tool Engine smoke PASS, lint 0 errors, production build PASS.**
 
 Current implementation:
 
@@ -347,3 +347,11 @@ npm run build
 - explicit allowlist permission boundary confirmed
 - 3 initial read-only diagnostic tools confirmed
 - full lint/build revalidation pending before runtime integration
+
+
+## C1-D full local validation — 2026-09-15
+
+- `npm run certify:c1:tools` — PASS
+- `npm run lint` — 0 errors, 4 warnings
+- `npm run build` — PASS
+- next step: connect the certified read-only Tool Engine to the local Ollama runtime and existing holographic `tooling` state
