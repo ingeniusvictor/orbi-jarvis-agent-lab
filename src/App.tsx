@@ -520,7 +520,7 @@ export default function App() {
     const intro = createSpeaker()
     speaker.current = intro
     intro.say(
-      'Hola. Soy L.U.M.I.A., la asistente inteligente principal de O.R.B.I.A. Puedes llamarme Lumi. Estoy lista.',
+      'Hola. Soy Lumia, la asistente inteligente principal de Orbia. Puedes llamarme Lumi. Estoy lista.',
     )
     await intro.end()
     speaker.current = null
