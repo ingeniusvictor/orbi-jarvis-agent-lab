@@ -12,6 +12,13 @@ const DEFAULT_MODEL = 'qwen3:4b'
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
 export const OLLAMA_MODEL = process.env.JARVIS_OLLAMA_MODEL ?? DEFAULT_MODEL
 
+export const ORBI_LOCAL_SYSTEM_PROMPT = `You are JARVIS running locally inside the ORBI JARVIS Agent Lab.
+You are a fast conversational voice assistant. Answer in the same language the user uses.
+Keep normal replies to one or two short spoken sentences. Plain prose only: no markdown, lists, headings or emoji.
+This is Phase 1A: you do not have tools yet. Never pretend that you opened, changed, searched or executed anything.
+If the user asks for an action that needs a tool, say briefly that local tool execution is not enabled in this phase.
+Do not reveal hidden reasoning or emit thinking tags. Give only the final spoken answer.`
+
 export async function probeOllama() {
   try {
     const res = await fetch(`${OLLAMA_URL}/api/tags`, {
@@ -102,7 +109,7 @@ export async function streamOllama({
  * Own one WebSocket connection using Ollama while preserving the exact frames
  * expected by src/lib/bridge.ts.
  */
-export function attachOllamaSession(socket, { systemPrompt }) {
+export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_PROMPT } = {}) {
   const history = []
   let active = null
   let closed = false
