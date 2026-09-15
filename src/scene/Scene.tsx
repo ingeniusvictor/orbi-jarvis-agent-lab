@@ -189,10 +189,13 @@ function Rig() {
     const want = Math.max(level, breathe)
     drive.level += (want - drive.level) * Math.min(1, dt * 9)
 
-    // Slow drift on the camera keeps handheld-ish life in the shot.
+    // Keep the optical centre stable. Horizontal camera drift creates parallax
+    // between the reactor plane (z=0) and L.U.M.I.A. (slightly in front), so the
+    // avatar appears to slide left/right even when its own X position is fixed.
+    // Preserve only a very small vertical breathe for life.
     const t = state.clock.elapsedTime
-    state.camera.position.x = Math.sin(t * 0.13) * 0.35
-    state.camera.position.y = Math.cos(t * 0.17) * 0.22
+    state.camera.position.x = 0
+    state.camera.position.y = Math.cos(t * 0.17) * 0.10
     state.camera.lookAt(0, 0, 0)
   })
 
