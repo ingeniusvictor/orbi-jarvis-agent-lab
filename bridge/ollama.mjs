@@ -72,49 +72,101 @@ export async function streamOllama({
     { role: 'user', content: prompt },
   ]
 
-  const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      messages,
-      stream: false,
-      think: false,
-      format: 'json',
-      options: {
-        temperature: 0.2,
-      },
-    }),
-    signal,
-  })
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    throw new Error(
-      `Ollama returned ${res.status}${detail ? `: ${detail.slice(0, 240)}` : ''}`,
-    )
+  const responseSchema = {
+    type: 'object',
+    properties: {
+      respuesta: { type: 'string' },
+    },
+    required: ['respuesta'],
+    additionalProperties: false,
   }
 
-  const packet = await res.json()
-  const raw = String(packet?.message?.content ?? '').trim()
-  if (!raw) throw new Error('Ollama returned an empty final answer.')
+  const runStructured = async (requestMessages) => {
+    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: requestMessages,
+        stream: false,
+        think: false,
+        // Ollama structured outputs: an explicit JSON schema is much more
+        // reliable than the loose "json" mode with small local models.
+        format: responseSchema,
+        options: {
+          temperature: 0,
+        },
+      }),
+      signal,
+    })
 
-  let parsed
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    // Defensive recovery for a model that wraps the JSON despite format=json.
-    const first = raw.indexOf('{')
-    const last = raw.lastIndexOf('}')
-    if (first < 0 || last <= first) {
-      throw new Error('Ollama did not return the required Spanish response object.')
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      throw new Error(
+        `Ollama returned ${res.status}${detail ? `: ${detail.slice(0, 240)}` : ''}`,
+      )
     }
-    parsed = JSON.parse(raw.slice(first, last + 1))
+
+    const packet = await res.json()
+    return String(packet?.message?.content ?? '').trim()
   }
 
-  const text = String(parsed?.respuesta ?? '').trim()
+  const parseAnswer = (raw) => {
+    if (!raw) return ''
+
+    let parsed = null
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      // Some templates still wrap a valid object in prose/code fences.
+      const first = raw.indexOf('{')
+      const last = raw.lastIndexOf('}')
+      if (first >= 0 && last > first) {
+        try {
+          parsed = JSON.parse(raw.slice(first, last + 1))
+        } catch {
+          parsed = null
+        }
+      }
+    }
+
+    // "respuesta" is the contract. The aliases are only a migration safety net
+    // for local templates that rename the single field despite the schema.
+    const candidate =
+      parsed?.respuesta ??
+      parsed?.response ??
+      parsed?.answer ??
+      parsed?.texto ??
+      parsed?.text ??
+      ''
+
+    return typeof candidate === 'string' ? candidate.trim() : ''
+  }
+
+  let raw = await runStructured(messages)
+  let text = parseAnswer(raw)
+
+  // One bounded repair attempt. Do not fail an otherwise healthy conversation
+  // merely because a small local model named the JSON field incorrectly.
   if (!text) {
-    throw new Error('Ollama response did not include a usable "respuesta" field.')
+    raw = await runStructured([
+      {
+        role: 'system',
+        content:
+          'Convierte la respuesta dada a un único objeto JSON que cumpla exactamente ' +
+          'el esquema solicitado. El campo "respuesta" debe contener solo la respuesta ' +
+          'final en español latinoamericano, sin razonamiento, traducciones ni comentarios.',
+      },
+      {
+        role: 'user',
+        content: raw || 'No hubo contenido útil. Responde brevemente en español.',
+      },
+    ])
+    text = parseAnswer(raw)
+  }
+
+  if (!text) {
+    throw new Error('Ollama no entregó una respuesta final válida en español.')
   }
 
   onText(text)
