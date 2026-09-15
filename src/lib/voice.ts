@@ -705,7 +705,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
       if (e.results[i].isFinal) fresh += chunk
       else interim += chunk
     }
-    const heard = `${settled}${fresh} ${interim}`.replace(/\s+/g, ' ').trim()
+    const heard = `${settled} ${fresh} ${interim}`.replace(/\s+/g, ' ').trim()
     if (!heard) return
     if (isEcho(`${fresh} ${interim}`, speakingNow())) {
       interim = ''
@@ -713,7 +713,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
     }
 
     if (mode === 'wake') {
-      settled += fresh
+      settled = `${settled} ${fresh}`.replace(/\s+/g, ' ').trim()
       if (WAKE.test(heard) && Date.now() - lastWake > WAKE_DEBOUNCE) {
         lastWake = Date.now()
         diag.wakes++
@@ -726,28 +726,23 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
       return
     }
 
-    settled += fresh
+    settled = `${settled} ${fresh}`.replace(/\s+/g, ' ').trim()
     const full = `${settled} ${interim}`.replace(/\s+/g, ' ').trim()
     if (!started || (mode === 'guard' && !barged)) {
-      const words = full.split(/\s+/).filter(Boolean).length
       if (mode === 'guard') {
-        // An override word cuts through everything below it — "stop" has to
-        // work on the first syllable or it is not a stop button.
+        // Chrome's browser SpeechRecognition listens to the same speakers that
+        // system TTS uses, so free-form barge-in here is fundamentally prone to
+        // self-interruption. In the browser fallback we therefore allow only an
+        // explicit interrupt phrase while L.U.M.I.A. is speaking. Natural
+        // free-form barge-in remains available on the VAD + server STT path.
+        //
+        // This prevents L.U.M.I.A. from hearing "Hola, en esta fase..." from
+        // her own speakers and cancelling the sentence she is currently saying.
         if (!OVERRIDE.test(full)) {
-          // His own first syllable, same as the premium path. This engine has
-          // no energy gate, so without the clock the only defence is the word
-          // count below, and a single clear word is exactly what leaks first.
-          const since = speakingSince()
-          if (since && Date.now() - since < SELF_GUARD_MS) {
-            diag.selfGuarded++
-            return
-          }
-          // Require three words before the browser fallback believes an
-          // interruption. On Windows the system TTS often leaks two recognisable
-          // words back into SpeechRecognition after the first-syllable guard,
-          // which used to make L.U.M.I.A. cancel her own answer mid-sentence.
-          // Explicit override words above still cut through immediately.
-          if (words < 3) return
+          if (isEcho(full, speakingNow())) drop('echo of L.U.M.I.A. while speaking')
+          else drop('speech ignored while L.U.M.I.A. is speaking; use an interrupt phrase')
+          reset()
+          return
         }
       }
       started = true
