@@ -38,6 +38,65 @@ export async function probeOllama() {
   }
 }
 
+/**
+ * Defensive cleaner for local voice output.
+ *
+ * Qwen3 supports an explicit /no_think mode, but some local templates/builds
+ * may still leak <think> blocks. Never send those blocks to the HUD or TTS.
+ * This is only a safety net; normal operation should already be non-thinking.
+ */
+function createSpokenFilter(onText) {
+  let inThink = false
+  let carry = ''
+
+  return {
+    push(delta) {
+      let text = carry + String(delta ?? '')
+      carry = ''
+
+      // Keep a short suffix in case a tag is split across stream chunks.
+      if (text.length > 16) {
+        carry = text.slice(-16)
+        text = text.slice(0, -16)
+      } else {
+        carry = text
+        return ''
+      }
+
+      let visible = ''
+      let i = 0
+      while (i < text.length) {
+        if (!inThink) {
+          const open = text.indexOf('<think>', i)
+          if (open === -1) {
+            visible += text.slice(i)
+            break
+          }
+          visible += text.slice(i, open)
+          inThink = true
+          i = open + 7
+        } else {
+          const close = text.indexOf('</think>', i)
+          if (close === -1) break
+          inThink = false
+          i = close + 8
+        }
+      }
+
+      if (visible) onText(visible)
+      return visible
+    },
+    flush() {
+      if (!carry) return ''
+      const tail = carry
+      carry = ''
+      if (inThink || tail.includes('<think>') || tail.includes('</think>')) return ''
+      onText(tail)
+      return tail
+    },
+  }
+}
+
 export async function streamOllama({
   prompt,
   history,
@@ -48,7 +107,7 @@ export async function streamOllama({
   const messages = [
     { role: 'system', content: systemPrompt },
     ...history,
-    { role: 'user', content: prompt },
+    { role: 'user', content: `${prompt}\n\n/no_think` },
   ]
 
   const res = await fetch(`${OLLAMA_URL}/api/chat`, {
@@ -78,15 +137,16 @@ export async function streamOllama({
   const decoder = new TextDecoder()
   let buffer = ''
   let text = ''
+  const spoken = createSpokenFilter((delta) => {
+    text += delta
+    onText(delta)
+  })
 
   const consumeLine = (line) => {
     if (!line.trim()) return
     const packet = JSON.parse(line)
     const delta = packet?.message?.content ?? ''
-    if (delta) {
-      text += delta
-      onText(delta)
-    }
+    if (delta) spoken.push(delta)
     if (packet?.error) throw new Error(String(packet.error))
   }
 
@@ -104,6 +164,7 @@ export async function streamOllama({
 
   buffer += decoder.decode()
   if (buffer.trim()) consumeLine(buffer)
+  spoken.flush()
 
   return text.trim()
 }
