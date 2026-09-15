@@ -28,24 +28,49 @@ let warmPromise = null
 export function warmOllama() {
   if (warmPromise) return warmPromise
 
+  const started = Date.now()
   warmPromise = (async () => {
     try {
-      const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+      // A blank /api/generate request can load weights without exercising the
+      // chat template/context path. The first spoken question then still pays
+      // that setup cost. Warm the exact chat route instead, but cap generation
+      // to a handful of tokens so startup work is done without wasting time.
+      const res = await fetch(`${OLLAMA_URL}/api/chat`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           model: OLLAMA_MODEL,
-          prompt: '',
+          messages: [
+            { role: 'system', content: ORBI_LOCAL_SYSTEM_PROMPT },
+            { role: 'user', content: 'Responde únicamente: listo.' },
+          ],
           stream: false,
+          think: false,
           keep_alive: '30m',
+          options: {
+            temperature: 0,
+            num_predict: 8,
+          },
         }),
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(45_000),
       })
-      return res.ok
+      const ok = res.ok
+      if (ok) {
+        console.log(
+          `[jarvis] LUMIA chat warm-up completed in ${((Date.now() - started) / 1000).toFixed(1)}s`,
+        )
+      }
+      return ok
     } catch {
       return false
     }
   })()
+
+  // A failed warm-up must not poison the process forever. The first real turn
+  // is allowed to retry instead of reusing one permanently-false promise.
+  warmPromise.then((ok) => {
+    if (!ok) warmPromise = null
+  })
 
   return warmPromise
 }
@@ -124,8 +149,13 @@ export async function streamOllama({
         // Ollama structured outputs: an explicit JSON schema is much more
         // reliable than the loose "json" mode with small local models.
         format: responseSchema,
+        keep_alive: '30m',
         options: {
           temperature: 0,
+          // Voice replies are intentionally short. This prevents a malformed
+          // local turn from generating hundreds of tokens before the user
+          // hears anything, while leaving ample room for two spoken sentences.
+          num_predict: 180,
         },
       }),
       signal,
