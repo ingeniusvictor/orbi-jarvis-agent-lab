@@ -42,7 +42,7 @@ export const ORBI_LOCAL_SYSTEM_PROMPT = composeLumiaVoiceSystemPrompt({
   knowledgeEnabled: false,
 })
 
-function selectReadOnlyTool(prompt, conversationId, requestId) {
+export function selectReadOnlyTool(prompt, conversationId, requestId) {
   const text = String(prompt ?? '').trim().toLowerCase()
 
   if (
@@ -99,7 +99,7 @@ function selectReadOnlyTool(prompt, conversationId, requestId) {
   return null
 }
 
-function toolResultToPrompt(execution) {
+export function toolResultToPrompt(execution) {
   if (!execution?.result) return ''
   if (!execution.result.ok) {
     return [
