@@ -246,7 +246,7 @@ export async function streamOllama({
  * Own one WebSocket connection using Ollama while preserving the exact frames
  * expected by src/lib/bridge.ts.
  */
-export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_PROMPT } = {}) {
+export function attachOllamaSession(socket) {
   const socketConversationId =
     `lumia-socket-${Date.now()}-${Math.random().toString(16).slice(2)}`
   let active = null
