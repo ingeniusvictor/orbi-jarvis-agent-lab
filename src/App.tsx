@@ -378,7 +378,9 @@ export default function App() {
     // The score. Must be started from inside this click handler for the same
     // reason as the rest of the audio.
     music.enable()
-    music.playBoot()
+    // The inherited boot-music track belongs to the original JARVIS presentation.
+    // L.U.M.I.A. keeps the synthesised reactor cue + ambient bed, but does not
+    // play that legacy intro before her own Spanish presentation.
     music.startAmbient()
 
     s.setPhase('boot')
