@@ -38,6 +38,17 @@ type Frame = {
   ok?: boolean
 }
 
+/**
+ * Stable conversation identity for this browser session.
+ *
+ * Socket reconnects must not silently become new conversations. The current C1
+ * store is still process-local/ephemeral, but this id lets the bridge restore
+ * recent turns after a WebSocket reconnect while the bridge process is alive.
+ */
+const conversationId =
+  globalThis.crypto?.randomUUID?.() ??
+  `lumia-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
 /** Every question gets an id so its answer can be told from anyone else's. */
 let askSeq = 0
 
@@ -485,7 +496,7 @@ export async function ask(
     arm()
 
     try {
-      ws.send(JSON.stringify({ type: 'ask', text: prompt, id }))
+      ws.send(JSON.stringify({ type: 'ask', text: prompt, id, conversationId }))
     } catch (err) {
       // The socket can go into CLOSING between connect() resolving and here.
       fail(err instanceof Error ? err : new Error(String(err)))
