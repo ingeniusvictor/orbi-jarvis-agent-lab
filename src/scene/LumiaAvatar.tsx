@@ -25,6 +25,9 @@ type Prepared = {
  * aligning the antenna + appendages as one silhouette.
  */
 const OPTICAL_LIFT = 0.095
+/** Small optical correction for the lightweight GLB: its right-side ear/arm
+ * carries more visual mass, so the face reads a few pixels right of centre. */
+const OPTICAL_SHIFT_X = -0.012
 
 function cloneMaterial(
   material: THREE.Material,
@@ -131,7 +134,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
 
     root.current.scale.setScalar(modelScale * voicePulse)
     root.current.position.set(
-      0,
+      targetHeight * OPTICAL_SHIFT_X,
       Math.sin(t * 0.82) * floatAmount,
       0.12,
     )
