@@ -247,7 +247,7 @@ Current implementation:
 
 ### C1-D — Tool contract
 
-**CERTIFIED FOUNDATION — Tool Engine smoke PASS, lint 0 errors, production build PASS.**
+**CERTIFIED FOUNDATION — Tool Engine smoke PASS, lint 0 errors, production build PASS. Runtime integration implemented; validation pending.**
 
 Current implementation:
 
@@ -358,3 +358,25 @@ npm run build
 
 
 User workstation confirmed C1-D build/lint on 2026-09-15: build PASS; lint 0 errors (4 warnings).
+
+
+## C1-D runtime integration
+
+Implemented on the convergence branch:
+
+- certified read-only ToolRegistry/ToolExecutor attached to local Ollama runtime;
+- explicit deterministic routing for runtime status, conversation status and bounded local knowledge search;
+- ordinary conversation does not execute a diagnostic tool;
+- bridge emits the existing `tool` frame before execution;
+- the current Companion UI already maps that frame to the holographic `tooling` phase and active-tool indicator;
+- tool result is injected into the final Ollama response as bounded read-only context;
+- no write tools, shell actions, file mutations, browser actions or unrestricted model-native tool planning are enabled in this step.
+
+Validate with:
+
+```bash
+npm run certify:c1:tool-runtime
+npm run lint
+npm run build
+npm run start:lumia
+```
