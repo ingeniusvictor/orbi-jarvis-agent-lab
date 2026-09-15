@@ -204,6 +204,7 @@ export async function streamOllama({
   history,
   systemPrompt,
   knowledgeContext,
+  toolContext,
   signal,
   onText,
 }) {
@@ -218,6 +219,7 @@ export async function streamOllama({
         (knowledgeContextToPrompt(knowledgeContext)
           ? '\n' + knowledgeContextToPrompt(knowledgeContext)
           : '') +
+        (toolContext ? '\n' + toolContext : '') +
         '\nDevuelve exclusivamente un objeto JSON válido con esta forma exacta: ' +
         '{"respuesta":"texto final para pronunciar"}. ' +
         'El valor de respuesta debe estar completamente en español latinoamericano, ' +
@@ -393,14 +395,31 @@ export function attachOllamaSession(socket) {
       try {
         const history = getConversationHistory(conversationId)
         const knowledgeContext = buildKnowledgeContext(prompt)
+        const toolRequest = selectReadOnlyTool(
+          prompt,
+          conversationId,
+          `${ask ?? 'turn'}-tool`,
+        )
+
+        let toolContext = ''
+        let toolExecution = null
+        if (toolRequest) {
+          send({ type: 'tool', ask, name: toolRequest.name })
+          toolExecution = await localToolExecutor.execute(toolRequest, {
+            allowed: LOCAL_READ_ONLY_TOOLS,
+          })
+          toolContext = toolResultToPrompt(toolExecution)
+        }
+
         answer = await streamOllama({
           prompt,
           history,
           systemPrompt: composeLumiaVoiceSystemPrompt({
-            toolsEnabled: false,
+            toolsEnabled: Boolean(toolRequest),
             knowledgeEnabled: knowledgeContext.entries.length > 0,
           }),
           knowledgeContext,
+          toolContext,
           signal: controller.signal,
           onText: (delta) => send({ type: 'text', ask, delta }),
         })
@@ -416,6 +435,8 @@ export function attachOllamaSession(socket) {
           text: answer,
           grounded: knowledgeContext.entries.length > 0,
           sourceEntryIds: knowledgeContext.entries.map((entry) => entry.id),
+          toolName: toolRequest?.name,
+          toolOk: toolExecution?.result?.ok,
         })
       } catch (err) {
         if (controller.signal.aborted || closed) return
