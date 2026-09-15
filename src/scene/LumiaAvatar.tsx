@@ -10,6 +10,8 @@ const MODEL_URL = '/models/lumia/lumia.glb'
 type Prepared = {
   object: THREE.Group
   reactive: THREE.MeshStandardMaterial[]
+  center: THREE.Vector3
+  height: number
 }
 
 function cloneMaterial(
@@ -44,6 +46,7 @@ function cloneMaterial(
  */
 export function LumiaAvatar({ drive }: { drive: Drive }) {
   const root = useRef<THREE.Group>(null)
+  const motionStartedAt = useRef<number | null>(null)
   const { scene } = useGLTF(MODEL_URL)
   const viewport = useThree((s) => s.viewport)
 
@@ -63,31 +66,58 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
         : cloneMaterial(child.material, reactive)
     })
 
-    return { object, reactive }
+    const box = new THREE.Box3().setFromObject(object)
+    const center = box.getCenter(new THREE.Vector3())
+    const size = box.getSize(new THREE.Vector3())
+
+    return {
+      object,
+      reactive,
+      center,
+      height: Math.max(size.y, 0.001),
+    }
   }, [scene])
 
   useFrame((state, dt) => {
     if (!root.current) return
 
     const fit = Math.min(viewport.width, viewport.height)
-    const baseScale = fit * 0.45
+    const targetHeight = fit * 0.45
+    const modelScale = targetHeight / prepared.height
     const t = state.clock.elapsedTime
     const phase = useStore.getState().phase
 
-    const floatAmount =
-      phase === 'speaking' ? 0.055 : phase === 'thinking' ? 0.045 : 0.032
-    const voicePulse = 1 + drive.level * 0.018
+    // The first reveal and spoken introduction stay perfectly frontal. The
+    // idle personality begins only after L.U.M.I.A. reaches standby for the
+    // first time, then eases in over four seconds rather than snapping into a
+    // tilted pose.
+    if (phase === 'dormant' && motionStartedAt.current === null) {
+      motionStartedAt.current = t
+    }
+    const motionAge =
+      motionStartedAt.current === null ? 0 : Math.max(0, t - motionStartedAt.current)
+    const motionBlend = THREE.MathUtils.smoothstep(
+      THREE.MathUtils.clamp(motionAge / 4, 0, 1),
+      0,
+      1,
+    )
 
-    root.current.scale.setScalar(baseScale * voicePulse)
-    // Source asset is Y=0..1, therefore -scale/2 centres it on the reactor.
+    const floatAmount =
+      phase === 'speaking' ? 0.042 : phase === 'thinking' ? 0.034 : 0.024
+    const voicePulse = 1 + drive.level * 0.012
+
+    root.current.scale.setScalar(modelScale * voicePulse)
     root.current.position.set(
       0,
-      -baseScale * 0.5 + Math.sin(t * 0.82) * floatAmount,
+      Math.sin(t * 0.82) * floatAmount,
       0.12,
     )
-    root.current.rotation.x = Math.sin(t * 0.31) * 0.018
-    root.current.rotation.y = Math.sin(t * 0.24) * 0.28
-    root.current.rotation.z = Math.sin(t * 0.19) * 0.012
+
+    // A presence, not a turntable: once idle motion is enabled the maximum yaw
+    // is only about five degrees. Pitch and roll are barely perceptible.
+    root.current.rotation.x = Math.sin(t * 0.31) * 0.010 * motionBlend
+    root.current.rotation.y = Math.sin(t * 0.24) * 0.085 * motionBlend
+    root.current.rotation.z = Math.sin(t * 0.19) * 0.006 * motionBlend
 
     // Let L.U.M.I.A.'s own surfaces breathe with the same accent/audio energy
     // as the surrounding hologram.
@@ -101,7 +131,15 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
 
   return (
     <group ref={root}>
-      <primitive object={prepared.object} />
+      <group
+        position={[
+          -prepared.center.x,
+          -prepared.center.y,
+          -prepared.center.z,
+        ]}
+      >
+        <primitive object={prepared.object} />
+      </group>
     </group>
   )
 }
