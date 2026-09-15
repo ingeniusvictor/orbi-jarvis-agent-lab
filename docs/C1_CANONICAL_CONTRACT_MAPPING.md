@@ -235,7 +235,7 @@ Current implementation:
 
 ### C1-C — Knowledge envelope
 
-**SMOKE CERTIFIED — knowledge envelope PASS; lint/build revalidation pending.**
+**CERTIFIED — knowledge smoke PASS, lint 0 errors, production build PASS.**
 
 Current implementation:
 
@@ -247,11 +247,21 @@ Current implementation:
 
 ### C1-D — Tool contract
 
-Then:
+**FOUNDATION IMPLEMENTED — local certification pending.**
 
-- port registry/executor/timeout/allowlist semantics;
-- start with read-only diagnostic tools;
-- surface tool frames to the existing holographic `tooling` state.
+Current implementation:
+
+- deterministic registry/executor ported from legacy LUMI;
+- explicit allowlist permission decision;
+- bounded timeout and bounded 4000-character result;
+- structured unknown/denied/invalid/timeout/failure states;
+- first three tools are read-only diagnostics:
+  - `orbi_runtime_status`
+  - `orbi_knowledge_search`
+  - `orbi_conversation_status`
+
+Runtime model planning and holographic `tooling` frames remain intentionally
+disconnected until this foundation passes local certification.
 
 ### C1-E — Local voice
 
@@ -311,3 +321,20 @@ npm run build
 - bounded context confirmed: <= 3 entries / <= 1200 chars
 - grounding confirmed: deterministic local-static provenance
 - full lint/build revalidation still pending after the C1-C integration
+
+
+## C1-C full local validation — 2026-09-15
+
+- `npm run certify:c1:knowledge` — PASS
+- `npm run lint` — 0 errors, 4 warnings (one C1-C stale-parameter warning subsequently removed)
+- `npm run build` — PASS
+
+## C1-D next validation
+
+Run:
+
+```bash
+npm run certify:c1:tools
+npm run lint
+npm run build
+```
