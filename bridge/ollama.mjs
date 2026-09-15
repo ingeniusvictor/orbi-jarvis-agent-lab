@@ -15,12 +15,27 @@ import {
   buildKnowledgeContext,
   knowledgeContextToPrompt,
 } from './orbia/knowledge.mjs'
+import { createToolRequest } from './orbia/contracts.mjs'
+import { createReadOnlyDiagnosticTools } from './orbia/diagnostic-tools.mjs'
+import { ToolExecutor, ToolRegistry } from './orbia/tool-engine.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 const DEFAULT_MODEL = 'qwen3:4b'
 
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
 export const OLLAMA_MODEL = process.env.JARVIS_OLLAMA_MODEL ?? DEFAULT_MODEL
+
+const localToolRegistry = new ToolRegistry()
+for (const tool of createReadOnlyDiagnosticTools({
+  provider: 'ollama',
+  model: OLLAMA_MODEL,
+})) {
+  localToolRegistry.register(tool)
+}
+const localToolExecutor = new ToolExecutor(localToolRegistry)
+const LOCAL_READ_ONLY_TOOLS = Object.freeze(
+  localToolRegistry.list().map((tool) => tool.name),
+)
 
 export const ORBI_LOCAL_SYSTEM_PROMPT = composeLumiaVoiceSystemPrompt({
   toolsEnabled: false,
