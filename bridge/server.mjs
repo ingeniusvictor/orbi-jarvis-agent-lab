@@ -21,6 +21,7 @@ import { displayServer } from './panels.mjs'
 import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
+import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, probeOllama } from './ollama.mjs'
 import { homedir, tmpdir } from 'node:os'
 import { readFileSync, realpathSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
@@ -29,6 +30,15 @@ import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
+
+/**
+ * Brain provider. Claude remains available for upstream compatibility, while
+ * Phase 1 adds an explicit local Ollama path that does not require Claude CLI.
+ */
+const PROVIDER = (process.env.JARVIS_PROVIDER ?? 'claude').toLowerCase()
+if (!['claude', 'ollama'].includes(PROVIDER)) {
+  throw new Error(`Unsupported JARVIS_PROVIDER="${PROVIDER}". Use claude or ollama.`)
+}
 
 /**
  * A crash here takes the whole assistant down mid-sentence, and most of what
@@ -1004,7 +1014,23 @@ console.log(`[jarvis] bridge listening on ws://localhost:${PORT}`)
 console.log(
   `[jarvis] speech ${elevenKey() ? 'via ElevenLabs (key from MCP config)' : 'using browser fallback voice'}`,
 )
-console.log(`[jarvis] model ${MODEL} · effort ${EFFORT}`)
+console.log(`[jarvis] provider ${PROVIDER}`)
+if (PROVIDER === 'ollama') {
+  console.log(`[jarvis] local model ${OLLAMA_MODEL} · ${OLLAMA_URL}`)
+  void probeOllama().then(({ ok, models }) => {
+    if (!ok) {
+      console.warn('[jarvis] Ollama is not reachable — start Ollama before asking a question')
+      return
+    }
+    console.log(
+      models.includes(OLLAMA_MODEL)
+        ? `[jarvis] Ollama ready · ${OLLAMA_MODEL} installed`
+        : `[jarvis] Ollama reachable, but ${OLLAMA_MODEL} is not installed`,
+    )
+  })
+} else {
+  console.log(`[jarvis] model ${MODEL} · effort ${EFFORT}`)
+}
 console.log(
   `[jarvis] writes ${ALLOW_WRITES ? 'ENABLED' : 'disabled'}` +
     (ALLOW_WRITES ? '' : ' — set JARVIS_ALLOW_WRITES=1 to permit shell/file/device actions'),
@@ -1041,6 +1067,15 @@ const RESULT_FAILURES = {
 
 wss.on('connection', (socket) => {
   console.log('[jarvis] client connected')
+
+  // Phase 1A: preserve the browser/voice transport but swap only the brain.
+  // Tools deliberately stay out of this first local milestone; once local
+  // conversation is certified, Phase 1B will place MCP/tools behind the same
+  // permission gate rather than bypassing it for convenience.
+  if (PROVIDER === 'ollama') {
+    attachOllamaSession(socket, { systemPrompt: SYSTEM_PROMPT })
+    return
+  }
 
   // Answer the HUD straight away rather than making it wait for the agent's
   // first turn. Refined later by the real init message.
