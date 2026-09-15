@@ -5,6 +5,7 @@ import {
   TTS_ENGINE,
   KOKORO_VOICE,
   BRIDGE_HTTP_URL,
+  SPEECH_LANG,
 } from '../config'
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
@@ -175,44 +176,44 @@ const VOICE_PREF_KEY = 'jarvis.voice'
  */
 function score(v: SpeechSynthesisVoice): number {
   const n = v.name.toLowerCase()
+  const lang = v.lang.toLowerCase()
+  const wanted = SPEECH_LANG.toLowerCase()
+  const base = wanted.split('-')[0]
   let s = 0
 
-  // The macOS British male, and the closest thing to the character available
-  // without leaving the machine.
-  if (n.startsWith('daniel')) s += 100
-  else if (n.includes('google uk english male')) s += 85
-  else if (/\b(oliver|arthur|jamie|malcolm)\b/.test(n)) s += 80
-  // Newer macOS en-GB male voices — casual, but serviceable.
-  else if (/\b(reed|rocko|eddy)\b/.test(n)) s += 40
+  // Language match dominates. ORBI's default is es-CL, while Windows/Chrome
+  // may expose another Latin-American Spanish locale instead.
+  if (lang === wanted) s += 140
+  else if (lang.startsWith(base + '-')) s += 90
+  else if (lang === base) s += 80
+  else return -1000
 
-  // Higher-quality variants of whatever matched above.
-  if (n.includes('premium')) s += 30
+  // Prefer Latin-American Spanish when the exact Chilean locale is absent.
+  if (/^es[-_](cl|mx|us|ar|co|pe|ve|uy|419)/i.test(v.lang)) s += 35
+  else if (/^es/i.test(v.lang)) s += 10
+
+  // Common quality markers exposed by OS/browser voice lists.
+  if (n.includes('premium')) s += 25
   else if (n.includes('enhanced')) s += 20
+  if (n.includes('natural')) s += 20
+  if (n.includes('google')) s += 10
+  if (n.includes('microsoft')) s += 8
 
-  if (/en[-_]gb/i.test(v.lang)) s += 25
-  else if (/^en/i.test(v.lang)) s += 5
-
-  // Voices that clearly aren't a butler.
-  if (/grandma|grandpa|bubbles|jester|bells|boing|whisper|zarvox|superstar|trinoids|wobble|bahh|organ|cellos|bad news|good news/.test(n)) {
-    s -= 200
-  }
-  // Female-presenting names across the English sets.
-  if (/\b(flo|sandy|shelley|kate|serena|fiona|moira|karen|tessa|samantha|zoe|allison|ava|susan)\b/.test(n)) {
-    s -= 60
-  }
+  // Prefer known male-presenting Spanish voices when available, but locale and
+  // quality are more important than gender.
+  if (/\b(pablo|lorenzo|jorge|diego|raul|raúl|enrique|alvaro|álvaro)\b/.test(n)) s += 18
 
   return s
 }
 
-/** Only voices that scored on a name match, not merely on being English —
- *  otherwise the picker cycles through a dozen US novelty voices. */
+/** Keep only voices matching the configured spoken language. */
 const USABLE = 40
 
 /** Best-first list of usable voices — also what the voice picker cycles. */
 export function candidateVoices(): SpeechSynthesisVoice[] {
   return speechSynthesis
     .getVoices()
-    .filter((v) => /^en/i.test(v.lang))
+    .filter((v) => v.lang.toLowerCase().startsWith(SPEECH_LANG.split('-')[0].toLowerCase()))
     .map((v) => ({ v, s: score(v) }))
     .filter((x) => x.s >= USABLE)
     .sort((a, b) => b.s - a.s)
@@ -236,7 +237,11 @@ function pickVoice(): SpeechSynthesisVoice | null {
     localStorage.removeItem(VOICE_PREF_KEY)
   }
 
-  cachedVoice = candidateVoices()[0] ?? all.find((v) => /^en/i.test(v.lang)) ?? null
+  cachedVoice =
+    candidateVoices()[0] ??
+    all.find((v) => v.lang.toLowerCase() === SPEECH_LANG.toLowerCase()) ??
+    all.find((v) => v.lang.toLowerCase().startsWith(SPEECH_LANG.split('-')[0].toLowerCase())) ??
+    null
   return cachedVoice
 }
 
@@ -477,7 +482,7 @@ export function createSpeaker(): Speaker {
       const u = new SpeechSynthesisUtterance(text)
       const voice = pickVoice()
       if (voice) u.voice = voice
-      u.lang = voice?.lang ?? 'en-GB'
+      u.lang = voice?.lang ?? SPEECH_LANG
       // Deliberate, and deliberately invariant — the character's pace does not
       // change with stakes, and that steadiness is most of the effect. This
       // lands around 130 wpm, below the median for film dialogue.
