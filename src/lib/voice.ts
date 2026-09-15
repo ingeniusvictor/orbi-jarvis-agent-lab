@@ -78,7 +78,7 @@ const WAKE_DEBOUNCE = 1500
  * indication why. Better a rare false wake than a name that does not answer.
  */
 const WAKE =
-  /\b(?:hey|hi|ok|okay|yo|oye|hola)?\s*(?:jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)\b(?!'s)/i
+  /\b(?:hey|hi|ok|okay|yo|oye|hola)?\s*(?:lumi|lumia|lumi a|jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)\b(?!'s)/i
 
 /** Everything after the wake phrase, which is usually the actual command. */
 function afterWake(text: string): string {
@@ -140,7 +140,7 @@ const TRAILS = /[,;:–—-]$/
  * Kept short deliberately. This is the one window where a genuine interruption
  * is also least likely: the user has not yet heard enough to want to stop him.
  */
-const SELF_GUARD_MS = 350
+const SELF_GUARD_MS = 900
 
 /**
  * A quiet gap this long with a finished-looking sentence ends the turn.
@@ -742,12 +742,12 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
             diag.selfGuarded++
             return
           }
-          // Two words before this engine believes an interruption. The energy
-          // path can be instant because it triggers on loudness the canceller
-          // has already had a pass at; here the evidence is a transcript of
-          // audio that includes his own playback, and one word of that is not
-          // evidence of anything.
-          if (words < 2) return
+          // Require three words before the browser fallback believes an
+          // interruption. On Windows the system TTS often leaks two recognisable
+          // words back into SpeechRecognition after the first-syllable guard,
+          // which used to make L.U.M.I.A. cancel her own answer mid-sentence.
+          // Explicit override words above still cut through immediately.
+          if (words < 3) return
         }
       }
       started = true
