@@ -844,6 +844,53 @@ kbd {
   text-shadow: 0 0 44px rgba(79, 214, 255, 1);
 }
 
+/* ORBI cold-open identity */
+.ignition-orbi {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(0, 229, 255, 0.10), transparent 26%),
+    radial-gradient(ellipse at center, #03151c 0%, #01060c 72%);
+}
+
+.ignition-ring-outer {
+  width: 270px;
+  height: 270px;
+  border-style: dashed;
+  border-color: rgba(79, 214, 255, 0.28);
+  border-top-color: rgba(79, 214, 255, 0.95);
+  border-right-color: rgba(79, 214, 255, 0.62);
+  animation-duration: 22s;
+}
+
+.ignition-ring-inner {
+  width: 188px;
+  height: 188px;
+  border-color: rgba(79, 214, 255, 0.18);
+  border-left-color: rgba(79, 214, 255, 0.82);
+  animation-direction: reverse;
+  animation-duration: 14s;
+}
+
+.ignition-orbi-node {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #dffbff;
+  box-shadow: 0 0 14px var(--interface), 0 0 28px rgba(0, 229, 255, 0.45);
+}
+
+.ignition-orbi-node-a { transform: translate(0, -135px); }
+.ignition-orbi-node-b { transform: translate(117px, 68px); }
+.ignition-orbi-node-c { transform: translate(-117px, 68px); }
+
+.ignition-kicker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.34em;
+  opacity: 0.55;
+  text-indent: 0.34em;
+}
+
 /* ------------------------------------------------------------------- boot */
 
 .boot {
@@ -1003,6 +1050,202 @@ kbd {
   stroke-linejoin: round;
   stroke-linecap: round;
   opacity: var(--glow);
+}
+
+
+/* ---------------------------------------------------------------- ORBI boot */
+
+.boot-orbi {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.055), transparent 30%),
+    linear-gradient(180deg, rgba(2, 15, 20, 0.96), var(--bg));
+}
+
+.boot-orbi::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.04) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(circle at center, #000 12%, transparent 72%);
+}
+
+.boot-orbi-kicker {
+  margin: 0 0 10px 26px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.34em;
+  color: var(--accent);
+  opacity: 0.58;
+}
+
+.boot-orbi-network,
+.boot-lumia-resolve,
+.boot-orbi-handoff {
+  width: min(62vmin, 560px);
+  height: min(62vmin, 560px);
+  overflow: visible;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 18%, transparent));
+}
+
+.boot-orbi-orbit,
+.boot-orbi-core-ring {
+  fill: none;
+  stroke: var(--accent);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.boot-orbi-orbit { stroke-width: 1.1; opacity: 0.6; }
+.boot-orbi-orbit-outer { opacity: 0.36; }
+.boot-orbi-core-ring {
+  stroke-width: 1.4;
+  opacity: 0.72;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+
+.boot-orbi-link {
+  stroke: color-mix(in srgb, var(--accent) 34%, transparent);
+  stroke-width: 0.8;
+}
+
+.boot-orbi-node {
+  fill: color-mix(in srgb, var(--accent) 75%, white);
+  stroke: #eaffff;
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 7px var(--accent));
+}
+
+.boot-orbi-domain,
+.boot-orbi-core-name,
+.boot-orbi-core-sub,
+.boot-lumia-name,
+.boot-lumia-sub,
+.boot-orbi-sync-title,
+.boot-orbi-sync-sub,
+.boot-orbi-ready {
+  font-family: 'JetBrains Mono', monospace;
+  fill: #eafcff;
+}
+
+.boot-orbi-domain {
+  font-size: 7px;
+  letter-spacing: 0.16em;
+  opacity: 0.62;
+}
+
+.boot-orbi-core-name {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+}
+
+.boot-orbi-core-sub {
+  font-size: 7px;
+  letter-spacing: 0.32em;
+  fill: var(--accent);
+}
+
+.boot-lumia-glyph {
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+
+.boot-lumia-line,
+.boot-lumia-smile,
+.boot-lumia-side {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.1;
+}
+
+.boot-lumia-eye {
+  fill: color-mix(in srgb, var(--accent) 18%, transparent);
+  stroke: #eaffff;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 8px var(--accent));
+}
+
+.boot-lumia-smile {
+  stroke: #eaffff;
+  stroke-linecap: round;
+}
+
+.boot-lumia-name {
+  font-size: 16px;
+  fill: #f2fdff;
+}
+
+.boot-lumia-sub {
+  font-size: 7px;
+  letter-spacing: 0.26em;
+  fill: var(--accent);
+}
+
+.boot-orbi-seg {
+  stroke: color-mix(in srgb, var(--accent) 25%, transparent);
+  stroke-width: 5;
+}
+
+.boot-orbi-seg-on {
+  stroke: #eaffff;
+  filter: drop-shadow(0 0 8px var(--accent));
+}
+
+.boot-orbi-sync-ring {
+  fill: none;
+  stroke: var(--accent);
+  opacity: calc(0.22 + var(--glow) * 0.55);
+}
+
+.boot-orbi-sync-ring-a {
+  stroke-width: 1.8;
+  stroke-dasharray: 44 10 6 10;
+}
+
+.boot-orbi-sync-ring-b {
+  stroke-width: 1;
+  stroke-dasharray: 3 7;
+}
+
+.boot-orbi-sync-core {
+  fill: color-mix(in srgb, var(--accent) calc(var(--glow) * 9%), transparent);
+  stroke: #eaffff;
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 calc(var(--glow) * 22px) var(--accent));
+}
+
+.boot-orbi-sync-mark {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  opacity: var(--glow);
+}
+
+.boot-orbi-sync-dot {
+  fill: #eaffff;
+  opacity: var(--glow);
+  filter: drop-shadow(0 0 9px var(--accent));
+}
+
+.boot-orbi-sync-title {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+}
+
+.boot-orbi-sync-sub {
+  font-size: 6px;
+  letter-spacing: 0.22em;
+  fill: var(--accent);
+}
+
+.boot-orbi-ready {
+  font-size: 8px;
+  letter-spacing: 0.34em;
+  fill: var(--accent);
+  opacity: calc(0.25 + var(--glow) * 0.7);
 }
 
 @media (max-width: 900px) {
