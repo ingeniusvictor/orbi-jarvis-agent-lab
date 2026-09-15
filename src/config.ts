@@ -74,6 +74,15 @@ export const BACKEND: 'bridge' | 'direct' = choice(
 export const BRIDGE_WS_URL = str(import.meta.env.VITE_BRIDGE_URL) ?? 'ws://localhost:8787'
 export const BRIDGE_HTTP_URL = BRIDGE_WS_URL.replace(/^ws/, 'http')
 
+
+/**
+ * Spoken language for the keyless browser speech path.
+ *
+ * ORBI defaults to Chilean/Latin-American Spanish for both recognition and
+ * system TTS. Override with any BCP-47 locale, e.g. es-MX or en-GB.
+ */
+export const SPEECH_LANG = str(import.meta.env.VITE_SPEECH_LANG) ?? 'es-CL'
+
 /**
  * Speech output engine.
  *
