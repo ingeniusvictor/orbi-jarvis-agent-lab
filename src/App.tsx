@@ -65,9 +65,76 @@ const newId = () =>
  *  that woke him as "travis" gets that word sent on to the model as a question. */
 const NAME = '(?:jarvis|jarvys|jervis|travis|jarviss|java\'s|jarv)'
 /** A bare vocative — "Jarvis", "hey jarvis" — with nothing asked. */
-const BARE_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo)?\\s*${NAME}[\\s,.!?]*$`, 'i')
+const BARE_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo|oye|hola)?\\s*${NAME}[\\s,.!?]*import { useEffect, useRef } from 'react'
+import { Scene } from './scene/Scene'
+import { Hud } from './ui/Hud'
+import { Boot } from './ui/Boot'
+import { Ignition } from './ui/Ignition'
+import { Diagnostics } from './ui/Diagnostics'
+import { useStore } from './store'
+import { startVoice, type Voice, type VoiceMode } from './lib/voice'
+import { createSpeaker, cycleVoice, currentVoiceName } from './lib/tts'
+import * as sfx from './lib/sfx'
+import * as music from './lib/music'
+import * as hands from './lib/hands'
+import { listenForClap } from './lib/clap'
+import * as camera from './lib/camera'
+import * as kokoro from './lib/kokoro'
+import { TTS_ENGINE } from './config'
+import { forTool, attention } from './lib/fillers'
+import {
+  ask,
+  warm,
+  interrupt,
+  watchServers,
+  watchPanels,
+  watchBlades,
+  watchCapture,
+  watchUi,
+  watchConnection,
+  connectedLabels,
+  usingBridge,
+  type Msg,
+} from './lib/brain'
+import { startAnalyser, micLevel } from './lib/audio'
+import { probeCapabilities } from './lib/capabilities'
+import { env } from './config'
+
+/**
+ * The conversation.
+ *
+ * This used to be a sequential loop — greet, await a capture, await an answer,
+ * repeat — with the microphone opened and closed around each step. That shape
+ * cannot be interrupted: while it is awaiting the answer, nothing is listening,
+ * so there is no way for the user to get a word in.
+ *
+ * It is an event machine now. The voice loop runs continuously and pushes
+ * events at us; every one of them is legal in every phase. Saying anything at
+ * all stops him talking, and whatever you say next becomes the new turn.
+ */
+
+/** How long to wait for someone to start speaking after he wakes. Generous:
+ *  people say his name and *then* think about what they wanted. */
+const AWAIT_SPEECH_MS = 14000
+
+/** After an answer, how long the mic stays open for a follow-up before he
+ *  drops back to standby. Long enough that you don't have to say the name
+ *  again to continue a thought. */
+const FOLLOW_UP_MS = 11000
+
+/** crypto.randomUUID needs a secure context, which a LAN address over plain
+ *  http is not. Not worth failing a whole turn over an id. */
+const newId = () =>
+  globalThis.crypto?.randomUUID?.() ??
+  `id${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
+
+/** The same mishearings voice.ts accepts for the wake word — otherwise a turn
+ *  that woke him as "travis" gets that word sent on to the model as a question. */
+const NAME = '(?:jarvis|jarvys|jervis|travis|jarviss|java\'s|jarv)'
+/** A bare vocative — "Jarvis", "hey jarvis" — with nothing asked. */
+, 'i')
 /** A leading vocative on a real command: "Jarvis, what's the weather". */
-const LEADING_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo)?\\s*${NAME}\\b[\\s,.:!?-]*`, 'i')
+const LEADING_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo|oye|hola)?\\s*${NAME}\\b[\\s,.:!?-]*`, 'i')
 
 export default function App() {
   const store = useStore
@@ -596,7 +663,7 @@ export default function App() {
         silence()
         const demo = createSpeaker()
         speaker.current = demo
-        demo.say(`Voice set to ${name.replace(/\(.*?\)/g, '').trim()}. At your service, sir.`)
+        demo.say(`Voz configurada como ${name.replace(/\(.*?\)/g, '').trim()}. A su servicio, señor.`)
         void demo.end()
         return
       }
@@ -638,7 +705,7 @@ export default function App() {
         silence()
         const t = createSpeaker()
         speaker.current = t
-        t.say('Audio test. If you can hear this, speech output is working, sir.')
+        t.say('Prueba de audio. Si puede escuchar esto, la salida de voz está funcionando, señor.')
         void t.end().then(() => {
           const d = (window as unknown as Record<string, Record<string, unknown>>).__tts
           console.info('[jarvis] audio test →', d)
