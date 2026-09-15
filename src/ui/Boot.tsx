@@ -24,12 +24,12 @@ import { useStore } from '../store'
 const T = { rings: 2600, suit: 5200, reactor: 7200 }
 
 const LOG = [
-  'MOUNT F:/BACKUP/GHOST (HIDDEN)',
-  'EXTEND SYSTEM MEMORY .......... OK',
-  'TELEMETRY / COMP CLIMATION',
-  'REMOVE SYSTEM CONFIGURATION',
-  'CHECKSUM ...................... OK',
-  'RUN SYSTEM TOOL',
+  'CARGANDO NÚCLEO O.R.B.I.A. .... OK',
+  'INICIALIZANDO MEMORIA LOCAL ... OK',
+  'ENLACE DE VOZ ................. OK',
+  'MOTOR DE IA LOCAL ............. OK',
+  'SISTEMA DE VISIÓN ............. OK',
+  'VERIFICACIÓN FINAL ............ OK',
 ]
 
 type Stage = 'bar' | 'rings' | 'suit' | 'reactor'
@@ -78,7 +78,7 @@ export function Boot() {
         <div className={`boot-bar ${stage !== 'bar' ? 'boot-bar-dim' : ''}`}>
           <div className="boot-bar-frame">
             <span className="boot-bar-title">
-              INITIATING SYSTEM 1<span className="boot-dots">…</span>
+              INICIANDO SISTEMA<span className="boot-dots">…</span>
               <span className="boot-cursor" />
             </span>
             <div className="boot-seg">
@@ -146,7 +146,7 @@ function Rings({ reduced }: { reduced: boolean }) {
         animate={{ opacity: 1, letterSpacing: '0.42em' }}
         transition={{ duration: 0.7, delay: 0.5, ease }}
       >
-        J.A.R.V.I.S
+        L.U.M.I.A.
       </motion.text>
     </svg>
   )
@@ -201,8 +201,8 @@ function Suit({ reduced }: { reduced: boolean }) {
           />
         </motion.g>
       ))}
-      <text x="-150" y="34" className="boot-tag">RT / PWR</text>
-      <text x="150" y="34" className="boot-tag">DEP / MK</text>
+      <text x="-150" y="34" className="boot-tag">ORBI / CORE</text>
+      <text x="150" y="34" className="boot-tag">IA / LOCAL</text>
     </svg>
   )
 }
