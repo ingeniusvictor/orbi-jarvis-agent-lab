@@ -11,6 +11,10 @@ import {
   appendConversationExchange,
   getConversationHistory,
 } from './orbia/conversation.mjs'
+import {
+  buildKnowledgeContext,
+  knowledgeContextToPrompt,
+} from './orbia/knowledge.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 const DEFAULT_MODEL = 'qwen3:4b'
@@ -107,6 +111,7 @@ export async function streamOllama({
   prompt,
   history,
   systemPrompt,
+  knowledgeContext,
   signal,
   onText,
 }) {
@@ -118,6 +123,9 @@ export async function streamOllama({
       role: 'system',
       content:
         systemPrompt +
+        (knowledgeContextToPrompt(knowledgeContext)
+          ? '\n' + knowledgeContextToPrompt(knowledgeContext)
+          : '') +
         '\nDevuelve exclusivamente un objeto JSON válido con esta forma exacta: ' +
         '{"respuesta":"texto final para pronunciar"}. ' +
         'El valor de respuesta debe estar completamente en español latinoamericano, ' +
@@ -292,10 +300,15 @@ export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_P
       let answer = ''
       try {
         const history = getConversationHistory(conversationId)
+        const knowledgeContext = buildKnowledgeContext(prompt)
         answer = await streamOllama({
           prompt,
           history,
-          systemPrompt,
+          systemPrompt: composeLumiaVoiceSystemPrompt({
+            toolsEnabled: false,
+            knowledgeEnabled: knowledgeContext.entries.length > 0,
+          }),
+          knowledgeContext,
           signal: controller.signal,
           onText: (delta) => send({ type: 'text', ask, delta }),
         })
@@ -304,7 +317,14 @@ export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_P
 
         appendConversationExchange(conversationId, prompt, answer)
 
-        send({ type: 'done', ask, conversationId, text: answer })
+        send({
+          type: 'done',
+          ask,
+          conversationId,
+          text: answer,
+          grounded: knowledgeContext.entries.length > 0,
+          sourceEntryIds: knowledgeContext.entries.map((entry) => entry.id),
+        })
       } catch (err) {
         if (controller.signal.aborted || closed) return
         send({
