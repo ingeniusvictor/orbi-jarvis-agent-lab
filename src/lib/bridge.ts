@@ -35,6 +35,7 @@ type Frame = {
   seconds?: number
   when?: string
   servers?: Array<string | { name?: string }>
+  ok?: boolean
 }
 
 /** Every question gets an id so its answer can be told from anyone else's. */
@@ -133,6 +134,7 @@ function deferred() {
 /** Resolved by the socket-level dispatcher on the first `ready` of the current
  *  connection. Re-armed per connection so a reconnect re-announces. */
 let firstReady = deferred()
+let modelReady = deferred()
 
 let everConnected = false
 
@@ -177,6 +179,8 @@ function dispatch(ws: WebSocket) {
         .filter(Boolean)
       onServers?.(servers)
       firstReady.resolve()
+    } else if (msg.type === 'model_ready') {
+      if (msg.ok !== false) modelReady.resolve()
     } else if (msg.type === 'panel' && msg.panel) {
       onPanel?.(msg.panel)
     } else if (msg.type === 'blade' && msg.blade) {
@@ -216,6 +220,7 @@ function connect(): Promise<WebSocket> {
   if (connecting) return connecting
 
   firstReady = deferred()
+  modelReady = deferred()
 
   connecting = new Promise<WebSocket>((resolve, reject) => {
     const ws = new WebSocket(BRIDGE_WS_URL)
@@ -296,6 +301,16 @@ export async function warmBridge(): Promise<void> {
     firstReady.promise,
     new Promise<void>((resolve) => setTimeout(resolve, 2500)),
   ])
+
+  // In local mode, wait for the real chat warm-up during the existing boot
+  // animation. This deliberately moves cold-start latency to power-on instead
+  // of making the user's first question feel broken.
+  if (servers.includes('ollama')) {
+    await Promise.race([
+      modelReady.promise,
+      new Promise<void>((resolve) => setTimeout(resolve, 45_000)),
+    ])
+  }
 }
 
 // ---------------------------------------------------------------------------
