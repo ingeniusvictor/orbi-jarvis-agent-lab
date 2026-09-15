@@ -180,7 +180,10 @@ function dispatch(ws: WebSocket) {
       onServers?.(servers)
       firstReady.resolve()
     } else if (msg.type === 'model_ready') {
-      if (msg.ok !== false) modelReady.resolve()
+      // Success or failure both mean the warm-up attempt is finished. A failed
+      // attempt must not hold the boot screen for the full timeout; the first
+      // real turn will retry through warmOllama().
+      modelReady.resolve()
     } else if (msg.type === 'panel' && msg.panel) {
       onPanel?.(msg.panel)
     } else if (msg.type === 'blade' && msg.blade) {
