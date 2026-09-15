@@ -510,9 +510,20 @@ export default function App() {
     }
 
     // Ask the bridge which speech engines exist before the loop starts, so the
-    // first turn already uses ElevenLabs when a key is present and the browser
-    // fallback when it is not — no flag, no reload.
+    // first spoken line already uses the best available Spanish voice.
     await probeCapabilities()
+
+    // L.U.M.I.A.'s introduction happens before the recogniser starts. This is
+    // deliberate: the assistant says her own wake word ("Lumi"), and starting
+    // SpeechRecognition first would let the microphone wake on her greeting.
+    store.getState().setPhase('speaking')
+    const intro = createSpeaker()
+    speaker.current = intro
+    intro.say(
+      'Hola. Soy L.U.M.I.A., la asistente inteligente principal de O.R.B.I.A. Puedes llamarme Lumi. Estoy lista.',
+    )
+    await intro.end()
+    speaker.current = null
 
     // One voice loop, started once, running until the page closes.
     voice.current = await startVoice({
