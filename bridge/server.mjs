@@ -21,7 +21,7 @@ import { displayServer } from './panels.mjs'
 import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
-import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, probeOllama } from './ollama.mjs'
+import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, ORBI_LOCAL_SYSTEM_PROMPT, probeOllama } from './ollama.mjs'
 import { homedir, tmpdir } from 'node:os'
 import { readFileSync, realpathSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
@@ -1073,7 +1073,7 @@ wss.on('connection', (socket) => {
   // conversation is certified, Phase 1B will place MCP/tools behind the same
   // permission gate rather than bypassing it for convenience.
   if (PROVIDER === 'ollama') {
-    attachOllamaSession(socket, { systemPrompt: SYSTEM_PROMPT })
+    attachOllamaSession(socket, { systemPrompt: ORBI_LOCAL_SYSTEM_PROMPT })
     return
   }
 
