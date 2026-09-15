@@ -249,6 +249,13 @@ export function attachOllamaSession(socket, { systemPrompt = ORBI_LOCAL_SYSTEM_P
 
   send({ type: 'ready', servers: ['ollama', 'orbi_local'] })
 
+  // The browser starts warming the bridge during the boot animation. Tell it
+  // when the local model is genuinely ready so the first spoken question does
+  // not race the cold-load path.
+  void warmOllama().then((ok) => {
+    if (!closed) send({ type: 'model_ready', ok })
+  })
+
   socket.on('message', (raw) => {
     let msg
     try {
