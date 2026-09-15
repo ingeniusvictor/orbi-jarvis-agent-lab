@@ -577,8 +577,8 @@ export function createSpeaker(): Speaker {
           diag.failures++
           diag.lastError = diag.lastError || 'no-start'
           finish()
-        }, 1500)
-      }, 700)
+        }, 2200)
+      }, 1600)
       diag.spoken++
       diag.lastText = text.slice(0, 60)
       diag.voice = u.voice?.name ?? 'default'
