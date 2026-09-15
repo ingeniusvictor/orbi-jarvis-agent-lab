@@ -55,6 +55,12 @@ const AWAIT_SPEECH_MS = 14000
  *  again to continue a thought. */
 const FOLLOW_UP_MS = 11000
 
+/** Chrome may deliver the assistant's own final words back through
+ * SpeechRecognition after TTS has technically ended. Keep the app in guard mode
+ * briefly so those delayed echo results are discarded instead of becoming a
+ * brand-new user turn that makes L.U.M.I.A. answer herself in a loop. */
+const POST_SPEECH_GUARD_MS = 1800
+
 /** crypto.randomUUID needs a secure context, which a LAN address over plain
  *  http is not. Not worth failing a whole turn over an id. */
 const newId = () =>
@@ -211,8 +217,16 @@ export default function App() {
         music.duck(false)
         store.getState().setActiveTool(null)
         music.working(false)
-        // Stay open. Having to say his name again to add one more sentence is
-        // the difference between a conversation and a vending machine.
+
+        // Do not flip straight from SPEAKING to LISTENING. Chrome can endpoint
+        // and return the last words coming from the speakers up to roughly a
+        // second later. If we were already in command mode by then, L.U.M.I.A.
+        // would accept her own answer as a new user request and answer it again,
+        // creating the visible/spoken repetition loop.
+        await new Promise((r) => setTimeout(r, POST_SPEECH_GUARD_MS))
+        if (stale()) return
+
+        // Stay open for a natural follow-up once the echo tail is safely gone.
         listen(FOLLOW_UP_MS)
       }
     }
@@ -258,9 +272,17 @@ export default function App() {
     const greeting = createSpeaker()
     speaker.current = greeting
     greeting.say(attention())
-    void greeting.end()
 
-    listen(AWAIT_SPEECH_MS)
+    // The browser recogniser can also hear this acknowledgement. Keep the
+    // machine out of command mode until the greeting and its short echo tail
+    // are finished, otherwise "Aquí estoy" can become the next command.
+    void (async () => {
+      await greeting.end()
+      await new Promise((r) => setTimeout(r, POST_SPEECH_GUARD_MS))
+      if (speaker.current === greeting) speaker.current = null
+      const now = store.getState().phase
+      if (now === 'waking' || now === 'speaking') listen(AWAIT_SPEECH_MS)
+    })()
   }
 
   /**
