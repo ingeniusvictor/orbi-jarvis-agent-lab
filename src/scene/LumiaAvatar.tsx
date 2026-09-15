@@ -14,6 +14,18 @@ type Prepared = {
   height: number
 }
 
+/**
+ * The GLB's geometric bounds are not its visual centre. The antenna extends
+ * much farther upward than the little feet extend downward, so centring the
+ * whole bounding box leaves the round body visibly low inside the reactor.
+ *
+ * Measured on the current lightweight L.U.M.I.A. asset, the main spherical
+ * body is centred about 9.5% of the model height below the bounds centre.
+ * Lifting by that amount aligns the face/body with the reactor rather than
+ * aligning the antenna + appendages as one silhouette.
+ */
+const OPTICAL_LIFT = 0.095
+
 function cloneMaterial(
   material: THREE.Material,
   reactive: THREE.MeshStandardMaterial[],
@@ -103,8 +115,19 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
     )
 
     const floatAmount =
-      phase === 'speaking' ? 0.042 : phase === 'thinking' ? 0.034 : 0.024
+      phase === 'speaking' ? 0.038 : phase === 'thinking' ? 0.030 : 0.022
     const voicePulse = 1 + drive.level * 0.012
+
+    const poseMotion =
+      phase === 'dormant'
+        ? 1
+        : phase === 'listening'
+          ? 0.55
+          : phase === 'speaking'
+            ? 0.40
+            : phase === 'thinking' || phase === 'tooling'
+              ? 0.22
+              : 0
 
     root.current.scale.setScalar(modelScale * voicePulse)
     root.current.position.set(
@@ -115,9 +138,12 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
 
     // A presence, not a turntable: once idle motion is enabled the maximum yaw
     // is only about five degrees. Pitch and roll are barely perceptible.
-    root.current.rotation.x = Math.sin(t * 0.31) * 0.010 * motionBlend
-    root.current.rotation.y = Math.sin(t * 0.24) * 0.085 * motionBlend
-    root.current.rotation.z = Math.sin(t * 0.19) * 0.006 * motionBlend
+    root.current.rotation.x =
+      Math.sin(t * 0.31) * 0.008 * motionBlend * poseMotion
+    root.current.rotation.y =
+      Math.sin(t * 0.24) * 0.055 * motionBlend * poseMotion
+    root.current.rotation.z =
+      Math.sin(t * 0.19) * 0.004 * motionBlend * poseMotion
 
     // Let L.U.M.I.A.'s own surfaces breathe with the same accent/audio energy
     // as the surrounding hologram.
@@ -134,7 +160,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
       <group
         position={[
           -prepared.center.x,
-          -prepared.center.y,
+          -prepared.center.y + prepared.height * OPTICAL_LIFT,
           -prepared.center.z,
         ]}
       >
