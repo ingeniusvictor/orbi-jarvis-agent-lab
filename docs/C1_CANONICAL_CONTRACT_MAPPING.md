@@ -217,14 +217,14 @@ voice-runtime projection to the current Companion provider.
 
 ### C1-A — Identity contract
 
-**IMPLEMENTED — runtime validation pending.**
+**CERTIFIED — smoke PASS, lint 0 errors, production build PASS.**
 
 Replace the hard-coded local provider identity text with the canonical LUMI
 identity composer while preserving the current voice-specific restrictions.
 
 ### C1-B — Conversation identity
 
-**IMPLEMENTED — runtime validation pending.**
+**CERTIFIED — smoke PASS, lint 0 errors, production build PASS.**
 
 Current implementation:
 
@@ -235,11 +235,15 @@ Current implementation:
 
 ### C1-C — Knowledge envelope
 
-Then:
+**IMPLEMENTED — local validation pending.**
 
-- port legacy bounded local knowledge behind the canonical KnowledgeContext;
-- expose provenance/source IDs;
-- keep current qwen3:4b provider.
+Current implementation:
+
+- deterministic bounded local search ported from legacy LUMI concepts;
+- max 3 context entries and max 1200 context characters;
+- explicit local-static provenance/source IDs;
+- current qwen3:4b/Ollama turns receive the bounded knowledge envelope;
+- grounded source IDs are returned in the bridge done frame.
 
 ### C1-D — Tool contract
 
@@ -282,3 +286,20 @@ npm run certify:c1
 ```
 
 This smoke test validates the canonical identity projection, conversation store, KnowledgeContext, ToolRequest/ToolResult, PermissionDecision and RuntimeState contracts. It does not replace lint/build/runtime voice testing.
+
+
+## Local validation record — 2026-09-15
+
+User workstation validation completed for C1-A/C1-B:
+
+- `npm run certify:c1` — PASS
+- `npm run lint` — 0 errors, 3 pre-existing warnings
+- `npm run build` — PASS (Vite bundle/chunk warnings only)
+
+C1-C should now be validated with:
+
+```bash
+npm run certify:c1:knowledge
+npm run lint
+npm run build
+```
