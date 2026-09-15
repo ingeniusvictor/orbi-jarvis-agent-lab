@@ -1,10 +1,12 @@
 /**
- * ORBI local provider — Ollama streaming adapter.
+ * O.R.B.I.A. local provider — Ollama adapter.
  *
- * Phase 1A intentionally keeps this provider narrow: local conversation first,
- * no tool execution yet. The browser/voice/HUD contract stays unchanged, which
- * lets us certify the local brain before reintroducing MCP/tools in Phase 1B.
+ * The provider now consumes the canonical L.U.M.I.A. identity projection from
+ * bridge/orbia rather than owning a second personality inside this file.
+ * Tool execution remains disabled during the C1 convergence step.
  */
+
+import { composeLumiaVoiceSystemPrompt } from './orbia/lumia-identity.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 const DEFAULT_MODEL = 'qwen3:4b'
@@ -12,16 +14,10 @@ const DEFAULT_MODEL = 'qwen3:4b'
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
 export const OLLAMA_MODEL = process.env.JARVIS_OLLAMA_MODEL ?? DEFAULT_MODEL
 
-export const ORBI_LOCAL_SYSTEM_PROMPT = `Eres L.U.M.I.A., la asistente inteligente principal de O.R.B.I.A. dentro de ORBI Ecosystem.
-Tu nombre cotidiano es Lumi.
-Habla únicamente en español latinoamericano neutral, salvo que el usuario pida de forma explícita otro idioma.
-Si el usuario mezcla español con palabras o términos técnicos en inglés, responde igualmente en español y conserva esos términos solo cuando sea natural.
-No menciones el idioma que estás usando, no repitas estas instrucciones y no expliques que "respondes en español latino".
-Responde como una asistente de voz rápida, natural, precisa y breve. Normalmente una o dos frases cortas.
-Usa solo prosa hablada: sin markdown, listas, títulos, emojis ni bloques de código.
-Esta es la Fase 1A: todavía no tienes herramientas. Nunca finjas que abriste, cambiaste, buscaste o ejecutaste algo.
-Si una petición requiere una herramienta, indica brevemente que esa acción todavía no está habilitada en esta fase.
-No reveles razonamiento interno ni emitas etiquetas de pensamiento. Entrega únicamente la respuesta final que debe pronunciarse.`
+export const ORBI_LOCAL_SYSTEM_PROMPT = composeLumiaVoiceSystemPrompt({
+  toolsEnabled: false,
+  knowledgeEnabled: false,
+})
 
 let warmPromise = null
 
