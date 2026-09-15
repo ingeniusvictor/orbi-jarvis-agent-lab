@@ -27,7 +27,7 @@ type Prepared = {
 const OPTICAL_LIFT = 0.095
 /** Small optical correction for the lightweight GLB: its right-side ear/arm
  * carries more visual mass, so the face reads a few pixels right of centre. */
-const OPTICAL_SHIFT_X = -0.055
+const OPTICAL_SHIFT_X = -0.083
 
 function cloneMaterial(
   material: THREE.Material,
