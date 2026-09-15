@@ -42,6 +42,83 @@ export const ORBI_LOCAL_SYSTEM_PROMPT = composeLumiaVoiceSystemPrompt({
   knowledgeEnabled: false,
 })
 
+function selectReadOnlyTool(prompt, conversationId, requestId) {
+  const text = String(prompt ?? '').trim().toLowerCase()
+
+  if (
+    text.includes('estado del sistema') ||
+    text.includes('estado de orbia') ||
+    text.includes('estado de lumia') ||
+    text.includes('qué modelo estás usando') ||
+    text.includes('que modelo estas usando') ||
+    text.includes('qué proveedor estás usando') ||
+    text.includes('que proveedor estas usando')
+  ) {
+    return createToolRequest({
+      id: requestId,
+      conversationId,
+      name: 'orbi_runtime_status',
+      input: {},
+    })
+  }
+
+  if (
+    text.includes('estado de la conversación') ||
+    text.includes('estado de la conversacion') ||
+    text.includes('cuántos mensajes llevamos') ||
+    text.includes('cuantos mensajes llevamos') ||
+    text.includes('cuántos turnos llevamos') ||
+    text.includes('cuantos turnos llevamos')
+  ) {
+    return createToolRequest({
+      id: requestId,
+      conversationId,
+      name: 'orbi_conversation_status',
+      input: {},
+    })
+  }
+
+  const knowledgePrefixes = [
+    'busca en el conocimiento ',
+    'consulta el conocimiento ',
+    'revisa el conocimiento ',
+  ]
+  const prefix = knowledgePrefixes.find((value) => text.startsWith(value))
+  if (prefix) {
+    const query = String(prompt).slice(prefix.length).trim()
+    if (query) {
+      return createToolRequest({
+        id: requestId,
+        conversationId,
+        name: 'orbi_knowledge_search',
+        input: { query },
+      })
+    }
+  }
+
+  return null
+}
+
+function toolResultToPrompt(execution) {
+  if (!execution?.result) return ''
+  if (!execution.result.ok) {
+    return [
+      'RESULTADO DE HERRAMIENTA O.R.B.I.A.:',
+      `herramienta=${execution.result.name}`,
+      `estado=ERROR`,
+      `codigo=${execution.result.errorCode ?? 'TOOL_FAILED'}`,
+      'Explica el fallo brevemente y no inventes un resultado.',
+    ].join('\n')
+  }
+
+  return [
+    'RESULTADO DE HERRAMIENTA O.R.B.I.A. (SOLO LECTURA):',
+    `herramienta=${execution.result.name}`,
+    `valor=${execution.result.value ?? ''}`,
+    'Usa este resultado como fuente de verdad para responder esta pregunta.',
+  ].join('\n')
+}
+
 let warmPromise = null
 
 export function warmOllama() {
