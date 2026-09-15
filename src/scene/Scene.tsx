@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { Component, Suspense, useMemo, type ReactNode } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import {
   EffectComposer,
@@ -105,6 +105,25 @@ function aim(tint: Tint, css: string): THREE.Color {
   return tint.color
 }
 
+class AvatarErrorBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('[lumia] avatar failed to load; continuing without GLB', error)
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children
+  }
+}
+
 const STYLE_INDEX = { ring: 0, sphere: 1, wire: 2 } as const
 
 function Rig() {
@@ -187,7 +206,11 @@ function Rig() {
   return (
     <>
       <Core drive={drive} />
-      <LumiaAvatar drive={drive} />
+      <AvatarErrorBoundary>
+        <Suspense fallback={null}>
+          <LumiaAvatar drive={drive} />
+        </Suspense>
+      </AvatarErrorBoundary>
       <Particles drive={drive} />
       <Orbits />
 
