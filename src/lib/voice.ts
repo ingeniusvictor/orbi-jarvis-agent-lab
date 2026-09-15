@@ -267,7 +267,7 @@ const norm = (s: string) =>
  * would be the single most infuriating failure this file could have.
  */
 const OVERRIDE =
-  /\b(stop|wait|jarvis|cancel|enough|quiet|hold on|shut up|never ?mind|forget it|no|para|espera|cancela|basta|silencio|calla|olvida|déjalo|dejalo)\b/i
+  /^(?:(?:lumi|lumia|jarvis)[\s,.:;!?-]+)?(?:stop|wait|cancel|enough|quiet|hold on|shut up|never ?mind|forget it|no|para|espera|cancela|basta|silencio|calla|olvida|déjalo|dejalo)(?:\s+por favor)?[\s,.!?]*$/i
 
 /**
  * Words too common to be evidence of anything.
