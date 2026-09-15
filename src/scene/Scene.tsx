@@ -12,6 +12,7 @@ import * as THREE from 'three'
 import { Core } from './Core'
 import { Particles } from './Particles'
 import { Orbits } from './Orbits'
+import { LumiaAvatar } from './LumiaAvatar'
 import { useStore, phaseColor, accentFor, type Phase } from '../store'
 
 /** Rings spin harder while JARVIS is working — reads as effort. */
@@ -186,8 +187,15 @@ function Rig() {
   return (
     <>
       <Core drive={drive} />
+      <LumiaAvatar drive={drive} />
       <Particles drive={drive} />
       <Orbits />
+
+      {/* The original reactor shaders ignore lights, so these affect only the
+          GLB avatar and leave the holographic ring visually unchanged. */}
+      <ambientLight intensity={1.15} />
+      <directionalLight position={[3, 4, 5]} intensity={1.6} color="#e8ffff" />
+      <pointLight position={[-2.2, 0.8, 3]} intensity={5.5} distance={8} color="#19c4c4" />
     </>
   )
 }
