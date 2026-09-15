@@ -123,7 +123,7 @@ function afterWake(text: string): string {
  * last word of a real request.
  */
 const CONTINUES =
-  /\b(and|or|but|so|because|since|if|when|while|that|which|who|whose|to|of|in|on|at|by|for|with|from|about|into|onto|over|under|between|through|the|a|an|my|your|his|her|its|our|their|is|are|was|were|be|been|do|does|did|have|has|had|can|could|would|should|will|shall|might|must|like|than|then|as|very|really|just|some|any|all|both|either|neither)$/i
+  /\b(and|or|but|so|because|since|if|when|while|that|which|who|whose|to|of|in|on|at|by|for|with|from|about|into|onto|over|under|between|through|the|a|an|my|your|his|her|its|our|their|is|are|was|were|be|been|do|does|did|have|has|had|can|could|would|should|will|shall|might|must|like|than|then|as|very|really|just|some|any|all|both|either|neither|y|o|pero|porque|si|cuando|mientras|que|cual|quien|de|del|en|por|para|con|desde|sobre|entre|hacia|el|la|los|las|un|una|unos|unas|mi|mis|tu|tus|su|sus|nuestro|nuestra|es|son|era|eran|ser|estar|está|estan|están|puede|puedo|podría|podria|quiero|como|más|mas|muy|algo|algún|alguna|todo|ambos)$/i
 
 /** Trailing punctuation a transcriber emits mid-thought. */
 const TRAILS = /[,;:–—-]$/
@@ -257,7 +257,7 @@ function makeAssembler(h: {
 const norm = (s: string) =>
   s
     .toLowerCase()
-    .replace(/[^a-z0-9' ]+/g, ' ')
+    .replace(/[^\p{L}\p{N}' ]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 
@@ -284,7 +284,14 @@ const STOP = new Set(
     'our their what which who how why when where do does did can could would ' +
     'should will shall not no yes if then than as about into over under out up ' +
     'down one two three first second third now here there just very really got ' +
-    'get have has had say said tell me okay ok well right').split(' '),
+    'get have has had say said tell me okay ok well right ' +
+    'el la los las un una unos unas y o pero de del a en por para con desde es son ' +
+    'era eran ser estar está estan están esto esta ese esa esos esas yo tú tu usted ' +
+    'él ella nosotros ustedes ellos ellas me te se mi mis su sus nuestro nuestra ' +
+    'qué que cuál cual quién quien cómo como porqué porque cuándo cuando dónde donde ' +
+    'puedo puede puedes podría podria debería deberia quiero quieres no sí si entonces ' +
+    'más mas muy algo todo uno dos tres primero segundo tercero ahora aquí aqui allí ' +
+    'solo sólo ya bien vale').split(' '),
 )
 
 /**
