@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import {
   isNonSpeechTranscript,
+  isRapidDuplicateTranscript,
   shouldDropStaleVoiceSegment,
   shouldInterruptBusyAssistant,
   transcriptSegmentIsStillActive,
+  voiceModeForPhase,
 } from '../src/lib/voice-focus'
 
 assert.equal(
@@ -100,3 +102,38 @@ assert.equal(isNonSpeechTranscript('O.R.B.I.A.'), false)
 
 console.log('Non-speech annotation filter: PASS')
 console.log('Music/silence/noise annotations remain visible but never become commands.')
+
+
+assert.equal(voiceModeForPhase('dormant'), 'wake')
+assert.equal(voiceModeForPhase('waking'), 'guard')
+assert.equal(voiceModeForPhase('listening'), 'command')
+assert.equal(voiceModeForPhase('speaking'), 'guard')
+
+assert.equal(
+  isRapidDuplicateTranscript(
+    '¿Puedes explicarme qué es un MPPT?',
+    'Puedes explicarme que es un MPPT.',
+    900,
+  ),
+  true,
+)
+assert.equal(
+  isRapidDuplicateTranscript(
+    '¿Puedes explicarme qué es un MPPT?',
+    'Puedes explicarme que es un MPPT.',
+    4000,
+  ),
+  false,
+)
+assert.equal(
+  isRapidDuplicateTranscript(
+    'Lumi',
+    'Lumi, para',
+    500,
+  ),
+  false,
+)
+
+console.log('Wake acknowledgement isolation: PASS')
+console.log('WAKING maps to GUARD, so L.U.M.I.A. cannot submit "¡Aquí!" as a user command.')
+console.log('Rapid exact STT duplicate suppression: PASS')
