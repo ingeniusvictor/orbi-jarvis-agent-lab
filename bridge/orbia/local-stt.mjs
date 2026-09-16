@@ -15,6 +15,7 @@ import {
   normalizeTechnicalSpeechText,
   ORBI_SPEECH_INITIAL_PROMPT,
 } from './speech-vocabulary.mjs'
+import { transcribeWithWhisperServer } from './whisper-server-runtime.mjs'
 
 const runFile = promisify(execFile)
 
@@ -66,6 +67,29 @@ export async function transcribeLocalWav(
   const readiness = probeLocalVoiceCapabilities({ env })
   if (!readiness.stt.localAvailable) {
     fail('VOICE_STT_UNAVAILABLE', 'Local Whisper runtime or model is unavailable.')
+  }
+
+  const persistent = await transcribeWithWhisperServer(bytes, {
+    env,
+    timeoutMs,
+    initialPrompt,
+  }).catch(() => null)
+
+  if (persistent?.text) {
+    const text = normalizeTechnicalSpeechText(persistent.text)
+    if (!text) {
+      fail('VOICE_STT_EMPTY_RESULT', 'Local Whisper produced an empty transcription.')
+    }
+    if (text.length > MAX_LOCAL_TRANSCRIPTION_CHARS) {
+      fail('VOICE_STT_FAILED', 'Local Whisper transcription exceeds the allowed size.')
+    }
+
+    return Object.freeze({
+      text,
+      language: 'es',
+      provider: persistent.provider,
+      latencyMs: persistent.latencyMs,
+    })
   }
 
   const { whisperCommand, whisperModel } = localVoicePaths(env)
@@ -133,7 +157,7 @@ export async function transcribeLocalWav(
     return Object.freeze({
       text,
       language: 'es',
-      provider: 'whisper-cpp-local',
+      provider: 'whisper-cli-local',
     })
   } finally {
     await rm(directory, { recursive: true, force: true })
