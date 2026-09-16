@@ -52,7 +52,7 @@ Child:             "...speech overlaps here..."
 If Whisper itself returns one mixed transcript, turn isolation cannot determine
 which words belonged to which person.
 
-## VF-01 — Household Focus interruption policy — NEXT AFTER VF-00 TEST
+## VF-01 — Household Focus interruption policy — IMPLEMENTED FOR LOCAL WHISPER
 
 Add a selectable policy:
 
@@ -148,3 +148,22 @@ Expected:
 ```bash
 npm run certify:voice-focus
 ```
+
+
+### Live household test finding
+
+The split HUD confirmed that GUARD speech from nearby people was being
+transcribed correctly into the raw ESCUCHANDO lane, but the VAD path still
+interrupted L.U.M.I.A. before the transcript could be classified.
+
+VF-01 now changes the local-Whisper guard behavior:
+
+- busy-time speech is still transcribed and shown in ESCUCHANDO;
+- it does not interrupt or become a command by default;
+- an explicit "Lumi ..." wake address or interrupt phrase remains valid;
+- a bare "Lumi" / "para" stops the answer and opens a bounded follow-up window;
+- the diagnostics panel counts `householdIgnored` events.
+
+This directly targets household speech from another adult, a child or ambient
+television without pretending that speaker identification has already been
+solved.
