@@ -113,3 +113,31 @@ export function voiceModeForPhase(
   if (phase === 'listening') return 'command'
   return 'guard'
 }
+
+
+function transcriptFingerprint(value: string): string {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Local VAD/Whisper can occasionally return the same short segment twice.
+ * Suppress only exact normalized duplicates inside a tight time window.
+ */
+export function isRapidDuplicateTranscript(
+  previous: string,
+  current: string,
+  elapsedMs: number,
+  windowMs = 2500,
+): boolean {
+  if (elapsedMs < 0 || elapsedMs > windowMs) return false
+  const a = transcriptFingerprint(previous)
+  const b = transcriptFingerprint(current)
+  return Boolean(a && b && a === b)
+}
