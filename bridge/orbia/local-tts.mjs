@@ -117,9 +117,7 @@ export async function synthesizeLocalSpeech(
         reject(
           new LocalTextToSpeechError(
             errorCode,
-            stderr.trim()
-              ? 'Local Kokoro synthesis failed.'
-              : 'Local Kokoro synthesis failed.',
+            'Local Kokoro synthesis failed.',
           ),
         )
       })
