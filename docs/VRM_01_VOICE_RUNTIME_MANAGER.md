@@ -1,5 +1,26 @@
 # VRM-01 — O.R.B.I.A. Voice Runtime Manager
 
+## Status
+
+**VRM-01A/B/C IMPLEMENTED — LOCAL WORKSTATION CERTIFICATION PENDING**
+
+Implemented on the convergence branch:
+
+- provider-neutral STT/TTS runtime state;
+- browser/local/auto voice modes;
+- independent STT and TTS selection;
+- Voice Profile Registry with owner/consent metadata;
+- deterministic spoken voice controls intercepted before the local LLM;
+- live WebSocket runtime updates without page reload;
+- selectable local Whisper STT path with browser fallback;
+- selectable local Kokoro TTS path with system fallback;
+- local runtime readiness exposed through bridge health and diagnostics;
+- `npm run voice:doctor` for installed-runtime inspection.
+
+The local Whisper/Kokoro binaries and weights remain machine-local under
+`.local-runtime/` and are not committed. End-to-end audio quality/latency is
+therefore not certified until the workstation runtime is installed and tested.
+
 ## Goal
 
 L.U.M.I.A. must not be tied to one speech engine or one speaking voice.
@@ -159,9 +180,9 @@ Other-PC
   voiceProfile = lumia-system
 ```
 
-## Planned implementation
+## Implementation blocks
 
-### VRM-01A — contracts and registry
+### VRM-01A — contracts and registry — IMPLEMENTED
 
 - provider-neutral STT mode;
 - provider-neutral TTS mode;
@@ -169,7 +190,7 @@ Other-PC
 - current active selection;
 - runtime status.
 
-### VRM-01B — spoken controls
+### VRM-01B — spoken controls — IMPLEMENTED
 
 - list available STT/TTS modes;
 - switch STT mode;
@@ -177,13 +198,13 @@ Other-PC
 - list voice profiles;
 - switch voice profile.
 
-### VRM-01C — C1-E integration
+### VRM-01C — C1-E integration — IMPLEMENTED, CERTIFICATION PENDING
 
 - Whisper.cpp becomes a selectable STT provider;
 - Kokoro becomes a selectable TTS provider;
 - existing browser/system path remains available.
 
-### VRM-01D — custom voice providers
+### VRM-01D — custom voice providers — DEFERRED
 
 - add custom/local cloned-voice adapter when a certified engine is chosen;
 - keep owner/consent metadata in the profile;
@@ -194,3 +215,16 @@ Other-PC
 Changing the speech engine or voice profile never changes L.U.M.I.A.'s identity,
 memory, knowledge, tools or permissions. It only changes how she hears and/or
 sounds.
+
+## Certification commands
+
+```bash
+npm run certify:voice
+npm run lint
+npm run build
+npm run voice:doctor
+```
+
+The certification scripts verify contracts and fallback routing. A PASS does not
+by itself certify real Whisper/Kokoro audio; that requires the local runtime
+assets and a manual Companion voice test.
