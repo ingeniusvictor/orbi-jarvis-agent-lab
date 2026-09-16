@@ -30,6 +30,17 @@ export function localVoicePaths(
     ) ||
     resolve(root, '.local-runtime', 'whisper.cpp', 'bin', 'Release', 'whisper-cli.exe')
 
+  const whisperServerCommand =
+    env.ORBI_LOCAL_STT_SERVER_COMMAND?.trim() ||
+    firstExisting(
+      [
+        resolve(root, '.local-runtime', 'whisper.cpp', 'bin', 'Release', 'whisper-server.exe'),
+        resolve(root, '.local-runtime', 'whisper.cpp', 'build', 'bin', 'Release', 'whisper-server.exe'),
+      ],
+      exists,
+    ) ||
+    resolve(root, '.local-runtime', 'whisper.cpp', 'bin', 'Release', 'whisper-server.exe')
+
   const whisperModel =
     env.ORBI_LOCAL_STT_MODEL?.trim() ||
     firstExisting(
@@ -57,6 +68,7 @@ export function localVoicePaths(
 
   return Object.freeze({
     whisperCommand,
+    whisperServerCommand,
     whisperModel,
     kokoroPython,
     kokoroScript,
@@ -74,8 +86,10 @@ export function probeLocalVoiceCapabilities({
   const whisper = Object.freeze({
     provider: 'whisper-cpp-local',
     commandReady: exists(paths.whisperCommand),
+    serverReady: exists(paths.whisperServerCommand),
     modelReady: exists(paths.whisperModel),
     command: paths.whisperCommand,
+    serverCommand: paths.whisperServerCommand,
     model: paths.whisperModel,
   })
 
