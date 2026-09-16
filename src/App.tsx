@@ -345,6 +345,7 @@ export default function App() {
       text: event.text,
       provider: event.provider,
       kind: event.kind,
+      wakeMatched: event.wakeMatched,
       mode: event.capturedMode,
       at: event.at,
     })
