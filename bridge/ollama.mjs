@@ -413,6 +413,8 @@ export async function streamOllama({
     throw new Error('Ollama no entregó una respuesta final válida en español.')
   }
 
+  text = sanitizeLumiaVoiceOutput(text)
+
   onText(text)
   return text
 }
