@@ -18,6 +18,16 @@ const statusText: Record<Phase, string> = {
   speaking: 'RESPONDIENDO',
 }
 
+function heardLaneLabel(
+  kind: 'speech' | 'self-echo',
+  mode: Phase | 'wake' | 'command' | 'guard' | 'deaf',
+): string {
+  if (kind === 'self-echo') return 'ECO LUMI'
+  if (mode === 'guard') return 'GUARD'
+  if (mode === 'deaf') return 'BLOQUEADO'
+  return 'TURNO'
+}
+
 function Corner({ at }: { at: 'tl' | 'tr' | 'bl' | 'br' }) {
   return <div className={`corner corner-${at}`} />
 }
@@ -291,7 +301,7 @@ export function Hud() {
                   exit={{ opacity: 0 }}
                 >
                   <span className="voice-line-mode">
-                    {line.kind === 'self-echo' ? 'ECO LUMI' : line.mode}
+                    {heardLaneLabel(line.kind, line.mode)}
                   </span>
                   <span className="voice-line-text">{line.text}</span>
                 </motion.div>
