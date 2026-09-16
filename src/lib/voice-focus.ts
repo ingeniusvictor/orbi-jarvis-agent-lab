@@ -87,3 +87,29 @@ export function isNonSpeechTranscript(text: string): boolean {
     value,
   )
 }
+
+
+/**
+ * Canonical UI-phase -> voice-mode mapping.
+ *
+ * A bare wake word puts the UI in "waking" while L.U.M.I.A. says her short
+ * acknowledgement. That phase must be GUARD, not COMMAND, otherwise the laptop
+ * microphone can transcribe "¡Aquí!" and submit L.U.M.I.A.'s own greeting as
+ * the next user request.
+ */
+export function voiceModeForPhase(
+  phase:
+    | 'offline'
+    | 'boot'
+    | 'dormant'
+    | 'waking'
+    | 'listening'
+    | 'thinking'
+    | 'tooling'
+    | 'speaking',
+): FocusVoiceMode {
+  if (phase === 'offline' || phase === 'boot') return 'deaf'
+  if (phase === 'dormant') return 'wake'
+  if (phase === 'listening') return 'command'
+  return 'guard'
+}
