@@ -35,6 +35,9 @@ type VoiceDiag = {
   speakerShield: boolean
   nonSpeech: number
   duplicates: number
+  queueDepth: number
+  maxQueueDepth: number
+  queueDrops: number
   idleMs: number
 }
 
@@ -124,6 +127,9 @@ export function Diagnostics() {
       <Row k="speaker shield" v={v.speakerShield ? 'ACTIVE' : 'standby'} />
       <Row k="non-speech ignored" v={String(v.nonSpeech ?? 0)} />
       <Row k="duplicate STT" v={String(v.duplicates ?? 0)} />
+      <Row k="STT queue" v={`${v.queueDepth ?? 0} (max ${v.maxQueueDepth ?? 0})`} bad={(v.queueDepth ?? 0) > 2} />
+      <Row k="queue drops" v={String(v.queueDrops ?? 0)} />
+      <Row k="STT latency" v={`${v.idleMs ?? 0} ms`} bad={(v.idleMs ?? 0) > 5000} />
       <Row k="mode" v={`${v.mode ?? '—'} (phase ${phase})`} />
       <Row k="accepted" v={String(v.accepted ?? 0)} bad={(v.accepted ?? 0) === 0} />
       <Row k="wakes" v={String(v.wakes ?? 0)} />
