@@ -28,11 +28,7 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
-import { probeLocalVoiceCapabilities } from './orbia/local-voice-probe.mjs'
-import {
-  getVoiceRuntimeState,
-  resolveVoiceRuntime,
-} from './orbia/voice-runtime.mjs'
+import { buildVoiceRuntimeStatus } from './orbia/voice-status.mjs'
 import {
   LocalSpeechToTextError,
   transcribeLocalWav,
@@ -706,13 +702,7 @@ const handleRequest = async (req, res) => {
     // Preserve the legacy booleans consumed by the current browser voice path,
     // while also exposing the provider-neutral VRM/C1-E readiness envelope.
     const eleven = Boolean(elevenKey())
-    const localVoice = probeLocalVoiceCapabilities()
-    const runtime = resolveVoiceRuntime({
-      localSttAvailable: localVoice.stt.localAvailable,
-      browserSttAvailable: true,
-      localTtsAvailable: localVoice.tts.localAvailable,
-      systemTtsAvailable: true,
-    })
+    const voice = buildVoiceRuntimeStatus()
 
     res.writeHead(200, { ...cors, 'content-type': 'application/json' })
     return res.end(
@@ -721,24 +711,7 @@ const handleRequest = async (req, res) => {
         tts: eleven,
         stt: eleven,
         voice: {
-          requested: getVoiceRuntimeState(),
-          effective: runtime,
-          local: {
-            sttAvailable: localVoice.stt.localAvailable,
-            ttsAvailable: localVoice.tts.localAvailable,
-            whisper: {
-              provider: localVoice.stt.whisper.provider,
-              commandReady: localVoice.stt.whisper.commandReady,
-              modelReady: localVoice.stt.whisper.modelReady,
-            },
-            kokoro: {
-              provider: localVoice.tts.kokoro.provider,
-              pythonReady: localVoice.tts.kokoro.pythonReady,
-              scriptReady: localVoice.tts.kokoro.scriptReady,
-              modelReady: localVoice.tts.kokoro.modelReady,
-              voicesReady: localVoice.tts.kokoro.voicesReady,
-            },
-          },
+          ...voice,
           elevenlabs: {
             available: eleven,
           },
@@ -1193,21 +1166,15 @@ console.log(
   `${CONSOLE_TAG} speech ${elevenKey() ? 'via ElevenLabs (key from MCP config)' : 'using browser fallback voice'}`,
 )
 console.log(`${CONSOLE_TAG} provider ${PROVIDER}`)
-const localVoiceAtBoot = probeLocalVoiceCapabilities()
-const voiceRuntimeAtBoot = resolveVoiceRuntime({
-  localSttAvailable: localVoiceAtBoot.stt.localAvailable,
-  browserSttAvailable: true,
-  localTtsAvailable: localVoiceAtBoot.tts.localAvailable,
-  systemTtsAvailable: true,
-})
+const voiceRuntimeAtBoot = buildVoiceRuntimeStatus()
 console.log(
-  `${CONSOLE_TAG} voice runtime STT ${voiceRuntimeAtBoot.sttMode}->${voiceRuntimeAtBoot.effectiveStt}` +
-    ` · TTS ${voiceRuntimeAtBoot.ttsMode}->${voiceRuntimeAtBoot.effectiveTts}` +
-    ` · profile ${voiceRuntimeAtBoot.voiceProfile}`,
+  `${CONSOLE_TAG} voice runtime STT ${voiceRuntimeAtBoot.requested.sttMode}->${voiceRuntimeAtBoot.effective.effectiveStt}` +
+    ` · TTS ${voiceRuntimeAtBoot.requested.ttsMode}->${voiceRuntimeAtBoot.effective.effectiveTts}` +
+    ` · profile ${voiceRuntimeAtBoot.requested.voiceProfile}`,
 )
 console.log(
-  `${CONSOLE_TAG} local voice Whisper ${localVoiceAtBoot.stt.localAvailable ? 'ready' : 'not ready'}` +
-    ` · Kokoro ${localVoiceAtBoot.tts.localAvailable ? 'ready' : 'not ready'}`,
+  `${CONSOLE_TAG} local voice Whisper ${voiceRuntimeAtBoot.local.sttAvailable ? 'ready' : 'not ready'}` +
+    ` · Kokoro ${voiceRuntimeAtBoot.local.ttsAvailable ? 'ready' : 'not ready'}`,
 )
 if (PROVIDER === 'ollama') {
   console.log(`${CONSOLE_TAG} local model ${OLLAMA_MODEL} · ${OLLAMA_URL}`)
