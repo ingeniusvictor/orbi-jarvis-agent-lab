@@ -28,6 +28,11 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { probeUrl, renderPage } from './page.mjs'
+import { probeLocalVoiceCapabilities } from './orbia/local-voice-probe.mjs'
+import {
+  getVoiceRuntimeState,
+  resolveVoiceRuntime,
+} from './orbia/voice-runtime.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
 
@@ -690,14 +695,48 @@ const handleRequest = async (req, res) => {
   }
 
   if (req.method === 'GET' && req.url === '/health') {
-    // The browser reads this once at boot to decide which voice engine to use.
-    // Both premium paths ride the same ElevenLabs key, so both flags track it:
-    // with a key the app transcribes with Scribe and speaks with ElevenLabs;
-    // without one it falls back to the browser's own recogniser and voice, so a
-    // student with nothing configured still has a working assistant.
+    // Preserve the legacy booleans consumed by the current browser voice path,
+    // while also exposing the provider-neutral VRM/C1-E readiness envelope.
     const eleven = Boolean(elevenKey())
+    const localVoice = probeLocalVoiceCapabilities()
+    const runtime = resolveVoiceRuntime({
+      localSttAvailable: localVoice.stt.localAvailable,
+      browserSttAvailable: true,
+      localTtsAvailable: localVoice.tts.localAvailable,
+      systemTtsAvailable: true,
+    })
+
     res.writeHead(200, { ...cors, 'content-type': 'application/json' })
-    return res.end(JSON.stringify({ ok: true, tts: eleven, stt: eleven }))
+    return res.end(
+      JSON.stringify({
+        ok: true,
+        tts: eleven,
+        stt: eleven,
+        voice: {
+          requested: getVoiceRuntimeState(),
+          effective: runtime,
+          local: {
+            sttAvailable: localVoice.stt.localAvailable,
+            ttsAvailable: localVoice.tts.localAvailable,
+            whisper: {
+              provider: localVoice.stt.whisper.provider,
+              commandReady: localVoice.stt.whisper.commandReady,
+              modelReady: localVoice.stt.whisper.modelReady,
+            },
+            kokoro: {
+              provider: localVoice.tts.kokoro.provider,
+              pythonReady: localVoice.tts.kokoro.pythonReady,
+              scriptReady: localVoice.tts.kokoro.scriptReady,
+              modelReady: localVoice.tts.kokoro.modelReady,
+              voicesReady: localVoice.tts.kokoro.voicesReady,
+            },
+          },
+          elevenlabs: {
+            available: eleven,
+          },
+        },
+      }),
+    )
   }
 
   // Serve local image files to the page. Screenshots and generated art land on
@@ -1018,6 +1057,22 @@ console.log(
   `${CONSOLE_TAG} speech ${elevenKey() ? 'via ElevenLabs (key from MCP config)' : 'using browser fallback voice'}`,
 )
 console.log(`${CONSOLE_TAG} provider ${PROVIDER}`)
+const localVoiceAtBoot = probeLocalVoiceCapabilities()
+const voiceRuntimeAtBoot = resolveVoiceRuntime({
+  localSttAvailable: localVoiceAtBoot.stt.localAvailable,
+  browserSttAvailable: true,
+  localTtsAvailable: localVoiceAtBoot.tts.localAvailable,
+  systemTtsAvailable: true,
+})
+console.log(
+  `${CONSOLE_TAG} voice runtime STT ${voiceRuntimeAtBoot.sttMode}->${voiceRuntimeAtBoot.effectiveStt}` +
+    ` · TTS ${voiceRuntimeAtBoot.ttsMode}->${voiceRuntimeAtBoot.effectiveTts}` +
+    ` · profile ${voiceRuntimeAtBoot.voiceProfile}`,
+)
+console.log(
+  `${CONSOLE_TAG} local voice Whisper ${localVoiceAtBoot.stt.localAvailable ? 'ready' : 'not ready'}` +
+    ` · Kokoro ${localVoiceAtBoot.tts.localAvailable ? 'ready' : 'not ready'}`,
+)
 if (PROVIDER === 'ollama') {
   console.log(`${CONSOLE_TAG} local model ${OLLAMA_MODEL} · ${OLLAMA_URL}`)
   void probeOllama().then(({ ok, models }) => {
