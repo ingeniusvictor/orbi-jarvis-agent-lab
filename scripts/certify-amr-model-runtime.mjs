@@ -35,10 +35,22 @@ assert.equal(
 )
 assert.equal(
   resolveModelRequest('qeen 4b', installed),
-  'qwen3:4b',
+  'orbia-lumia:4b',
 )
 assert.equal(
   resolveModelRequest('queen 3 4 b', installed),
+  'qwen3:4b',
+)
+assert.equal(
+  resolveModelRequest('qwen 4b', installed),
+  'orbia-lumia:4b',
+)
+assert.equal(
+  resolveModelRequest('orbi qwen 4b', installed),
+  'orbia-lumia:4b',
+)
+assert.equal(
+  resolveModelRequest('qwen3 4b original', installed),
   'qwen3:4b',
 )
 assert.equal(
