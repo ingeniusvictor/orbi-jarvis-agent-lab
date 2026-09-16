@@ -1,5 +1,25 @@
 # C1-E — Local Voice Convergence Plan
 
+## Status
+
+**C1-E1 THROUGH C1-E4 IMPLEMENTED — C1-E5 LOCAL AUDIO CERTIFICATION PENDING**
+
+Current implementation includes:
+
+- local Whisper/Kokoro asset probe;
+- bounded Whisper.cpp adapter and `/stt/local` bridge route;
+- browser-side conversion of captured segments to mono 16 kHz PCM WAV;
+- reuse of the existing VAD, long-utterance assembler and barge-in path;
+- bounded Kokoro adapter and `/tts/local` bridge route;
+- runtime browser/local switching through VRM;
+- technical STT vocabulary hints including Qwen, Ollama, O.R.B.I.A. and L.U.M.I.A.;
+- deterministic fallback to browser/system voice when local runtimes are absent;
+- runtime diagnostics and `npm run voice:doctor`.
+
+No claim is made yet that Whisper/Kokoro audio is working on the user's current
+machine. The binaries, Python environment and model weights are intentionally
+local-only and must be installed/verified before C1-E5 can be closed.
+
 ## Why this is next
 
 The Companion runtime is now stable enough to move beyond browser-dependent
@@ -76,33 +96,33 @@ L.U.M.I.A. holographic output
 
 ## Planned implementation order
 
-### C1-E1 — Local STT capability probe
+### C1-E1 — Local STT capability probe — IMPLEMENTED
 
 - detect whether the Whisper.cpp executable exists;
 - detect configured local model path;
 - report readiness through the bridge;
 - do not change the active voice path yet.
 
-### C1-E2 — Local STT adapter
+### C1-E2 — Local STT adapter — IMPLEMENTED
 
 - port the bounded legacy LocalSpeechToTextProvider concepts;
 - expose a bridge-local transcription route;
 - retain current browser SpeechRecognition as fallback.
 
-### C1-E3 — Companion integration
+### C1-E3 — Companion integration — IMPLEMENTED
 
 - route captured audio through local STT when available;
 - keep current turn assembly;
 - preserve wake/listen/guard behavior;
 - compare latency and transcription quality against browser recognition.
 
-### C1-E4 — Local TTS convergence
+### C1-E4 — Local TTS convergence — IMPLEMENTED
 
 - Kokoro local primary where performance is acceptable;
 - SAPI local fallback;
 - browser TTS remains controlled fallback during transition.
 
-### C1-E5 — Certification
+### C1-E5 — Certification — PENDING
 
 Validate:
 
@@ -130,3 +150,18 @@ Return to Adaptive Model Runtime:
 
 This will allow the same L.U.M.I.A. build to recommend lighter models on modest
 computers and larger models on machines with dedicated GPUs and more memory.
+
+## Current certification gate
+
+Run on the target workstation:
+
+```bash
+npm run certify:voice
+npm run lint
+npm run build
+npm run voice:doctor
+```
+
+After local runtimes are ready, manually validate browser mode, local mode,
+independent STT/TTS switching, long Spanish dictation, Qwen/Ollama terminology,
+barge-in, repeated turns and fallback behaviour.
