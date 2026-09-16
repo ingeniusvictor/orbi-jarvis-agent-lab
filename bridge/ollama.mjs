@@ -25,6 +25,11 @@ import {
   resolveModelRequest,
   setActiveModel,
 } from './orbia/model-manager.mjs'
+import { probeLocalVoiceCapabilities } from './orbia/local-voice-probe.mjs'
+import {
+  getVoiceRuntimeState,
+  resolveVoiceRuntime,
+} from './orbia/voice-runtime.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
@@ -36,10 +41,29 @@ export const OLLAMA_VOICE_NUM_PREDICT = Math.max(
   Math.min(180, Number(process.env.JARVIS_OLLAMA_NUM_PREDICT) || 120),
 )
 
+function getVoiceRuntimeSnapshot() {
+  const localVoice = probeLocalVoiceCapabilities()
+  return {
+    status: 'READY',
+    requested: getVoiceRuntimeState(),
+    effective: resolveVoiceRuntime({
+      localSttAvailable: localVoice.stt.localAvailable,
+      browserSttAvailable: true,
+      localTtsAvailable: localVoice.tts.localAvailable,
+      systemTtsAvailable: true,
+    }),
+    local: {
+      whisperReady: localVoice.stt.localAvailable,
+      kokoroReady: localVoice.tts.localAvailable,
+    },
+  }
+}
+
 const localToolRegistry = new ToolRegistry()
 for (const tool of createReadOnlyDiagnosticTools({
   provider: 'ollama',
   getModel: getActiveModel,
+  getVoiceRuntime: getVoiceRuntimeSnapshot,
 })) {
   localToolRegistry.register(tool)
 }
@@ -85,6 +109,22 @@ export function selectReadOnlyTool(prompt, conversationId, requestId) {
       id: requestId,
       conversationId,
       name: 'orbi_conversation_status',
+      input: {},
+    })
+  }
+
+  if (
+    text.includes('estado de la voz') ||
+    text.includes('estado del sistema de voz') ||
+    text.includes('qué modo de voz estás usando') ||
+    text.includes('que modo de voz estas usando') ||
+    text.includes('qué reconocimiento de voz estás usando') ||
+    text.includes('que reconocimiento de voz estas usando')
+  ) {
+    return createToolRequest({
+      id: requestId,
+      conversationId,
+      name: 'orbi_voice_runtime_status',
       input: {},
     })
   }
