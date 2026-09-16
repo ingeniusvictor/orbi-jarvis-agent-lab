@@ -167,3 +167,30 @@ VF-01 now changes the local-Whisper guard behavior:
 This directly targets household speech from another adult, a child or ambient
 television without pretending that speaker identification has already been
 solved.
+
+## VF-01A — L.U.M.I.A. self-echo rejection — IMPLEMENTED
+
+The split HUD exposed the primary false-speaker source directly: while
+L.U.M.I.A. spoke through the laptop speakers, local Whisper transcribed parts of
+that same answer in GUARD mode. Those fragments could look like another person
+and could keep the voice pipeline busy.
+
+The previous echo filter compared Whisper output only with the sentence being
+spoken at that exact moment plus a short 1.8 s tail. That is too narrow for
+local Whisper because decoding may finish several seconds later, after
+L.U.M.I.A. has already moved to another sentence.
+
+The current fix:
+
+- keeps a bounded 18 s rolling reference of recent L.U.M.I.A. TTS sentences;
+- uses that wider reference only for busy/guard audio;
+- uses a slightly stronger guard-time echo match;
+- classifies detected feedback as `self-echo`;
+- displays it in ESCUCHANDO as `ECO LUMI` for observability;
+- drops it before Household Focus, turn assembly, O.R.B.I.A. or the LLM;
+- counts `selfEchoes` in diagnostics.
+
+Browser acoustic echo cancellation remains enabled. The software reference
+filter is an additional layer because laptop loudspeaker leakage can survive
+browser AEC, especially when local Whisper decodes delayed audio.
+
