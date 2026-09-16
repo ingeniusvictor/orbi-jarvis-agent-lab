@@ -25,10 +25,13 @@ import {
   resolveModelRequest,
   setActiveModel,
 } from './orbia/model-manager.mjs'
-import { probeLocalVoiceCapabilities } from './orbia/local-voice-probe.mjs'
+import { buildVoiceRuntimeStatus } from './orbia/voice-status.mjs'
 import {
-  getVoiceRuntimeState,
-  resolveVoiceRuntime,
+  parseVoiceRuntimeControl,
+  resolveVoiceProfileRequest,
+  setSttMode,
+  setTtsMode,
+  setVoiceProfile,
 } from './orbia/voice-runtime.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
@@ -41,23 +44,7 @@ export const OLLAMA_VOICE_NUM_PREDICT = Math.max(
   Math.min(180, Number(process.env.JARVIS_OLLAMA_NUM_PREDICT) || 120),
 )
 
-function getVoiceRuntimeSnapshot() {
-  const localVoice = probeLocalVoiceCapabilities()
-  return {
-    status: 'READY',
-    requested: getVoiceRuntimeState(),
-    effective: resolveVoiceRuntime({
-      localSttAvailable: localVoice.stt.localAvailable,
-      browserSttAvailable: true,
-      localTtsAvailable: localVoice.tts.localAvailable,
-      systemTtsAvailable: true,
-    }),
-    local: {
-      whisperReady: localVoice.stt.localAvailable,
-      kokoroReady: localVoice.tts.localAvailable,
-    },
-  }
-}
+const getVoiceRuntimeSnapshot = () => buildVoiceRuntimeStatus()
 
 const localToolRegistry = new ToolRegistry()
 for (const tool of createReadOnlyDiagnosticTools({
@@ -161,6 +148,137 @@ function modelInventoryToSpeech(models) {
     .join(', ')
 
   return `Tengo disponibles ${names}.`
+}
+
+function voiceStatusToSpeech(status) {
+  const profile =
+    status?.activeProfile?.displayName ??
+    status?.requested?.voiceProfile ??
+    'voz predeterminada'
+  return (
+    `Reconocimiento ${status?.effective?.effectiveStt ?? 'desconocido'}. ` +
+    `Salida de voz ${status?.effective?.effectiveTts ?? 'desconocida'}. ` +
+    `Perfil ${profile}.`
+  )
+}
+
+export function applyVoiceRuntimeControl(control) {
+  const before = buildVoiceRuntimeStatus()
+
+  if (!control || typeof control !== 'object') {
+    return { changed: false, answer: 'No entendí el cambio de voz solicitado.', status: before }
+  }
+
+  if (control.action === 'status') {
+    return { changed: false, answer: voiceStatusToSpeech(before), status: before }
+  }
+
+  if (control.action === 'list_profiles') {
+    const profiles = before.profiles
+      .map((profile) =>
+        profile.enabled
+          ? profile.displayName
+          : `${profile.displayName}, no disponible`,
+      )
+      .join(', ')
+    return {
+      changed: false,
+      answer: profiles
+        ? `Tengo estos perfiles de voz: ${profiles}.`
+        : 'No encuentro perfiles de voz disponibles.',
+      status: before,
+    }
+  }
+
+  if (control.action === 'set_auto') {
+    setSttMode('auto')
+    setTtsMode('auto')
+    const status = buildVoiceRuntimeStatus()
+    return {
+      changed: true,
+      answer: `Modo de voz automático activado. ${voiceStatusToSpeech(status)}`,
+      status,
+    }
+  }
+
+  if (control.action === 'set_stt') {
+    if (control.mode === 'local' && !before.local.sttAvailable) {
+      return {
+        changed: false,
+        answer: 'Whisper local todavía no está preparado. Mantengo el reconocimiento actual.',
+        status: before,
+      }
+    }
+    setSttMode(control.mode)
+    const status = buildVoiceRuntimeStatus()
+    return {
+      changed: true,
+      answer:
+        control.mode === 'local'
+          ? 'Listo. Ahora usaré reconocimiento local con Whisper.'
+          : 'Listo. Ahora usaré el reconocimiento del navegador.',
+      status,
+    }
+  }
+
+  if (control.action === 'set_tts') {
+    if (control.mode === 'local' && !before.local.ttsAvailable) {
+      return {
+        changed: false,
+        answer: 'Kokoro local todavía no está preparado. Mantengo la voz actual.',
+        status: before,
+      }
+    }
+    setTtsMode(control.mode)
+    if (control.mode === 'local') {
+      setVoiceProfile('lumia-kokoro')
+    } else if (control.mode === 'system') {
+      setVoiceProfile('lumia-system')
+    }
+    const status = buildVoiceRuntimeStatus()
+    return {
+      changed: true,
+      answer:
+        control.mode === 'local'
+          ? 'Listo. Ahora usaré la voz local de L.U.M.I.A.'
+          : 'Listo. Ahora usaré la voz del sistema.',
+      status,
+    }
+  }
+
+  if (control.action === 'set_profile') {
+    const profile = resolveVoiceProfileRequest(control.requested)
+    if (!profile) {
+      return {
+        changed: false,
+        answer: 'No encuentro un perfil de voz que coincida con esa solicitud.',
+        status: before,
+      }
+    }
+    if (!profile.enabled) {
+      return {
+        changed: false,
+        answer: `${profile.displayName} todavía no está disponible en este equipo.`,
+        status: before,
+      }
+    }
+
+    setVoiceProfile(profile.id)
+    if (profile.provider === 'system') setTtsMode('system')
+    if (profile.provider.includes('local')) setTtsMode('local')
+    const status = buildVoiceRuntimeStatus()
+    return {
+      changed: true,
+      answer: `Listo. Perfil de voz cambiado a ${profile.displayName}.`,
+      status,
+    }
+  }
+
+  return {
+    changed: false,
+    answer: 'No entendí el cambio de voz solicitado.',
+    status: before,
+  }
 }
 
 export function toolResultToPrompt(execution) {
