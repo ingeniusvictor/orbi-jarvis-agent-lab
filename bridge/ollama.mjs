@@ -201,6 +201,37 @@ export function applyVoiceRuntimeControl(control) {
     }
   }
 
+  if (control.action === 'set_mode') {
+    if (control.mode === 'local') {
+      setSttMode('local')
+      setTtsMode('local')
+      const status = buildVoiceRuntimeStatus()
+      if (status.local.ttsAvailable) setVoiceProfile('lumia-kokoro')
+      return {
+        changed: true,
+        answer:
+          'Modo local activado. ' +
+          (status.local.sttAvailable
+            ? 'Usaré Whisper para escucharte. '
+            : 'Whisper aún no está disponible y usaré el navegador como respaldo. ') +
+          (status.local.ttsAvailable
+            ? 'Usaré la voz local de L.U.M.I.A.'
+            : 'Kokoro aún no está disponible y usaré la voz del sistema como respaldo.'),
+        status: buildVoiceRuntimeStatus(),
+      }
+    }
+
+    setSttMode('browser')
+    setTtsMode('system')
+    setVoiceProfile('lumia-system')
+    const status = buildVoiceRuntimeStatus()
+    return {
+      changed: true,
+      answer: 'Modo navegador activado. Usaré reconocimiento del navegador y voz del sistema.',
+      status,
+    }
+  }
+
   if (control.action === 'set_stt') {
     if (control.mode === 'local' && !before.local.sttAvailable) {
       return {
