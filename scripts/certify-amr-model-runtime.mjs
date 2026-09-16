@@ -39,6 +39,22 @@ assert.deepEqual(
   { action: 'switch', requested: 'rápido' },
 )
 
+assert.deepEqual(
+  parseModelControl('Lumi, ¿qué modelo puedes usar?'),
+  { action: 'list' },
+)
+
+assert.deepEqual(
+  parseModelControl('Lumi, puedes cambiar a 1.7b'),
+  { action: 'switch', requested: '1.7b' },
+)
+
+assert.deepEqual(
+  parseModelControl('Lumi, cámbiate a qwen3:4b'),
+  { action: 'switch', requested: 'qwen3:4b' },
+)
+
+
 const before = getActiveModel()
 setActiveModel('qwen3:1.7b')
 
