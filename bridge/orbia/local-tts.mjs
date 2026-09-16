@@ -64,7 +64,6 @@ export async function synthesizeLocalSpeech(
       })
 
       let stdout = ''
-      let stderr = ''
       const timer = setTimeout(() => {
         child.kill()
         reject(
@@ -79,10 +78,9 @@ export async function synthesizeLocalSpeech(
         stdout += String(chunk)
         if (stdout.length > 16_384) stdout = stdout.slice(-16_384)
       })
-      child.stderr.on('data', (chunk) => {
-        stderr += String(chunk)
-        if (stderr.length > 16_384) stderr = stderr.slice(-16_384)
-      })
+      // Drain stderr so a noisy subprocess cannot block on a full pipe. Error
+      // details stay local and are intentionally not surfaced to the browser.
+      child.stderr.resume()
 
       child.on('error', () => {
         clearTimeout(timer)
