@@ -28,3 +28,6 @@ public/mediapipe/
 
 # Local L.U.M.I.A. prototype asset. Move to Git LFS when the visual pass is certified.
 public/models/lumia/lumia.glb
+
+# Local voice/model runtimes and weights. Never commit downloaded binaries/models.
+.local-runtime/
