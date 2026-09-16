@@ -6,7 +6,10 @@
  * Tool execution remains disabled during the C1 convergence step.
  */
 
-import { composeLumiaVoiceSystemPrompt } from './orbia/lumia-identity.mjs'
+import {
+  composeLumiaVoiceSystemPrompt,
+  sanitizeLumiaVoiceOutput,
+} from './orbia/lumia-identity.mjs'
 import {
   appendConversationExchange,
   getConversationHistory,
