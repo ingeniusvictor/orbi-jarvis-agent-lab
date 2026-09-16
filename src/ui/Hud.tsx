@@ -294,7 +294,7 @@ export function Hud() {
             </div>
 
             <AnimatePresence initial={false}>
-              {heardLines.slice(-4).map((line) => (
+              {heardLines.slice(-10).map((line) => (
                 <motion.div
                   key={line.id}
                   className={`voice-line voice-line-heard ${
@@ -347,7 +347,7 @@ export function Hud() {
             <AnimatePresence initial={false}>
               {turns
                 .filter((turn) => turn.role === 'jarvis')
-                .slice(-3)
+                .slice(-6)
                 .map((turn) => (
                   <motion.div
                     key={turn.id}
