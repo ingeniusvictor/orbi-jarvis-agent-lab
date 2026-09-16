@@ -19,13 +19,14 @@ const statusText: Record<Phase, string> = {
 }
 
 function heardLaneLabel(
-  kind: 'speech' | 'self-echo',
+  kind: 'speech' | 'self-echo' | 'non-speech',
   mode: Phase | 'wake' | 'command' | 'guard' | 'deaf',
 ): string {
   if (kind === 'self-echo') return 'ECO LUMI'
+  if (kind === 'non-speech') return 'NO VOZ'
   if (mode === 'guard') return 'GUARD'
   if (mode === 'deaf') return 'BLOQUEADO'
-  return 'TURNO'
+  return 'STT'
 }
 
 function Corner({ at }: { at: 'tl' | 'tr' | 'bl' | 'br' }) {
@@ -173,6 +174,7 @@ export function Hud() {
   const ui = useStore((s) => s.ui)
 
   const latestHeard = heardLines[heardLines.length - 1]
+  const latestUserTurn = [...turns].reverse().find((turn) => turn.role === 'user')
 
   // accentFor folds JARVIS's overrides in over the phase colour, so one
   // variable on the root carries a theme change into every .hud-* rule without
@@ -294,7 +296,11 @@ export function Hud() {
                 <motion.div
                   key={line.id}
                   className={`voice-line voice-line-heard ${
-                    line.kind === 'self-echo' ? 'voice-line-echo' : ''
+                    line.kind === 'self-echo'
+                      ? 'voice-line-echo'
+                      : line.kind === 'non-speech'
+                        ? 'voice-line-noise'
+                        : ''
                   }`}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -307,6 +313,13 @@ export function Hud() {
                 </motion.div>
               ))}
             </AnimatePresence>
+
+            {latestUserTurn && (
+              <div className="voice-command-final">
+                <span className="voice-command-label">COMANDO A O.R.B.I.A.</span>
+                <span className="voice-command-text">{latestUserTurn.text}</span>
+              </div>
+            )}
 
             <AnimatePresence>
               {caption && (
