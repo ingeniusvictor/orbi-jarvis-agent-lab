@@ -59,3 +59,15 @@ npm run build
 ```
 
 Then start L.U.M.I.A. and test the spoken controls above.
+
+
+## Local certification — 2026-09-15
+
+User workstation validation:
+
+- `npm run certify:amr` — PASS
+- `npm run lint` — 0 errors, 4 warnings
+- `npm run build` — PASS
+- Vite externalized Node module and large-chunk messages remain non-blocking warnings
+
+AMR-01 foundation is certified for runtime voice testing.
