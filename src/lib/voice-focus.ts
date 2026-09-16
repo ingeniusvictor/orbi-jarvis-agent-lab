@@ -38,3 +38,26 @@ export function shouldDropStaleVoiceSegment(
 export function transcriptSegmentIsStillActive(): false {
   return false
 }
+
+
+/**
+ * Household Focus guard rule.
+ *
+ * While L.U.M.I.A. is thinking/speaking, background speech is visible in the
+ * raw STT lane but must not interrupt the active answer unless the person
+ * explicitly addresses L.U.M.I.A. or uses an override phrase.
+ */
+export function shouldInterruptBusyAssistant(
+  text: string,
+  {
+    wake,
+    override,
+  }: {
+    wake: RegExp
+    override: RegExp
+  },
+): boolean {
+  const said = String(text ?? '').trim()
+  if (!said) return false
+  return wake.test(said) || override.test(said)
+}
