@@ -32,6 +32,7 @@ type VoiceDiag = {
   staleSegments: number
   householdIgnored: number
   selfEchoes: number
+  speakerShield: boolean
   idleMs: number
 }
 
@@ -118,6 +119,7 @@ export function Diagnostics() {
       <Row k="stale segments" v={String(v.staleSegments ?? 0)} />
       <Row k="household ignored" v={String(v.householdIgnored ?? 0)} />
       <Row k="LUMIA self-echo" v={String(v.selfEchoes ?? 0)} />
+      <Row k="speaker shield" v={v.speakerShield ? 'ACTIVE' : 'standby'} />
       <Row k="mode" v={`${v.mode ?? '—'} (phase ${phase})`} />
       <Row k="accepted" v={String(v.accepted ?? 0)} bad={(v.accepted ?? 0) === 0} />
       <Row k="wakes" v={String(v.wakes ?? 0)} />
