@@ -191,15 +191,6 @@ export function parseVoiceRuntimeControl(prompt) {
   }
 
   if (
-    text.includes('estado de la voz') ||
-    text.includes('modo de voz') ||
-    text.includes('que reconocimiento de voz') ||
-    text.includes('que voz estas usando')
-  ) {
-    return { action: 'status' }
-  }
-
-  if (
     text.includes('modo de voz automatico') ||
     text.includes('voz en automatico') ||
     text.includes('voz automatica')
@@ -260,6 +251,16 @@ export function parseVoiceRuntimeControl(prompt) {
     text.includes('voz del navegador')
   ) {
     return { action: 'set_tts', mode: 'system' }
+  }
+
+  if (
+    text.includes('estado de la voz') ||
+    text.includes('que modo de voz') ||
+    text.includes('cual es el modo de voz') ||
+    text.includes('que reconocimiento de voz') ||
+    text.includes('que voz estas usando')
+  ) {
+    return { action: 'status' }
   }
 
   const profileMatch = text.match(
