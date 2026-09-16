@@ -11,6 +11,11 @@ const registry = new ToolRegistry()
 for (const tool of createReadOnlyDiagnosticTools({
   provider: 'ollama',
   model: 'orbia-lumia:4b',
+  getVoiceRuntime: () => ({
+    status: 'READY',
+    requested: { sttMode: 'auto', ttsMode: 'auto', voiceProfile: 'lumia-system' },
+    effective: { effectiveStt: 'browser', effectiveTts: 'system' },
+  }),
 })) {
   registry.register(tool)
 }
@@ -35,6 +40,16 @@ const conversationRequest = selectReadOnlyTool(
   'runtime-tool-2',
 )
 assert.equal(conversationRequest?.name, 'orbi_conversation_status')
+
+const voiceRequest = selectReadOnlyTool(
+  'Lumi, ¿qué modo de voz estás usando?',
+  conversationId,
+  'runtime-tool-voice',
+)
+assert.equal(voiceRequest?.name, 'orbi_voice_runtime_status')
+const voiceExecution = await executor.execute(voiceRequest, { allowed })
+assert.equal(voiceExecution.result.ok, true)
+assert.match(voiceExecution.result.value, /effectiveStt/)
 
 const knowledgeRequest = selectReadOnlyTool(
   'Busca en el conocimiento LUMIA Studio',
