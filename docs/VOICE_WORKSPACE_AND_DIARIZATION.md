@@ -212,3 +212,26 @@ This separation is important before enabling diarization: multivoice logic must
 operate on real speech evidence rather than music/noise annotations or
 loudspeaker echo.
 
+
+## MPPT grounding + truthful wake evidence
+
+A later live test exposed two separate issues:
+
+1. Whisper/model input could surface the observed acronym variant `UMPPT`,
+   causing the small local model to invent an unrelated networking definition.
+2. Every transcript captured while dormant was visually labeled
+   `ACTIVACIÓN`, even when the wake word had not actually matched.
+
+Current hardening:
+
+- local STT normalizes observed full-acronym variants `UMPPT`, `MTTP` and
+  `MPTT` to `MPPT`;
+- the bounded local Knowledge Engine contains a controlled photovoltaic MPPT
+  definition and explicitly states that MPPT is not a communications protocol;
+- only a real wake-word match is labeled `ACTIVACIÓN`;
+- other speech heard while dormant is labeled `FONDO`, so the HUD no longer
+  implies a false wake event.
+
+This keeps raw recognition evidence visible while making both the knowledge path
+and the wake diagnostics more truthful.
+
