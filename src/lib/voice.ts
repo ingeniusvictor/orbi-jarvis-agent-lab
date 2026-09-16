@@ -10,6 +10,7 @@ import { startVad, type Vad } from './vad'
 import { caps } from './capabilities'
 import { audioBlobToPcmWav } from './wav'
 import {
+  isNonSpeechTranscript,
   shouldDropStaleVoiceSegment,
   shouldInterruptBusyAssistant,
   transcriptSegmentIsStillActive,
@@ -50,7 +51,7 @@ export type VoiceTranscriptEvent = {
   id: string
   text: string
   provider: 'browser' | 'whisper-local' | 'elevenlabs'
-  kind: 'speech' | 'self-echo'
+  kind: 'speech' | 'self-echo' | 'non-speech'
   capturedMode: VoiceMode
   at: number
 }
@@ -430,6 +431,8 @@ export const diag = {
   selfEchoes: 0,
   /** Speaker Shield is active upstream while local TTS/system audio is audible. */
   speakerShield: false,
+  /** Whisper acoustic annotations discarded before command assembly. */
+  nonSpeech: 0,
   /** Milliseconds the last transcription round-trip took. */
   idleMs: 0,
 }
@@ -613,6 +616,7 @@ async function startVadBridgeVoice(
       const selfEcho =
         !OVERRIDE.test(said) &&
         isEcho(said, echoReference, capturedMode === 'guard')
+      const nonSpeech = !selfEcho && isNonSpeechTranscript(said)
 
       diag.heard = said
       diag.heardAt = Date.now()
@@ -620,7 +624,7 @@ async function startVadBridgeVoice(
         id: `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         text: said,
         provider: provider === 'local' ? 'whisper-local' : 'elevenlabs',
-        kind: selfEcho ? 'self-echo' : 'speech',
+        kind: selfEcho ? 'self-echo' : nonSpeech ? 'non-speech' : 'speech',
         capturedMode: capturedMode as VoiceMode,
         at: Date.now(),
       })
@@ -628,6 +632,12 @@ async function startVadBridgeVoice(
       if (selfEcho) {
         diag.selfEchoes++
         drop('echo of L.U.M.I.A. loudspeaker output')
+        return
+      }
+
+      if (nonSpeech) {
+        diag.nonSpeech++
+        drop('non-speech Whisper annotation ignored')
         return
       }
 
@@ -873,6 +883,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
     const selfEcho =
       !OVERRIDE.test(text) &&
       isEcho(text, browserEchoReference, mode === 'guard')
+    const nonSpeech = !selfEcho && isNonSpeechTranscript(text)
 
     diag.heard = text
     diag.heardAt = Date.now()
@@ -880,7 +891,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
       id: `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       text,
       provider: 'browser',
-      kind: selfEcho ? 'self-echo' : 'speech',
+      kind: selfEcho ? 'self-echo' : nonSpeech ? 'non-speech' : 'speech',
       capturedMode: mode,
       at: Date.now(),
     })
@@ -888,6 +899,11 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
     if (selfEcho) {
       diag.selfEchoes++
       drop('echo of L.U.M.I.A. loudspeaker output')
+      return
+    }
+    if (nonSpeech) {
+      diag.nonSpeech++
+      drop('non-speech recognition annotation ignored')
       return
     }
     if (mode === 'wake') {
