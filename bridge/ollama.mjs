@@ -145,6 +145,13 @@ export function toolResultToPrompt(execution) {
 
 const warmPromises = new Map()
 
+function warmTimeoutMsForModel(model) {
+  const name = String(model ?? '').toLowerCase()
+  if (/\b(?:14b|32b|70b)\b/.test(name)) return 180_000
+  if (/\b(?:7b|8b)\b/.test(name)) return 120_000
+  return 60_000
+}
+
 export function warmOllama(model = getActiveModel()) {
   if (warmPromises.has(model)) return warmPromises.get(model)
 
@@ -172,16 +179,25 @@ export function warmOllama(model = getActiveModel()) {
             num_predict: 8,
           },
         }),
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(warmTimeoutMsForModel(model)),
       })
       const ok = res.ok
       if (ok) {
         console.log(
           `[lumia] chat warm-up completed · ${model} · ${((Date.now() - started) / 1000).toFixed(1)}s`,
         )
+      } else {
+        const detail = await res.text().catch(() => '')
+        console.warn(
+          `[lumia] warm-up failed · ${model} · HTTP ${res.status}` +
+            (detail ? ` · ${detail.slice(0, 240)}` : ''),
+        )
       }
       return ok
-    } catch {
+    } catch (err) {
+      console.warn(
+        `[lumia] warm-up failed · ${model} · ${String(err?.name ?? 'Error')}: ${String(err?.message ?? err)}`,
+      )
       return false
     }
   })()
