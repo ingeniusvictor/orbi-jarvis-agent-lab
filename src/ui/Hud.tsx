@@ -149,6 +149,8 @@ function DecodeText({ text }: { text: string }) {
 export function Hud() {
   const phase = useStore((s) => s.phase)
   const caption = useStore((s) => s.caption)
+  const heardLines = useStore((s) => s.heardLines)
+  const multiSpeakerLines = useStore((s) => s.multiSpeakerLines)
   const turns = useStore((s) => s.turns)
   const activeTool = useStore((s) => s.activeTool)
   const connected = useStore((s) => s.connected)
@@ -260,44 +262,93 @@ export function Hud() {
         )}
       </AnimatePresence>
 
-      {/* Conversation log — last few turns, fading upward */}
+      {/* Voice workspace: what the microphone understood and what L.U.M.I.A.
+          answered are deliberately separate. Raw STT is evidence, not the same
+          thing as a command or an assistant response. */}
       {ui.chrome.transcript && (
-        <div className="log">
-          <AnimatePresence initial={false}>
-            {turns.slice(-4).map((t) => (
-              <motion.div
-                key={t.id}
-                className={`log-line log-${t.role}`}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-              >
-                <span className="log-who">{t.role === 'user' ? 'TÚ' : 'LUMI'}</span>
-                {/* Only his half decodes. What the user said was never
-                    transmitted from anywhere — dressing it up as machine
-                    output would be a lie about where the words came from. */}
-                <span className="log-text">
-                  {t.role === 'jarvis' ? <DecodeText text={t.text} /> : t.text}
-                </span>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
+        <>
+          <section className="voice-pane voice-pane-heard">
+            <div className="voice-pane-head">
+              <span>ESCUCHANDO</span>
+              <span className="voice-pane-sub">
+                {heardLines.at(-1)?.provider === 'whisper-local'
+                  ? 'WHISPER LOCAL'
+                  : heardLines.at(-1)?.provider?.toUpperCase() || 'STT'}
+              </span>
+            </div>
 
-      <AnimatePresence>
-        {caption && (
-          <motion.div
-            className="caption"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            {caption}
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <AnimatePresence initial={false}>
+              {heardLines.slice(-4).map((line) => (
+                <motion.div
+                  key={line.id}
+                  className="voice-line voice-line-heard"
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <span className="voice-line-mode">{line.mode}</span>
+                  <span className="voice-line-text">{line.text}</span>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {caption && (
+                <motion.div
+                  className="voice-live"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <span className="voice-live-dot" />
+                  <span>{caption}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
+
+          <section className="voice-pane voice-pane-lumi">
+            <div className="voice-pane-head">
+              <span>RESPUESTA</span>
+              <span className="voice-pane-sub">L.U.M.I.A.</span>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {turns
+                .filter((turn) => turn.role === 'jarvis')
+                .slice(-3)
+                .map((turn) => (
+                  <motion.div
+                    key={turn.id}
+                    className="voice-line voice-line-lumi"
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <span className="voice-line-text">
+                      <DecodeText text={turn.text} />
+                    </span>
+                  </motion.div>
+                ))}
+            </AnimatePresence>
+          </section>
+
+          {multiSpeakerLines.length > 0 && (
+            <section className="voice-pane voice-pane-multi">
+              <div className="voice-pane-head">
+                <span>CONVERSACIÓN MULTIVOZ</span>
+                <span className="voice-pane-sub">DIARIZACIÓN</span>
+              </div>
+              {multiSpeakerLines.slice(-5).map((line) => (
+                <div key={line.id} className="voice-line voice-line-multi">
+                  <span className="voice-line-mode">{line.speaker}</span>
+                  <span className="voice-line-text">{line.text}</span>
+                </div>
+              ))}
+            </section>
+          )}
+        </>
+      )}
 
       {/* The one surface. Panels used to sit alongside this as a second place
           for things to appear, which meant two places to look and a decision
