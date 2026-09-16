@@ -40,6 +40,14 @@ export type VoiceMode =
   /** Something is playing that must not be transcribed at all. */
   | 'deaf'
 
+export type VoiceTranscriptEvent = {
+  id: string
+  text: string
+  provider: 'browser' | 'whisper-local' | 'elevenlabs'
+  capturedMode: VoiceMode
+  at: number
+}
+
 export type VoiceHandlers = {
   /** Read fresh on every result, so the app never has to re-subscribe. */
   mode: () => VoiceMode
@@ -51,6 +59,8 @@ export type VoiceHandlers = {
   onSpeechStart: () => void
   /** Live transcript, for the caption under the reactor. */
   onPartial: (text: string) => void
+  /** A raw recogniser segment before turn assembly/model submission. */
+  onTranscript?: (event: VoiceTranscriptEvent) => void
   /** A complete, endpointed utterance. */
   onUtterance: (text: string) => void
   /** The recogniser is unusable. Distinct from the user saying nothing. */
@@ -485,8 +495,10 @@ async function startVadBridgeVoice(
   const pendingAudio: Array<{
     blob: Blob
     capturedMode: FocusVoiceMode
+    epoch: number
   }> = []
   let draining = false
+  let captureEpoch = 0
 
   /**
    * Transcripts become turns here rather than one-per-segment.
@@ -494,6 +506,11 @@ async function startVadBridgeVoice(
    */
   const assemble = makeAssembler({
     emit: (text) => {
+      // Seal the turn the moment one coherent command is accepted. Audio that
+      // arrived while Whisper was decoding this command belongs to a later
+      // speaker/turn and must not be appended just because it is already queued.
+      captureEpoch++
+      pendingAudio.length = 0
       diag.dropped = ''
       diag.accepted++
       diag.holding = ''
@@ -513,6 +530,7 @@ async function startVadBridgeVoice(
   const transcribe = async (
     blob: Blob,
     capturedMode: FocusVoiceMode,
+    epoch: number,
   ) => {
     const mode = h.mode()
     if (mode === 'deaf') return
@@ -549,6 +567,14 @@ async function startVadBridgeVoice(
       const said = (text ?? '').trim()
       diag.lastError = ''
 
+      // A previous segment may have completed the command while this one was
+      // still inside Whisper. Do not let the late result reopen that turn.
+      if (epoch !== captureEpoch) {
+        diag.staleSegments++
+        drop('late transcript ignored after command turn was sealed')
+        return
+      }
+
       if (!said) {
         drop('nothing intelligible in the segment')
         return
@@ -563,6 +589,13 @@ async function startVadBridgeVoice(
 
       diag.heard = said
       diag.heardAt = Date.now()
+      h.onTranscript?.({
+        id: `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        text: said,
+        provider: provider === 'local' ? 'whisper-local' : 'elevenlabs',
+        capturedMode: capturedMode as VoiceMode,
+        at: Date.now(),
+      })
 
       if (mode === 'wake') {
         if (WAKE.test(said) && Date.now() - lastWake > WAKE_DEBOUNCE) {
@@ -601,7 +634,11 @@ async function startVadBridgeVoice(
     try {
       while (pendingAudio.length) {
         const pending = pendingAudio.shift()!
-        await transcribe(pending.blob, pending.capturedMode)
+        await transcribe(
+          pending.blob,
+          pending.capturedMode,
+          pending.epoch,
+        )
       }
     } finally {
       draining = false
@@ -633,6 +670,7 @@ async function startVadBridgeVoice(
       pendingAudio.push({
         blob,
         capturedMode: h.mode() as FocusVoiceMode,
+        epoch: captureEpoch,
       })
       void drain()
     },
@@ -762,6 +800,13 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
     }
     diag.heard = text
     diag.heardAt = Date.now()
+    h.onTranscript?.({
+      id: `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      text,
+      provider: 'browser',
+      capturedMode: mode,
+      at: Date.now(),
+    })
     if (mode === 'wake') {
       assemble.cancel()
       if (WAKE.test(text) && Date.now() - lastWake > WAKE_DEBOUNCE) {
