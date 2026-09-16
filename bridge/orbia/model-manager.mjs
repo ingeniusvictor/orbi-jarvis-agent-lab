@@ -39,6 +39,15 @@ const QWEN_SPEECH_ALIASES = [
   'cuen',
 ]
 
+const ORBI_MODEL_ALIASES = [
+  'orbia',
+  'orbi',
+  'lumia',
+  'lumi',
+  'personalizado',
+  'custom',
+]
+
 function soundsLikeQwen(value) {
   const compact = compactModelText(value)
   return QWEN_SPEECH_ALIASES.some((alias) => compact.includes(alias))
@@ -97,6 +106,36 @@ export function resolveModelRequest(requested, installedModels) {
   const compact = compactModelText(requested)
   const size = requestedSize(requested)
   const qwenRequested = soundsLikeQwen(requested)
+  const orbiRequested = ORBI_MODEL_ALIASES.some((alias) => q.includes(alias))
+  const explicitGeneric =
+    q.includes('original') ||
+    q.includes('base') ||
+    q.includes('generico') ||
+    q.includes('generic') ||
+    /\bqwen\s*3\b/.test(q) ||
+    /\bqwin\s*3\b/.test(q) ||
+    /\bqeen\s*3\b/.test(q) ||
+    /\bqueen\s*3\b/.test(q)
+
+  // The ORBI-personalised 4B model is the preferred L.U.M.I.A. variant when the
+  // spoken request is ambiguous ("Qwen 4B"). An explicit "Qwen3 4B original"
+  // still selects the untouched upstream model.
+  if (size === '4b' && !explicitGeneric) {
+    const preferredOrbi = firstMatching(installed, [
+      (n) => n.includes('orbia-lumia:4b'),
+    ])
+    if (preferredOrbi && (qwenRequested || orbiRequested || q === '4b')) {
+      return preferredOrbi
+    }
+  }
+
+  if (size === '4b' && explicitGeneric) {
+    const generic4b = firstMatching(installed, [
+      (n) => n.includes('qwen3:4b'),
+      (n) => compactModelText(n).includes('qwen') && requestedSize(n) === '4b',
+    ])
+    if (generic4b) return generic4b
+  }
 
   // Browser speech recognition often hears "Qwen" as queen/qeen/qwin and may
   // insert spaces around generation/size numbers. Resolve the family + size
