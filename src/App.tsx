@@ -11,6 +11,7 @@ import {
   type VoiceMode,
   type VoiceTranscriptEvent,
 } from './lib/voice'
+import { voiceModeForPhase } from './lib/voice-focus'
 import { createSpeaker, cycleVoice, currentVoiceName } from './lib/tts'
 import * as sfx from './lib/sfx'
 import * as music from './lib/music'
@@ -245,20 +246,8 @@ export default function App() {
   // -- voice events ---------------------------------------------------------
 
   /** What the voice loop should do with what it hears, derived from phase. */
-  const mode = (): VoiceMode => {
-    switch (store.getState().phase) {
-      case 'offline':
-      case 'boot':
-        return 'deaf'
-      case 'dormant':
-        return 'wake'
-      case 'waking':
-      case 'listening':
-        return 'command'
-      default:
-        return 'guard' // thinking, tooling, speaking
-    }
-  }
+  const mode = (): VoiceMode =>
+    voiceModeForPhase(store.getState().phase)
 
   const onWake = (trailing: string) => {
     const phase = store.getState().phase
@@ -276,9 +265,10 @@ export default function App() {
 
     store.getState().setPhase('waking')
 
-    // Answer to his name. Deliberately NOT awaited any more: the microphone is
-    // already open and the echo filter knows his voice, so the user can talk
-    // straight over the greeting instead of waiting it out.
+    // Answer to the wake name. A same-breath command ("Lumi, explícame...")
+    // was already handled above through `trailing`. For a bare "Lumi", the
+    // waking phase is deliberately GUARD so this acknowledgement cannot be
+    // transcribed back as the user's next command.
     const greeting = createSpeaker()
     speaker.current = greeting
     greeting.say(attention())
