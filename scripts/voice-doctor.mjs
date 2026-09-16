@@ -1,5 +1,6 @@
 import { buildVoiceRuntimeStatus } from '../bridge/orbia/voice-status.mjs'
 import { localVoicePaths } from '../bridge/orbia/local-voice-probe.mjs'
+import { probeWhisperServerRuntime } from '../bridge/orbia/whisper-server-runtime.mjs'
 import {
   probeSpeakerDiarization,
   speakerDiarizationPaths,
@@ -9,6 +10,7 @@ const status = buildVoiceRuntimeStatus()
 const paths = localVoicePaths()
 const diarization = probeSpeakerDiarization()
 const diarizationPaths = speakerDiarizationPaths()
+const whisperServer = await probeWhisperServerRuntime()
 
 const mark = (value) => (value ? 'READY' : 'MISSING')
 
@@ -26,6 +28,11 @@ console.log(`Whisper executable: ${mark(status.local.whisper.commandReady)}`)
 console.log(`  ${paths.whisperCommand}`)
 console.log(`Whisper model:      ${mark(status.local.whisper.modelReady)}`)
 console.log(`  ${paths.whisperModel}`)
+console.log(`Whisper server:     ${mark(whisperServer.commandReady)}`)
+console.log(`  ${whisperServer.command}`)
+console.log(
+  `Whisper hot runtime: ${whisperServer.running ? 'RUNNING' : 'STOPPED'} · ${whisperServer.baseUrl}`,
+)
 console.log('')
 console.log(`Kokoro Python:      ${mark(status.local.kokoro.pythonReady)}`)
 console.log(`  ${paths.kokoroPython}`)
