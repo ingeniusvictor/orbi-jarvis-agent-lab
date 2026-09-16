@@ -18,6 +18,7 @@ import { BACKEND, BRIDGE_HTTP_URL, env } from '../config'
  */
 
 export type VoiceRuntimeCapabilities = {
+  status?: string
   requested?: {
     sttMode?: string
     ttsMode?: string
@@ -43,6 +44,22 @@ export type VoiceRuntimeCapabilities = {
       voicesReady?: boolean
     }
   }
+  activeProfile?: {
+    id?: string
+    displayName?: string
+    provider?: string
+    speakerRef?: string
+    enabled?: boolean
+    consentConfirmed?: boolean
+  } | null
+  profiles?: Array<{
+    id?: string
+    displayName?: string
+    provider?: string
+    speakerRef?: string
+    enabled?: boolean
+    consentConfirmed?: boolean
+  }>
   elevenlabs?: {
     available?: boolean
   }
@@ -69,6 +86,29 @@ export function caps(): Capabilities {
 
 export function capabilitiesProbed(): boolean {
   return probed
+}
+
+/** Apply a live VRM update pushed by the bridge after a spoken voice command. */
+export function applyVoiceRuntimeSnapshot(
+  voice: VoiceRuntimeCapabilities | undefined,
+): Capabilities {
+  if (!voice) return current
+  current = {
+    ...current,
+    voice: {
+      ...(current.voice ?? {}),
+      ...voice,
+      local: {
+        ...(current.voice?.local ?? {}),
+        ...(voice.local ?? {}),
+      },
+      elevenlabs: {
+        ...(current.voice?.elevenlabs ?? {}),
+        ...(voice.elevenlabs ?? {}),
+      },
+    },
+  }
+  return current
 }
 
 /**
