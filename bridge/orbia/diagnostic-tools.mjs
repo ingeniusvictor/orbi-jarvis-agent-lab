@@ -9,7 +9,7 @@
 import { getConversationHistory } from './conversation.mjs'
 import { buildKnowledgeContext } from './knowledge.mjs'
 
-export function createReadOnlyDiagnosticTools({ provider = 'ollama', model = 'unknown' } = {}) {
+export function createReadOnlyDiagnosticTools({ provider = 'ollama', model = 'unknown', getModel } = {}) {
   return Object.freeze([
     Object.freeze({
       name: 'orbi_runtime_status',
@@ -19,7 +19,7 @@ export function createReadOnlyDiagnosticTools({ provider = 'ollama', model = 'un
       execute: () => ({
         status: 'READY',
         provider,
-        model,
+        model: typeof getModel === 'function' ? getModel() : model,
         toolPolicy: 'C1_READ_ONLY',
       }),
     }),
