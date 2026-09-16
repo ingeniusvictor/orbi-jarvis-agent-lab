@@ -40,5 +40,7 @@ export function normalizeTechnicalSpeechText(value) {
     .replace(/\bM\s*P\s*P\s*T\b/giu, 'MPPT')
     .replace(/\bMTTP\b/giu, 'MPPT')
     .replace(/\bMPTT\b/giu, 'MPPT')
+    .replace(/\bUMPPT\b/giu, 'MPPT')
+    .replace(/\bU\s*M\s*P\s*P\s*T\b/giu, 'MPPT')
     .trim()
 }
