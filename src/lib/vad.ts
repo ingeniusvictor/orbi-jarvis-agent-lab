@@ -28,6 +28,9 @@ import { getMic } from './audio'
  */
 
 export type VadHandlers = {
+  /** Optional upstream mute gate. When true no segment is recorded at all.
+   * Used by local Whisper while L.U.M.I.A.'s loudspeaker output is audible. */
+  suppress?: () => boolean
   /** The signal crossed into speech. Instant; this is the barge-in trigger. */
   onStart: () => void
   /** Speech ended. The blob is one complete, decodable audio file. */
@@ -203,6 +206,21 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
   const tick = () => {
     if (stopped) return
     raf = requestAnimationFrame(tick)
+
+    // Speaker Shield: when L.U.M.I.A. is physically audible from the laptop
+    // speakers, do not even create a MediaRecorder segment for local STT. Text
+    // echo filtering after Whisper is too late: it still burns CPU and can
+    // create 20-30 second backlogs in a noisy room.
+    if (h.suppress?.()) {
+      if (recorder) discardRecorder()
+      armedAt = 0
+      speaking = false
+      speechStartedAt = 0
+      lastLoud = 0
+      smoothEnergy = 0
+      h.onLevel(0)
+      return
+    }
 
     const energy = rms()
     smoothEnergy += (energy - smoothEnergy) * 0.5
