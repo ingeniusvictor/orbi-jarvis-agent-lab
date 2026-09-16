@@ -178,24 +178,54 @@ export function parseModelControl(prompt) {
     /\bque modelos? (?:puedo|puedes|puede|podemos) usar\b/.test(text) ||
     /\bque modelos? (?:tienes|hay|estan)\b/.test(text) ||
     /\bmodelos? (?:disponibles|instalados)\b/.test(text) ||
-    /\b(?:lista|listar|muestra|mostrar|dime) (?:los )?modelos\b/.test(text)
+    /\b(?:lista|listar|muestra|mostrar|dime) (?:los )?modelos\b/.test(text) ||
+    /\b(?:puedes|podrias|puede|eres capaz de) (?:cambiar|cambiarte|usar) (?:de |a |otro )?modelo\b/.test(text)
 
   if (asksForInventory) {
     return { action: 'list' }
   }
 
+  const withoutName = raw.replace(/^(?:lumi|lumia)[,\s:.-]*/i, '').trim()
+
+  // Explicit negation must never be turned into a model switch.
+  if (
+    /\bno (?:quiero |vayas a |debes |puedes )?(?:cambiar|cambies|usar|uses|activar|actives)\b/i.test(
+      withoutName,
+    )
+  ) {
+    return null
+  }
+
   const patterns = [
-    /(?:puedes |podrias |puede )?(?:cambiar|cambia|cambiate) (?:al modelo |de modelo a |a )(.+)/i,
-    /(?:quiero que |por favor )?(?:uses|usa|utiliza|activa|pon) (?:el modelo )?(.+)/i,
+    /(?:puedes |podrias |puede )?(?:cambiar|cambia|cambiate) (?:al modelo |de modelo a |de modelo al |de modelo por |a |al |por )(.+)/i,
+    /(?:quiero |quisiera )?(?:cambiar|cambiarme) (?:de modelo )?(?:a |al |por )(.+)/i,
+    /(?:quiero que |por favor )?(?:uses|usa|utiliza|activa|pon) (?:el modelo |modelo |a )?(.+)/i,
     /(?:ponte|pasate|pasa) (?:al modelo |a )(.+)/i,
   ]
-
-  const withoutName = raw.replace(/^(?:lumi|lumia)[,\s:.-]*/i, '').trim()
 
   for (const pattern of patterns) {
     const match = pattern.exec(withoutName)
     const requested = match?.[1]?.trim().replace(/[?.!]+$/, '').trim()
     if (requested) return { action: 'switch', requested }
+  }
+
+  // SpeechRecognition often mangles the grammar around technical names even
+  // when the important part survives. If a clear switch verb and a clear model
+  // clue are both present, pass the whole utterance to the resolver. The
+  // resolver already understands Qwen ASR variants, sizes and profiles.
+  const switchIntent =
+    /\b(?:cambiar|cambia|cambiate|cambies|usar|usa|uses|utiliza|activar|activa|pon|ponte|pasar|pasa|pasate)\b/.test(
+      text,
+    )
+  const modelClue =
+    soundsLikeQwen(text) ||
+    requestedSize(text) !== null ||
+    /\b(?:rapido|ligero|equilibrado|balanceado|principal|codigo|coder|programacion)\b/.test(
+      text,
+    )
+
+  if (switchIntent && modelClue) {
+    return { action: 'switch', requested: withoutName.replace(/[?.!]+$/, '').trim() }
   }
 
   return null
