@@ -123,32 +123,31 @@ export function parseModelControl(prompt) {
   const text = normalize(raw)
   if (!text) return null
 
-  if (
-    text.includes('que modelos puedo usar') ||
-    text.includes('que modelos tienes') ||
-    text.includes('modelos disponibles') ||
-    text.includes('lista los modelos') ||
-    text.includes('listar modelos')
-  ) {
+  const asksForInventory =
+    /\bque modelos? (?:puedo|puedes|puede|podemos) usar\b/.test(text) ||
+    /\bque modelos? (?:tienes|hay|estan)\b/.test(text) ||
+    /\bmodelos? (?:disponibles|instalados)\b/.test(text) ||
+    /\b(?:lista|listar|muestra|mostrar|dime) (?:los )?modelos\b/.test(text)
+
+  if (asksForInventory) {
     return { action: 'list' }
   }
 
-  const switchIntent =
-    text.includes('cambia al modelo') ||
-    text.includes('cambiar al modelo') ||
-    text.includes('usa el modelo') ||
-    text.includes('utiliza el modelo') ||
-    text.includes('activa el modelo') ||
-    text.includes('pon el modelo')
+  const patterns = [
+    /(?:puedes |podrias |puede )?(?:cambiar|cambia|cambiate) (?:al modelo |de modelo a |a )(.+)/i,
+    /(?:quiero que |por favor )?(?:uses|usa|utiliza|activa|pon) (?:el modelo )?(.+)/i,
+    /(?:ponte|pasate|pasa) (?:al modelo |a )(.+)/i,
+  ]
 
-  if (!switchIntent) return null
+  const withoutName = raw.replace(/^(?:lumi|lumia)[,\s:.-]*/i, '').trim()
 
-  const cleaned = raw
-    .replace(/^(?:lumi|lumia)[,\s:.-]*/i, '')
-    .replace(/.*?(?:cambia(?:r)? al modelo|usa el modelo|utiliza el modelo|activa el modelo|pon el modelo)\s*/i, '')
-    .trim()
+  for (const pattern of patterns) {
+    const match = pattern.exec(withoutName)
+    const requested = match?.[1]?.trim().replace(/[?.!]+$/, '').trim()
+    if (requested) return { action: 'switch', requested }
+  }
 
-  return cleaned ? { action: 'switch', requested: cleaned } : null
+  return null
 }
 
 export function buildModelInventory(installedModels) {
