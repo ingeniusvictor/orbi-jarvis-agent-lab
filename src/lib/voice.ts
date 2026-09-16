@@ -103,6 +103,11 @@ const WAKE_DEBOUNCE = 1500
 const WAKE =
   /\b(?:hey|hi|ok|okay|yo|oye|hola)?\s*(?:lumi|lumia|lumi a|jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)\b(?!'s)/i
 
+/** A wake name with no actual instruction. In busy GUARD mode this is ignored
+ * because laptop speaker echo frequently collapses to a lone assistant name. */
+const BARE_WAKE =
+  /^(?:hey|hi|ok|okay|yo|oye|hola)?\s*(?:lumi|lumia|lumi a|jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)\s*[,.!?]*$/i
+
 /** Everything after the wake phrase, which is usually the actual command. */
 function afterWake(text: string): string {
   const m = WAKE.exec(text)
@@ -636,6 +641,7 @@ async function startVadBridgeVoice(
           !shouldInterruptBusyAssistant(said, {
             wake: WAKE,
             override: OVERRIDE,
+            bareWake: BARE_WAKE,
           })
         ) {
           diag.householdIgnored++
