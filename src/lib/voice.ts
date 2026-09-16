@@ -163,20 +163,34 @@ const CONTINUE_MS = 1600
 const MAX_HOLD_MS = 6000
 
 /**
+ * Browser SpeechRecognition is more eager to endpoint/restart than the VAD path.
+ * Give natural dictation more breathing room so a longer Spanish question is
+ * not dispatched after the first small pause.
+ */
+const BROWSER_SILENCE_MS = 1200
+const BROWSER_SETTLE_MS = 900
+const BROWSER_CONTINUE_MS = 2400
+const BROWSER_MAX_HOLD_MS = 30000
+
+/**
  * How long to keep waiting, given what has been said so far.
  * 0 means "this is a complete thought, send it now".
  */
-function holdFor(text: string): number {
+function holdFor(
+  text: string,
+  settleMs = SETTLE_MS,
+  continueMs = CONTINUE_MS,
+): number {
   const words = text.trim().split(/\s+/).filter(Boolean)
-  if (!words.length) return CONTINUE_MS
+  if (!words.length) return continueMs
   // An explicit terminator is the speaker telling us they are done.
   if (/[.!?]$/.test(text)) return 0
-  if (TRAILS.test(text.trim())) return CONTINUE_MS
-  if (CONTINUES.test(words[words.length - 1])) return CONTINUE_MS
+  if (TRAILS.test(text.trim())) return continueMs
+  if (CONTINUES.test(words[words.length - 1])) return continueMs
   // One or two words is usually the start of something, not the whole of it —
   // except for the short commands that genuinely are complete.
-  if (words.length <= 2 && !OVERRIDE.test(text)) return CONTINUE_MS
-  return SETTLE_MS
+  if (words.length <= 2 && !OVERRIDE.test(text)) return continueMs
+  return settleMs
 }
 
 type Assembler = {
@@ -189,10 +203,20 @@ type Assembler = {
   held: () => string
 }
 
-function makeAssembler(h: {
-  emit: (text: string) => void
-  partial: (text: string) => void
-}): Assembler {
+function makeAssembler(
+  h: {
+    emit: (text: string) => void
+    partial: (text: string) => void
+  },
+  timing: {
+    settleMs?: number
+    continueMs?: number
+    maxHoldMs?: number
+  } = {},
+): Assembler {
+  const settleMs = timing.settleMs ?? SETTLE_MS
+  const continueMs = timing.continueMs ?? CONTINUE_MS
+  const maxHoldMs = timing.maxHoldMs ?? MAX_HOLD_MS
   let held = ''
   let timer: ReturnType<typeof setTimeout> | null = null
   let firstAt = 0
@@ -224,13 +248,13 @@ function makeAssembler(h: {
       // Already talking again. Decide nothing now — the next transcript is
       // part of this same sentence and will bring more of it.
       if (active) {
-        timer = setTimeout(fire, MAX_HOLD_MS)
+        timer = setTimeout(fire, maxHoldMs)
         return
       }
 
       const wait = Math.min(
-        holdFor(held),
-        Math.max(0, MAX_HOLD_MS - (Date.now() - firstAt)),
+        holdFor(held, settleMs, continueMs),
+        Math.max(0, maxHoldMs - (Date.now() - firstAt)),
       )
       diag.waitedMs = wait
       if (wait === 0) {
@@ -625,16 +649,27 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
   let lastAlive = Date.now()
   let silenceTimer: ReturnType<typeof setTimeout> | null = null
 
-  /** Same assembly rules as the premium path — a pause is not a full stop. */
-  const assemble = makeAssembler({
-    emit: (text) => {
-      diag.dropped = ''
-      diag.accepted++
-      diag.holding = ''
-      h.onUtterance(text)
+  /**
+   * Browser recognition endpoints more aggressively than the VAD path. Keep
+   * partial thoughts together for longer so natural pauses in a longer request
+   * do not become separate user turns.
+   */
+  const assemble = makeAssembler(
+    {
+      emit: (text) => {
+        diag.dropped = ''
+        diag.accepted++
+        diag.holding = ''
+        h.onUtterance(text)
+      },
+      partial: (text) => h.onPartial(text),
     },
-    partial: (text) => h.onPartial(text),
-  })
+    {
+      settleMs: BROWSER_SETTLE_MS,
+      continueMs: BROWSER_CONTINUE_MS,
+      maxHoldMs: BROWSER_MAX_HOLD_MS,
+    },
+  )
 
   const touch = () => {
     lastAlive = Date.now()
@@ -687,7 +722,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
     clearSilence()
     // Endpoint on a short quiet gap; the ElevenLabs path tunes this more
     // finely, but a fixed window is plenty for the fallback.
-    silenceTimer = setTimeout(emit, 900)
+    silenceTimer = setTimeout(emit, BROWSER_SILENCE_MS)
   }
 
   const onResult = (e: any) => {
@@ -782,6 +817,15 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
       running = false
       diag.running = false
       touch()
+
+      // Chrome can end a SpeechRecognition session while the user is still in
+      // a long sentence. Preserve that segment before opening the next session;
+      // otherwise the next onResult clears the old interim text and the tail of
+      // the question appears to have been "cut off".
+      if (!stopped && (settled.trim() || interim.trim())) {
+        emit()
+      }
+
       rec = null
       if (!stopped) setTimeout(spin, 80)
     }
