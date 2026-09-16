@@ -2,8 +2,8 @@
  * O.R.B.I.A. Voice Runtime Manager — VRM-01A.
  *
  * Provider-neutral runtime preferences for how L.U.M.I.A. hears and speaks.
- * The current browser voice path remains untouched until C1-E integration is
- * certified; this module is the canonical source of truth for future routing.
+ * Browser/system and local Whisper/Kokoro paths now converge through this
+ * canonical runtime state while preserving deterministic fallback behaviour.
  */
 
 export const STT_MODES = Object.freeze(['auto', 'browser', 'local'])
@@ -154,21 +154,18 @@ export function resolveVoiceProfileRequest(requested) {
     return getVoiceProfile('lumia-system')
   }
 
-  if (
-    q.includes('kokoro') ||
-    q.includes('local') ||
-    q.includes('lumia')
-  ) {
+  const fuzzy = [...profiles.values()].find((profile) => {
+    const id = normalizeIntent(profile.id)
+    const name = normalizeIntent(profile.displayName)
+    return id.includes(q) || name.includes(q)
+  })
+  if (fuzzy) return fuzzy
+
+  if (q.includes('kokoro') || q.includes('local')) {
     return getVoiceProfile('lumia-kokoro')
   }
 
-  return (
-    [...profiles.values()].find((profile) => {
-      const id = normalizeIntent(profile.id)
-      const name = normalizeIntent(profile.displayName)
-      return id.includes(q) || name.includes(q)
-    }) ?? null
-  )
+  return null
 }
 
 /**
