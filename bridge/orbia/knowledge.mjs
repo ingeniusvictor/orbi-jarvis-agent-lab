@@ -49,6 +49,23 @@ export const ORBIA_KNOWLEDGE_ENTRIES = Object.freeze([
     tags: Object.freeze(['studio', 'chatbox', 'workspace', 'knowledge', 'projects', 'reports']),
   }),
   Object.freeze({
+    id: 'solar-mppt-basics',
+    sourceType: 'local-static',
+    domain: 'solar',
+    title: 'MPPT en sistemas fotovoltaicos',
+    content:
+      'MPPT significa Maximum Power Point Tracking, o seguimiento del punto de máxima potencia. En un sistema fotovoltaico, el controlador o la etapa MPPT ajusta dinámicamente el punto eléctrico de operación de los módulos para extraer la mayor potencia disponible según irradiancia, temperatura y otras condiciones. No es un protocolo de comunicaciones.',
+    tags: Object.freeze([
+      'mppt',
+      'solar',
+      'fotovoltaico',
+      'paneles',
+      'inversor',
+      'controlador',
+      'maximum power point tracking',
+    ]),
+  }),
+  Object.freeze({
     id: 'orbi-knowledge-boundary',
     sourceType: 'local-static',
     domain: 'system',
@@ -147,7 +164,7 @@ export function knowledgeContextToPrompt(context) {
     ...context.entries.map(
       (entry) => `[${entry.id}] ${entry.title}: ${entry.content}`,
     ),
-    'Usa solo este contexto para afirmaciones específicas de ORBI. Si no alcanza, dilo claramente.',
+    'Usa este contexto como fuente controlada para los temas que cubre. Para afirmaciones específicas de ORBI, no inventes detalles que no estén respaldados aquí.',
   ]
 
   return lines.join('\n')
