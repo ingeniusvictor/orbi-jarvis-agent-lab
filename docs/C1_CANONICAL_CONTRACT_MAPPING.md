@@ -380,3 +380,17 @@ npm run lint
 npm run build
 npm run start:lumia
 ```
+
+
+## Safe latency pass — 2026-09-15
+
+To improve perceived local response speed without re-enabling raw Qwen streaming:
+
+- browser long-dictation protection remains active;
+- browser post-dictation settle reduced from 900 ms to 300 ms;
+- Ollama keep-alive extended from 30 minutes to 2 hours by default;
+- spoken local generation capped at 120 output tokens by default (configurable);
+- Ollama turn timing is logged as total/prompt/generation latency and tokens/sec;
+- structured JSON final-answer guard remains enabled to prevent reasoning leakage.
+
+Runtime validation is still required on the user workstation.
