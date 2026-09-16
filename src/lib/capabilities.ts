@@ -17,11 +17,44 @@ import { BACKEND, BRIDGE_HTTP_URL, env } from '../config'
  * is not a path worth encouraging, so direct mode is treated as browser-only.
  */
 
+export type VoiceRuntimeCapabilities = {
+  requested?: {
+    sttMode?: string
+    ttsMode?: string
+    voiceProfile?: string
+  }
+  effective?: {
+    effectiveStt?: string
+    effectiveTts?: string
+  }
+  local?: {
+    sttAvailable?: boolean
+    ttsAvailable?: boolean
+    whisper?: {
+      provider?: string
+      commandReady?: boolean
+      modelReady?: boolean
+    }
+    kokoro?: {
+      provider?: string
+      pythonReady?: boolean
+      scriptReady?: boolean
+      modelReady?: boolean
+      voicesReady?: boolean
+    }
+  }
+  elevenlabs?: {
+    available?: boolean
+  }
+}
+
 export type Capabilities = {
   /** ElevenLabs speech-to-text (Scribe) is reachable via the bridge. */
   stt: boolean
   /** ElevenLabs text-to-speech is reachable via the bridge. */
   tts: boolean
+  /** Provider-neutral VRM/C1-E readiness. Optional for older bridge builds. */
+  voice?: VoiceRuntimeCapabilities
 }
 
 /** Browser-only until the probe says otherwise. Safe default: the app works. */
@@ -56,8 +89,16 @@ export async function probeCapabilities(): Promise<Capabilities> {
       signal: AbortSignal.timeout(3000),
     })
     if (res.ok) {
-      const h = (await res.json()) as { stt?: boolean; tts?: boolean }
-      current = { stt: Boolean(h.stt), tts: Boolean(h.tts) }
+      const h = (await res.json()) as {
+        stt?: boolean
+        tts?: boolean
+        voice?: VoiceRuntimeCapabilities
+      }
+      current = {
+        stt: Boolean(h.stt),
+        tts: Boolean(h.tts),
+        voice: h.voice,
+      }
     }
   } catch {
     // Bridge down or slow — stay on the browser engines rather than blocking
