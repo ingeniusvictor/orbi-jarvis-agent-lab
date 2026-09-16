@@ -10,6 +10,7 @@ import {
 import {
   LUMIA_IDENTITY,
   composeLumiaVoiceSystemPrompt,
+  sanitizeLumiaVoiceOutput,
 } from '../bridge/orbia/lumia-identity.mjs'
 import {
   appendConversationExchange,
@@ -83,6 +84,15 @@ assert.match(prompt, /L\.U\.M\.I\.A\./)
 assert.match(prompt, /O\.R\.B\.I\.A\./)
 assert.match(prompt, /herramientas todavía no están habilitadas/i)
 assert.equal(LUMIA_IDENTITY.spokenName, 'Lumi')
+assert.match(prompt, /nunca llames al usuario Lumi/i)
+assert.equal(
+  sanitizeLumiaVoiceOutput('¿En qué puedo ayudarte hoy, Lumi?'),
+  '¿En qué puedo ayudarte hoy?',
+)
+assert.equal(
+  sanitizeLumiaVoiceOutput('Mi nombre es Lumi.'),
+  'Mi nombre es Lumi.',
+)
 
 clearConversation(conversationId)
 assert.equal(getConversationHistory(conversationId).length, 0)
