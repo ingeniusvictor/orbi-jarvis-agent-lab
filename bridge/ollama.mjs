@@ -24,6 +24,11 @@ const DEFAULT_MODEL = 'qwen3:4b'
 
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
 export const OLLAMA_MODEL = process.env.JARVIS_OLLAMA_MODEL ?? DEFAULT_MODEL
+export const OLLAMA_KEEP_ALIVE = process.env.JARVIS_OLLAMA_KEEP_ALIVE ?? '2h'
+export const OLLAMA_VOICE_NUM_PREDICT = Math.max(
+  48,
+  Math.min(180, Number(process.env.JARVIS_OLLAMA_NUM_PREDICT) || 120),
+)
 
 const localToolRegistry = new ToolRegistry()
 for (const tool of createReadOnlyDiagnosticTools({
@@ -142,7 +147,7 @@ export function warmOllama() {
           ],
           stream: false,
           think: false,
-          keep_alive: '30m',
+          keep_alive: OLLAMA_KEEP_ALIVE,
           options: {
             temperature: 0,
             num_predict: 8,
@@ -251,13 +256,13 @@ export async function streamOllama({
         // Ollama structured outputs: an explicit JSON schema is much more
         // reliable than the loose "json" mode with small local models.
         format: responseSchema,
-        keep_alive: '30m',
+        keep_alive: OLLAMA_KEEP_ALIVE,
         options: {
           temperature: 0,
           // Voice replies are intentionally short. This prevents a malformed
           // local turn from generating hundreds of tokens before the user
           // hears anything, while leaving ample room for two spoken sentences.
-          num_predict: 180,
+          num_predict: OLLAMA_VOICE_NUM_PREDICT,
         },
       }),
       signal,
@@ -271,6 +276,23 @@ export async function streamOllama({
     }
 
     const packet = await res.json()
+
+    const totalMs = Number(packet?.total_duration ?? 0) / 1_000_000
+    const promptMs = Number(packet?.prompt_eval_duration ?? 0) / 1_000_000
+    const evalMs = Number(packet?.eval_duration ?? 0) / 1_000_000
+    const evalCount = Number(packet?.eval_count ?? 0)
+    const tokensPerSecond =
+      evalMs > 0 && evalCount > 0 ? (evalCount / evalMs) * 1000 : 0
+
+    console.log(
+      '[orbia] LUMIA local latency' +
+        ` total=${totalMs.toFixed(0)}ms` +
+        ` prompt=${promptMs.toFixed(0)}ms` +
+        ` generate=${evalMs.toFixed(0)}ms` +
+        ` output=${evalCount}tok` +
+        (tokensPerSecond ? ` speed=${tokensPerSecond.toFixed(1)}tok/s` : ''),
+    )
+
     return String(packet?.message?.content ?? '').trim()
   }
 
