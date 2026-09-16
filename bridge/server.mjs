@@ -33,6 +33,14 @@ import {
   getVoiceRuntimeState,
   resolveVoiceRuntime,
 } from './orbia/voice-runtime.mjs'
+import {
+  LocalSpeechToTextError,
+  transcribeLocalWav,
+} from './orbia/local-stt.mjs'
+import {
+  LocalTextToSpeechError,
+  synthesizeLocalSpeech,
+} from './orbia/local-tts.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
 
@@ -855,6 +863,134 @@ const handleRequest = async (req, res) => {
            String(err?.message ?? 'unknown error').replace(/[<&]/g, '')
          }`,
       )
+    }
+  }
+
+  // Local speech endpoints are explicit during C1-E migration. The current
+  // browser/ElevenLabs paths remain untouched until Companion-side routing is
+  // certified, so these can be exercised independently without regressing voice.
+  if (req.method === 'POST' && req.url === '/tts/local') {
+    let body = ''
+    let overflowed = false
+    for await (const chunk of req) {
+      body += chunk
+      if (body.length > 64 * 1024) {
+        overflowed = true
+        break
+      }
+    }
+    if (overflowed) {
+      req.destroy()
+      res.writeHead(400, cors)
+      return res.end('body too large')
+    }
+
+    let payload
+    try {
+      payload = JSON.parse(body || '{}')
+    } catch {
+      res.writeHead(400, cors)
+      return res.end('bad json')
+    }
+
+    try {
+      const result = await synthesizeLocalSpeech(payload?.text, {
+        speaker: payload?.speaker || 'ef_dora',
+      })
+      res.writeHead(200, {
+        ...cors,
+        'content-type': result.mimeType,
+        'cache-control': 'no-cache',
+        'x-orbia-voice-provider': result.provider,
+        'x-orbia-voice-speaker': result.speaker,
+      })
+      return res.end(Buffer.from(result.audio))
+    } catch (err) {
+      const code =
+        err instanceof LocalTextToSpeechError
+          ? err.code
+          : 'VOICE_TTS_FAILED'
+      const status =
+        code === 'VOICE_TTS_UNAVAILABLE'
+          ? 503
+          : code === 'VOICE_TTS_INVALID_TEXT'
+            ? 400
+            : code === 'VOICE_TTS_TIMEOUT'
+              ? 504
+              : 502
+      res.writeHead(status, {
+        ...cors,
+        'content-type': 'application/json',
+      })
+      return res.end(JSON.stringify({ ok: false, errorCode: code }))
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/stt/local') {
+    const type = String(req.headers['content-type'] || '').toLowerCase()
+    if (!type.includes('audio/wav') && !type.includes('audio/wave') && !type.includes('audio/x-wav')) {
+      res.writeHead(415, {
+        ...cors,
+        'content-type': 'application/json',
+      })
+      return res.end(
+        JSON.stringify({
+          ok: false,
+          errorCode: 'VOICE_STT_UNSUPPORTED_FORMAT',
+        }),
+      )
+    }
+
+    const chunks = []
+    let size = 0
+    let overflowed = false
+    for await (const chunk of req) {
+      chunks.push(chunk)
+      size += chunk.length
+      if (size > 25 * 1024 * 1024) {
+        overflowed = true
+        break
+      }
+    }
+    if (overflowed) {
+      req.destroy()
+      res.writeHead(413, cors)
+      return res.end('audio too large')
+    }
+
+    try {
+      const result = await transcribeLocalWav(Buffer.concat(chunks))
+      res.writeHead(200, {
+        ...cors,
+        'content-type': 'application/json',
+        'x-orbia-voice-provider': result.provider,
+      })
+      return res.end(
+        JSON.stringify({
+          text: result.text,
+          language: result.language,
+          provider: result.provider,
+        }),
+      )
+    } catch (err) {
+      const code =
+        err instanceof LocalSpeechToTextError
+          ? err.code
+          : 'VOICE_STT_FAILED'
+      const status =
+        code === 'VOICE_STT_UNAVAILABLE'
+          ? 503
+          : code === 'VOICE_STT_UNSUPPORTED_FORMAT' ||
+              code === 'VOICE_STT_INVALID_AUDIO'
+            ? 400
+            : code === 'VOICE_STT_TIMEOUT'
+              ? 504
+              : 502
+      res.writeHead(status, {
+        ...cors,
+        'content-type': 'application/json',
+      })
+      return res.end(JSON.stringify({ ok: false, errorCode: code }))
     }
   }
 
