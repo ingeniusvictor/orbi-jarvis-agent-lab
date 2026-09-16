@@ -375,10 +375,10 @@ export const useStore = create<State>((set) => ({
   setLevel: (level) => set({ level }),
   setCaption: (caption) => set({ caption }),
   pushHeardLine: (line) =>
-    set((s) => ({ heardLines: [...s.heardLines.slice(-23), line] })),
+    set((s) => ({ heardLines: [...s.heardLines.slice(-59), line] })),
   pushMultiSpeakerLine: (line) =>
     set((s) => ({
-      multiSpeakerLines: [...s.multiSpeakerLines.slice(-23), line],
+      multiSpeakerLines: [...s.multiSpeakerLines.slice(-59), line],
     })),
   setActiveTool: (activeTool) => set({ activeTool }),
   setError: (error) => set({ error }),
