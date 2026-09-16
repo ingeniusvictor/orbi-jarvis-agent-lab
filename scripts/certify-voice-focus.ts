@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  isNonSpeechTranscript,
   shouldDropStaleVoiceSegment,
   shouldInterruptBusyAssistant,
   transcriptSegmentIsStillActive,
@@ -89,3 +90,13 @@ assert.equal(
 console.log('Household Focus guard policy: PASS')
 console.log('Ambient busy-time speech stays observable but cannot hijack the turn.')
 console.log('Explicit Lumi/interrupt phrases remain valid barge-in controls.')
+
+
+assert.equal(isNonSpeechTranscript('[Música]'), true)
+assert.equal(isNonSpeechTranscript('[Music]'), true)
+assert.equal(isNonSpeechTranscript('(silencio)'), true)
+assert.equal(isNonSpeechTranscript('Lumi, explícame un MPPT'), false)
+assert.equal(isNonSpeechTranscript('O.R.B.I.A.'), false)
+
+console.log('Non-speech annotation filter: PASS')
+console.log('Music/silence/noise annotations remain visible but never become commands.')
