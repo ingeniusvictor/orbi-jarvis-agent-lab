@@ -3,6 +3,7 @@ import { getMic } from './audio'
 import { speakingNow, speakingSince } from './tts'
 import { startVad, type Vad } from './vad'
 import { caps } from './capabilities'
+import { audioBlobToPcmWav } from './wav'
 
 /**
  * The voice loop.
@@ -429,12 +430,36 @@ export async function startVoice(h: VoiceHandlers): Promise<Voice> {
     )
     return { stop: () => {}, live: () => false }
   }
-  diag.engine = caps().stt ? 'elevenlabs' : 'browser'
-  return caps().stt ? startElevenVoice(h) : startBrowserVoice(h)
+  const capability = caps()
+  const requested = capability.voice?.requested?.sttMode ?? 'auto'
+  const localReady = Boolean(capability.voice?.local?.sttAvailable)
+
+  if (requested === 'browser') {
+    diag.engine = 'browser'
+    return startBrowserVoice(h)
+  }
+
+  if ((requested === 'local' || requested === 'auto') && localReady) {
+    diag.engine = 'whisper-local'
+    return startVadBridgeVoice(h, 'local')
+  }
+
+  if (requested === 'auto' && capability.stt) {
+    diag.engine = 'elevenlabs'
+    return startVadBridgeVoice(h, 'elevenlabs')
+  }
+
+  // An explicitly requested local runtime that is not ready falls back safely
+  // rather than leaving L.U.M.I.A. deaf.
+  diag.engine = 'browser'
+  return startBrowserVoice(h)
 }
 
 /** VAD + ElevenLabs Scribe. */
-async function startElevenVoice(h: VoiceHandlers): Promise<Voice> {
+async function startVadBridgeVoice(
+  h: VoiceHandlers,
+  provider: 'elevenlabs' | 'local',
+): Promise<Voice> {
   let lastWake = 0
   let vad: Vad | null = null
 
@@ -481,10 +506,17 @@ async function startElevenVoice(h: VoiceHandlers): Promise<Voice> {
     if (mode === 'deaf') return
     const t0 = performance.now()
     try {
-      const res = await fetch(`${BRIDGE_HTTP_URL}/stt`, {
+      const requestBlob =
+        provider === 'local' ? await audioBlobToPcmWav(blob) : blob
+      const endpoint = provider === 'local' ? '/stt/local' : '/stt'
+      const res = await fetch(`${BRIDGE_HTTP_URL}${endpoint}`, {
         method: 'POST',
-        headers: { 'content-type': blob.type || 'audio/webm' },
-        body: blob,
+        headers: {
+          'content-type':
+            requestBlob.type ||
+            (provider === 'local' ? 'audio/wav' : 'audio/webm'),
+        },
+        body: requestBlob,
       })
       diag.idleMs = Math.round(performance.now() - t0)
       if (!res.ok) {
@@ -531,7 +563,11 @@ async function startElevenVoice(h: VoiceHandlers): Promise<Voice> {
     } catch (err) {
       diag.restarts++
       diag.lastError = String(err)
-      drop('could not reach the speech service')
+      drop(
+        provider === 'local'
+          ? 'could not use local Whisper'
+          : 'could not reach the speech service',
+      )
     }
   }
 
