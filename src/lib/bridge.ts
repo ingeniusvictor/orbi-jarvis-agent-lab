@@ -1,6 +1,7 @@
 import type { AskHandlers } from './anthropic'
 import type { Blade, Panel } from '../store'
 import { BRIDGE_WS_URL } from '../config'
+import type { VoiceRuntimeCapabilities } from './capabilities'
 
 /**
  * Client for the local bridge (see bridge/server.mjs).
@@ -36,6 +37,7 @@ type Frame = {
   when?: string
   servers?: Array<string | { name?: string }>
   ok?: boolean
+  voice?: VoiceRuntimeCapabilities
 }
 
 /**
@@ -110,6 +112,14 @@ export function watchBlades(fn: (blade: Blade) => void) {
 let onUi: ((op: string, args: any) => void) | null = null
 export function watchUi(fn: (op: string, args: any) => void) {
   onUi = fn
+}
+
+/** Live Voice Runtime Manager updates pushed after deterministic voice controls. */
+let onVoiceRuntime: ((voice: VoiceRuntimeCapabilities) => void) | null = null
+export function watchVoiceRuntime(
+  fn: (voice: VoiceRuntimeCapabilities) => void,
+) {
+  onVoiceRuntime = fn
 }
 
 /**
@@ -225,6 +235,8 @@ function dispatch(ws: WebSocket) {
       // A `ui` frame with no args is normal — reset and clear take none — so an
       // absent args object is an empty one, not a reason to drop the command.
       onUi?.(msg.op, (msg.args ?? {}) as Record<string, unknown>)
+    } else if (msg.type === 'voice_runtime' && msg.voice) {
+      onVoiceRuntime?.(msg.voice)
     }
   })
 }
