@@ -721,7 +721,7 @@ async function startVadBridgeVoice(
     suppress: () =>
       provider === 'local' &&
       h.mode() === 'guard' &&
-      speakerOutputActive(),
+      (speakerOutputActive() || Boolean(speakingNow())),
     onStart: () => {
       const mode = h.mode()
       diag.mode = mode
@@ -781,7 +781,7 @@ async function startVadBridgeVoice(
     diag.speakerShield =
       provider === 'local' &&
       mode === 'guard' &&
-      speakerOutputActive()
+      (speakerOutputActive() || Boolean(speakingNow()))
     vad?.setGuard(mode === 'guard')
     // He has stood down — by Escape, by the idle timeout, or by dropping back
     // to the wake word. Anything half-said belonged to a conversation that is
