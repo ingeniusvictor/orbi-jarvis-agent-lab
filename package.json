@@ -31,14 +31,15 @@
     "certify:c1:voice-adapters": "node scripts/certify-c1-local-voice-adapters.mjs",
     "voice:doctor": "node scripts/voice-doctor.mjs",
     "certify:vrm:runtime": "node scripts/certify-vrm-control-runtime.mjs",
-    "certify:voice": "npm run certify:c1 && npm run certify:vrm && npm run certify:vrm:runtime && npm run certify:c1:voice-probe && npm run certify:c1:voice-adapters && npm run certify:voice-focus && npm run certify:diarization-probe && npm run certify:diarization-adapter && npm run certify:c1:tool-runtime",
+    "certify:voice": "npm run certify:c1 && npm run certify:vrm && npm run certify:vrm:runtime && npm run certify:c1:voice-probe && npm run certify:c1:voice-adapters && npm run certify:voice-focus && npm run certify:diarization-probe && npm run certify:diarization-adapter && npm run certify:multivoice-stt && npm run certify:c1:tool-runtime",
     "voice:setup": "node scripts/setup-local-voice.mjs",
     "voice:setup:whisper": "node scripts/setup-local-voice.mjs --whisper-only",
     "voice:setup:kokoro": "node scripts/setup-local-voice.mjs --kokoro-only",
     "certify:voice-focus": "tsx scripts/certify-voice-focus.ts",
     "certify:diarization-probe": "node scripts/certify-speaker-diarization-probe.mjs",
     "voice:setup:diarization": "node scripts/setup-speaker-diarization.mjs",
-    "certify:diarization-adapter": "node scripts/certify-speaker-diarization-adapter.mjs"
+    "certify:diarization-adapter": "node scripts/certify-speaker-diarization-adapter.mjs",
+    "certify:multivoice-stt": "node scripts/certify-multivoice-stt.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
