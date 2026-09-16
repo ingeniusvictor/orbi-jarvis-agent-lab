@@ -98,6 +98,10 @@ const BY_TOOL: Rule[] = [
     tool: /orbi_model_switch|orbi_model_registry/,
     lines: ['Ajustando el modelo local.', 'Revisando los modelos locales.'],
   },
+  {
+    tool: /orbi_voice_runtime_control|orbi_voice_runtime_status/,
+    lines: ['Ajustando la voz.', 'Revisando el sistema de voz.'],
+  },
   // Video sits above image because higgsfield and palmier both do either, so
   // the verb in the tool name is the only thing separating them — a rule on the
   // server alone would send every generate_video to "Rendering."
