@@ -1,6 +1,7 @@
 import { BRIDGE_HTTP_URL, SPEECH_LANG } from '../config'
 import { getMic } from './audio'
 import {
+  speakerOutputActive,
   speakingEchoReference,
   speakingNow,
   speakingSince,
@@ -422,6 +423,8 @@ export const diag = {
   householdIgnored: 0,
   /** Transcripts classified as L.U.M.I.A.'s own loudspeaker echo. */
   selfEchoes: 0,
+  /** Speaker Shield is active upstream while local TTS/system audio is audible. */
+  speakerShield: false,
   /** Milliseconds the last transcription round-trip took. */
   idleMs: 0,
 }
@@ -699,6 +702,10 @@ async function startVadBridgeVoice(
   }
 
   vad = await startVad({
+    suppress: () =>
+      provider === 'local' &&
+      h.mode() === 'guard' &&
+      speakerOutputActive(),
     onStart: () => {
       const mode = h.mode()
       diag.mode = mode
@@ -755,6 +762,10 @@ async function startVadBridgeVoice(
   // 200ms lag on the echo gate is imperceptible.
   const guardPoll = setInterval(() => {
     const mode = h.mode()
+    diag.speakerShield =
+      provider === 'local' &&
+      mode === 'guard' &&
+      speakerOutputActive()
     vad?.setGuard(mode === 'guard')
     // He has stood down — by Escape, by the idle timeout, or by dropping back
     // to the wake word. Anything half-said belonged to a conversation that is
