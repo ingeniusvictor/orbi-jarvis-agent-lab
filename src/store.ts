@@ -60,6 +60,21 @@ export type Turn = {
   tools?: string[]
 }
 
+export type HeardLine = {
+  id: string
+  text: string
+  provider: 'browser' | 'whisper-local' | 'elevenlabs'
+  mode: Phase | 'wake' | 'command' | 'guard' | 'deaf'
+  at: number
+}
+
+export type MultiSpeakerLine = {
+  id: string
+  speaker: string
+  text: string
+  at: number
+}
+
 /**
  * An image JARVIS has put into orbit around the reactor.
  *
@@ -214,8 +229,12 @@ type State = {
   phase: Phase
   /** 0..1 mic loudness, drives the reactor pulse. */
   level: number
-  /** What JARVIS is currently reading aloud or has just said. */
+  /** Live partial transcription while the microphone is listening. */
   caption: string
+  /** Raw STT segments, kept separate from assistant replies. */
+  heardLines: HeardLine[]
+  /** Future diarized speaker lane. Empty until a real speaker classifier exists. */
+  multiSpeakerLines: MultiSpeakerLine[]
   turns: Turn[]
   activeTool: string | null
   error: string | null
@@ -255,6 +274,8 @@ type State = {
   setPhase: (p: Phase) => void
   setLevel: (l: number) => void
   setCaption: (c: string) => void
+  pushHeardLine: (line: HeardLine) => void
+  pushMultiSpeakerLine: (line: MultiSpeakerLine) => void
   setActiveTool: (t: string | null) => void
   setError: (e: string | null) => void
   setConnected: (c: string[]) => void
@@ -274,6 +295,8 @@ export const useStore = create<State>((set) => ({
   phase: 'offline',
   level: 0,
   caption: '',
+  heardLines: [],
+  multiSpeakerLines: [],
   turns: [],
   activeTool: null,
   error: null,
@@ -349,6 +372,12 @@ export const useStore = create<State>((set) => ({
   setPhase: (phase) => set({ phase }),
   setLevel: (level) => set({ level }),
   setCaption: (caption) => set({ caption }),
+  pushHeardLine: (line) =>
+    set((s) => ({ heardLines: [...s.heardLines.slice(-23), line] })),
+  pushMultiSpeakerLine: (line) =>
+    set((s) => ({
+      multiSpeakerLines: [...s.multiSpeakerLines.slice(-23), line],
+    })),
   setActiveTool: (activeTool) => set({ activeTool }),
   setError: (error) => set({ error }),
   setConnected: (connected) => set({ connected }),
@@ -404,11 +433,22 @@ export const useStore = create<State>((set) => ({
     set((s) => {
       const panels = what === 'transcript' ? s.panels : []
       const turns = what === 'panels' ? s.turns : []
+      const heardLines = what === 'panels' ? s.heardLines : []
+      const multiSpeakerLines =
+        what === 'panels' ? s.multiSpeakerLines : []
       // Blades clear with the panels. "Clear the screen" said out loud means the
       // screen, and leaving a full-height article standing while the cards
       // around it vanish is the interface arguing with the instruction.
       const blades = what === 'transcript' ? s.blades : []
-      const cleared = { panels, turns, blades, focusedBlade: null, expandedBlade: null }
+      const cleared = {
+        panels,
+        turns,
+        heardLines,
+        multiSpeakerLines,
+        blades,
+        focusedBlade: null,
+        expandedBlade: null,
+      }
       return what === 'all'
         ? { ...cleared, caption: '', activeTool: null }
         : cleared
