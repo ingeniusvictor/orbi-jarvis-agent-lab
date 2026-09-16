@@ -6,6 +6,7 @@ import { caps } from './capabilities'
 import { audioBlobToPcmWav } from './wav'
 import {
   shouldDropStaleVoiceSegment,
+  shouldInterruptBusyAssistant,
   transcriptSegmentIsStillActive,
   type FocusVoiceMode,
 } from './voice-focus'
@@ -408,6 +409,8 @@ export const diag = {
   restarts: 0,
   /** Queued audio discarded because its original turn already closed. */
   staleSegments: 0,
+  /** Busy-time household speech heard but intentionally not treated as barge-in. */
+  householdIgnored: 0,
   /** Milliseconds the last transcription round-trip took. */
   idleMs: 0,
 }
@@ -597,6 +600,33 @@ async function startVadBridgeVoice(
         at: Date.now(),
       })
 
+      // Household Focus for local Whisper: speech captured while L.U.M.I.A. is
+      // busy remains visible in ESCUCHANDO, but it cannot cancel the answer or
+      // become a new command unless the speaker explicitly says her name or an
+      // interrupt phrase. This is what keeps a child/spouse/TV from hijacking a
+      // turn simply by talking nearby.
+      if (provider === 'local' && capturedMode === 'guard') {
+        if (
+          !shouldInterruptBusyAssistant(said, {
+            wake: WAKE,
+            override: OVERRIDE,
+          })
+        ) {
+          diag.householdIgnored++
+          drop('household speech observed while busy; explicit Lumi/interrupt required')
+          return
+        }
+
+        h.onSpeechStart()
+
+        // "Lumi, explícame..." is an intentional barge-in and should become a
+        // new command. A bare "Lumi" or "para" only stops the current answer
+        // and leaves the assistant listening for what comes next.
+        const trailing = WAKE.test(said) ? afterWake(said) : ''
+        if (trailing) h.onUtterance(trailing)
+        return
+      }
+
       if (mode === 'wake') {
         if (WAKE.test(said) && Date.now() - lastWake > WAKE_DEBOUNCE) {
           lastWake = Date.now()
@@ -663,7 +693,11 @@ async function startVadBridgeVoice(
           diag.selfGuarded++
           return
         }
-        h.onSpeechStart()
+
+        // Local Whisper uses Household Focus: wait for the transcript before
+        // deciding whether this is an intentional interruption. ElevenLabs
+        // keeps the historical natural barge-in behavior.
+        if (provider !== 'local') h.onSpeechStart()
       }
     },
     onEnd: (blob) => {
