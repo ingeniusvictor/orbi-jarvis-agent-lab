@@ -24,6 +24,7 @@ function heardLaneLabel(
 ): string {
   if (kind === 'self-echo') return 'ECO LUMI'
   if (kind === 'non-speech') return 'NO VOZ'
+  if (mode === 'wake') return 'ACTIVACIÓN'
   if (mode === 'guard') return 'GUARD'
   if (mode === 'deaf') return 'BLOQUEADO'
   return 'STT'
