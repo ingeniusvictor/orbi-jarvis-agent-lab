@@ -86,6 +86,15 @@ assert.deepEqual(
   { action: 'set_auto' },
 )
 
+assert.deepEqual(
+  parseVoiceRuntimeControl('Lumi, activa modo local'),
+  { action: 'set_mode', mode: 'local' },
+)
+assert.deepEqual(
+  parseVoiceRuntimeControl('Lumi, usa modo navegador'),
+  { action: 'set_mode', mode: 'browser' },
+)
+
 setSttMode(before.sttMode)
 setTtsMode(before.ttsMode)
 setVoiceProfile(before.voiceProfile)
