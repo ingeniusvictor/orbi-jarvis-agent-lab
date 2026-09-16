@@ -4,6 +4,7 @@ import {
   getVoiceProfile,
   getVoiceRuntimeState,
   listVoiceProfiles,
+  parseVoiceRuntimeControl,
   registerVoiceProfile,
   resolveVoiceRuntime,
   setSttMode,
@@ -63,6 +64,27 @@ registerVoiceProfile({
 assert.throws(() => setVoiceProfile('cert-no-consent'), /consent/i)
 
 assert.ok(listVoiceProfiles().length >= 4)
+
+assert.deepEqual(
+  parseVoiceRuntimeControl('Lumi, usa reconocimiento local'),
+  { action: 'set_stt', mode: 'local' },
+)
+assert.deepEqual(
+  parseVoiceRuntimeControl('Lumi, vuelve al reconocimiento del navegador'),
+  { action: 'set_stt', mode: 'browser' },
+)
+assert.deepEqual(
+  parseVoiceRuntimeControl('Lumi, usa la voz local'),
+  { action: 'set_tts', mode: 'local' },
+)
+assert.deepEqual(
+  parseVoiceRuntimeControl('Lumi, usa la voz del sistema'),
+  { action: 'set_tts', mode: 'system' },
+)
+assert.deepEqual(
+  parseVoiceRuntimeControl('Lumi, activa modo de voz automático'),
+  { action: 'set_auto' },
+)
 
 setSttMode(before.sttMode)
 setTtsMode(before.ttsMode)
