@@ -38,6 +38,7 @@ import {
   synthesizeLocalSpeech,
 } from './orbia/local-tts.mjs'
 import { transcribeMultivoiceLocalWav } from './orbia/multivoice-stt.mjs'
+import { ensureWhisperServer } from './orbia/whisper-server-runtime.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
 
@@ -1249,6 +1250,21 @@ console.log(
   `${CONSOLE_TAG} local voice Whisper ${voiceRuntimeAtBoot.local.sttAvailable ? 'ready' : 'not ready'}` +
     ` · Kokoro ${voiceRuntimeAtBoot.local.ttsAvailable ? 'ready' : 'not ready'}`,
 )
+
+if (voiceRuntimeAtBoot.local.sttAvailable) {
+  void ensureWhisperServer().then((status) => {
+    if (status.ready) {
+      console.log(
+        `${CONSOLE_TAG} Whisper hot runtime ready · ${status.baseUrl}` +
+          (status.reused ? ' · reused' : ' · model kept resident'),
+      )
+    } else {
+      console.warn(
+        `${CONSOLE_TAG} whisper-server unavailable (${status.reason ?? 'unknown'}) · CLI fallback remains enabled`,
+      )
+    }
+  })
+}
 if (PROVIDER === 'ollama') {
   console.log(`${CONSOLE_TAG} local model ${OLLAMA_MODEL} · ${OLLAMA_URL}`)
   void probeOllama().then(({ ok, models }) => {
