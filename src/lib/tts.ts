@@ -118,11 +118,24 @@ if (typeof window !== 'undefined') {
 let nativeBroken = false
 
 let speakingAt = 0
+let outputAudible = false
+let outputTailUntil = 0
 
 /** When the current sentence started, or 0 if nothing is being spoken. The
  *  voice loop uses this to refuse to interrupt him in his own first syllable. */
 export function speakingSince(): number {
   return speaking ? speakingAt : 0
+}
+
+/** True while L.U.M.I.A.'s physical output is audible, plus the short acoustic
+ * tail that can still be present in the room after playback ends. */
+export function speakerOutputActive(): boolean {
+  return outputAudible || Date.now() < outputTailUntil
+}
+
+function markOutputAudible(on: boolean) {
+  outputAudible = on
+  if (!on) outputTailUntil = Date.now() + ECHO_TAIL_MS
 }
 
 function rememberEcho(text: string) {
@@ -592,6 +605,7 @@ export function createSpeaker(): Speaker {
         if (done) return
         done = true
         nativeInFlight = false
+        if (started) markOutputAudible(false)
         if (watchdog) clearTimeout(watchdog)
         if (keepalive) clearInterval(keepalive)
         cancelAnimationFrame(raf)
@@ -604,6 +618,7 @@ export function createSpeaker(): Speaker {
 
       u.onstart = () => {
         started = true
+        markOutputAudible(true)
         diag.started++
         diag.lastError = ''
         if (watchdog) clearTimeout(watchdog)
@@ -713,6 +728,7 @@ export function createSpeaker(): Speaker {
         done = true
         cancelAnimationFrame(raf)
         outLevel = 0.12
+        markOutputAudible(false)
         URL.revokeObjectURL(url)
         if (currentAudio === audio) currentAudio = null
         resolve()
@@ -721,6 +737,7 @@ export function createSpeaker(): Speaker {
       // SpeechSynthesisUtterance.onstart, and it is what makes the diagnostics
       // verdict — and the T self-test — tell the truth on the premium path.
       audio.onplaying = () => {
+        markOutputAudible(true)
         diag.started++
         diag.lastError = ''
       }
