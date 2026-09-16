@@ -8,6 +8,7 @@ import {
   synthesizeLocalSpeech,
 } from '../bridge/orbia/local-tts.mjs'
 import {
+  normalizeTechnicalSpeechText,
   ORBI_SPEECH_INITIAL_PROMPT,
   ORBI_SPEECH_VOCABULARY,
 } from '../bridge/orbia/speech-vocabulary.mjs'
@@ -38,6 +39,18 @@ assert.ok(ORBI_SPEECH_VOCABULARY.includes('Qwen'))
 assert.ok(ORBI_SPEECH_VOCABULARY.includes('L.U.M.I.A.'))
 assert.match(ORBI_SPEECH_INITIAL_PROMPT, /Qwen/)
 assert.match(ORBI_SPEECH_INITIAL_PROMPT, /Ollama/)
+assert.equal(
+  normalizeTechnicalSpeechText('Explícame qué es un MTTP.'),
+  'Explícame qué es un MPPT.',
+)
+assert.equal(
+  normalizeTechnicalSpeechText('Explícame qué es un MPTT.'),
+  'Explícame qué es un MPPT.',
+)
+assert.equal(
+  normalizeTechnicalSpeechText('Escuché solo una M.'),
+  'Escuché solo una M.',
+)
 
 console.log('C1-E local voice adapter contract smoke test: PASS')
 console.log('STT: PCM WAV guard + bounded invalid-input handling')
