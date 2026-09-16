@@ -1,6 +1,10 @@
 import { BRIDGE_HTTP_URL, SPEECH_LANG } from '../config'
 import { getMic } from './audio'
-import { speakingNow, speakingSince } from './tts'
+import {
+  speakingEchoReference,
+  speakingNow,
+  speakingSince,
+} from './tts'
 import { startVad, type Vad } from './vad'
 import { caps } from './capabilities'
 import { audioBlobToPcmWav } from './wav'
@@ -45,6 +49,7 @@ export type VoiceTranscriptEvent = {
   id: string
   text: string
   provider: 'browser' | 'whisper-local' | 'elevenlabs'
+  kind: 'speech' | 'self-echo'
   capturedMode: VoiceMode
   at: number
 }
@@ -342,7 +347,11 @@ const STOP = new Set(
  * mangles its own playback badly enough that a substring match rarely holds,
  * but the *words* survive.
  */
-function isEcho(heard: string, spoken: string): boolean {
+function isEcho(
+  heard: string,
+  spoken: string,
+  strict = false,
+): boolean {
   if (!spoken) return false
   if (OVERRIDE.test(heard)) return false
 
@@ -362,7 +371,7 @@ function isEcho(heard: string, spoken: string): boolean {
 
   let hits = 0
   for (const w of content) if (mine.has(w)) hits++
-  return hits / content.length >= 0.6
+  return hits / content.length >= (strict ? 0.5 : 0.6)
 }
 
 // ---------------------------------------------------------------------------
@@ -411,6 +420,8 @@ export const diag = {
   staleSegments: 0,
   /** Busy-time household speech heard but intentionally not treated as barge-in. */
   householdIgnored: 0,
+  /** Transcripts classified as L.U.M.I.A.'s own loudspeaker echo. */
+  selfEchoes: 0,
   /** Milliseconds the last transcription round-trip took. */
   idleMs: 0,
 }
@@ -583,12 +594,17 @@ async function startVadBridgeVoice(
         return
       }
 
-      // His own voice, come back through the microphone. The raised guard
-      // threshold stops most of it at the door; this catches the rest.
-      if (isEcho(said, speakingNow())) {
-        drop('echo of his own voice')
-        return
-      }
+      // L.U.M.I.A. is on loudspeakers, so the microphone can receive her
+      // own answer as if a second person were talking. For audio captured while
+      // she was busy, compare against the rolling TTS history rather than only
+      // the current sentence: Whisper may return several seconds late.
+      const echoReference =
+        capturedMode === 'guard'
+          ? speakingEchoReference()
+          : speakingNow()
+      const selfEcho =
+        !OVERRIDE.test(said) &&
+        isEcho(said, echoReference, capturedMode === 'guard')
 
       diag.heard = said
       diag.heardAt = Date.now()
@@ -596,9 +612,16 @@ async function startVadBridgeVoice(
         id: `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         text: said,
         provider: provider === 'local' ? 'whisper-local' : 'elevenlabs',
+        kind: selfEcho ? 'self-echo' : 'speech',
         capturedMode: capturedMode as VoiceMode,
         at: Date.now(),
       })
+
+      if (selfEcho) {
+        diag.selfEchoes++
+        drop('echo of L.U.M.I.A. loudspeaker output')
+        return
+      }
 
       // Household Focus for local Whisper: speech captured while L.U.M.I.A. is
       // busy remains visible in ESCUCHANDO, but it cannot cancel the answer or
@@ -828,19 +851,28 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
     const mode = h.mode()
     reset()
     if (!text || mode === 'deaf') return
-    if (isEcho(text, speakingNow())) {
-      drop('echo of his own voice')
-      return
-    }
+    const browserEchoReference =
+      mode === 'guard' ? speakingEchoReference() : speakingNow()
+    const selfEcho =
+      !OVERRIDE.test(text) &&
+      isEcho(text, browserEchoReference, mode === 'guard')
+
     diag.heard = text
     diag.heardAt = Date.now()
     h.onTranscript?.({
       id: `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       text,
       provider: 'browser',
+      kind: selfEcho ? 'self-echo' : 'speech',
       capturedMode: mode,
       at: Date.now(),
     })
+
+    if (selfEcho) {
+      diag.selfEchoes++
+      drop('echo of L.U.M.I.A. loudspeaker output')
+      return
+    }
     if (mode === 'wake') {
       assemble.cancel()
       if (WAKE.test(text) && Date.now() - lastWake > WAKE_DEBOUNCE) {
