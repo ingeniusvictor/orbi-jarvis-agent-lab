@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict'
+import {
+  buildModelInventory,
+  getActiveModel,
+  parseModelControl,
+  resolveModelRequest,
+  setActiveModel,
+} from '../bridge/orbia/model-manager.mjs'
+import { createReadOnlyDiagnosticTools } from '../bridge/orbia/diagnostic-tools.mjs'
+import { ToolExecutor, ToolRegistry } from '../bridge/orbia/tool-engine.mjs'
+
+const installed = [
+  'orbia-lumia:4b',
+  'qwen3:1.7b',
+  'qwen3:4b',
+  'qwen2.5-coder:7b',
+]
+
+assert.equal(
+  resolveModelRequest('rápido', installed),
+  'qwen3:1.7b',
+)
+assert.equal(
+  resolveModelRequest('modelo equilibrado', installed),
+  'orbia-lumia:4b',
+)
+assert.equal(
+  resolveModelRequest('modelo de código', installed),
+  'qwen2.5-coder:7b',
+)
+
+assert.deepEqual(
+  parseModelControl('Lumi, ¿qué modelos puedo usar?'),
+  { action: 'list' },
+)
+
+assert.deepEqual(
+  parseModelControl('Lumi, cambia al modelo rápido'),
+  { action: 'switch', requested: 'rápido' },
+)
+
+const before = getActiveModel()
+setActiveModel('qwen3:1.7b')
+
+const registry = new ToolRegistry()
+for (const tool of createReadOnlyDiagnosticTools({
+  provider: 'ollama',
+  getModel: getActiveModel,
+})) {
+  registry.register(tool)
+}
+
+const executor = new ToolExecutor(registry)
+const execution = await executor.execute(
+  {
+    id: 'amr-status',
+    conversationId: 'amr-cert',
+    name: 'orbi_runtime_status',
+    input: {},
+  },
+  { allowed: ['orbi_runtime_status'] },
+)
+
+assert.equal(execution.result.ok, true)
+assert.match(execution.result.value, /qwen3:1.7b/)
+
+const inventory = buildModelInventory(installed)
+assert.equal(
+  inventory.find((item) => item.name === 'qwen3:1.7b')?.active,
+  true,
+)
+
+setActiveModel(before)
+
+console.log('AMR-01 Adaptive Model Runtime smoke test: PASS')
+console.log('Aliases: fast / balanced / coding')
+console.log('Runtime status: active model is dynamic')
+console.log('Voice control parser: list + switch intents')
