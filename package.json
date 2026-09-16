@@ -39,7 +39,8 @@
     "certify:diarization-probe": "node scripts/certify-speaker-diarization-probe.mjs",
     "voice:setup:diarization": "node scripts/setup-speaker-diarization.mjs",
     "certify:diarization-adapter": "node scripts/certify-speaker-diarization-adapter.mjs",
-    "certify:multivoice-stt": "node scripts/certify-multivoice-stt.mjs"
+    "certify:multivoice-stt": "node scripts/certify-multivoice-stt.mjs",
+    "voice:benchmark:multivoice": "node scripts/benchmark-multivoice.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
