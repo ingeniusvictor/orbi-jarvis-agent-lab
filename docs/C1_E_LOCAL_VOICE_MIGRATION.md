@@ -165,3 +165,19 @@ npm run voice:doctor
 After local runtimes are ready, manually validate browser mode, local mode,
 independent STT/TTS switching, long Spanish dictation, Qwen/Ollama terminology,
 barge-in, repeated turns and fallback behaviour.
+
+## Workstation validation — 2026-09-15
+
+Confirmed on the target Windows workstation:
+
+- `npm run lint` — PASS, 0 warnings / 0 errors.
+- `npm run build` — PASS.
+- whisper.cpp Windows CPU runtime — READY.
+- Whisper `ggml-base.bin` model — READY.
+- `npm run voice:doctor` reports `Local STT: READY`.
+- VRM `auto` currently resolves STT to `local`.
+- TTS remains `system` because Kokoro is not installed yet.
+
+Next certification gate: manual Companion STT validation with short Spanish commands,
+long dictation, technical vocabulary (Qwen/Ollama/O.R.B.I.A./L.U.M.I.A.) and
+barge-in before installing Kokoro.
