@@ -37,6 +37,7 @@ import {
   LocalTextToSpeechError,
   synthesizeLocalSpeech,
 } from './orbia/local-tts.mjs'
+import { transcribeMultivoiceLocalWav } from './orbia/multivoice-stt.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
 
@@ -891,6 +892,78 @@ const handleRequest = async (req, res) => {
             : code === 'VOICE_TTS_TIMEOUT'
               ? 504
               : 502
+      res.writeHead(status, {
+        ...cors,
+        'content-type': 'application/json',
+      })
+      return res.end(JSON.stringify({ ok: false, errorCode: code }))
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/stt/multivoice') {
+    const type = String(req.headers['content-type'] || '').toLowerCase()
+    if (
+      !type.includes('audio/wav') &&
+      !type.includes('audio/wave') &&
+      !type.includes('audio/x-wav')
+    ) {
+      res.writeHead(415, {
+        ...cors,
+        'content-type': 'application/json',
+      })
+      return res.end(
+        JSON.stringify({
+          ok: false,
+          errorCode: 'DIARIZATION_UNSUPPORTED_AUDIO',
+        }),
+      )
+    }
+
+    const chunks = []
+    let size = 0
+    let overflowed = false
+    for await (const chunk of req) {
+      chunks.push(chunk)
+      size += chunk.length
+      if (size > 25 * 1024 * 1024) {
+        overflowed = true
+        break
+      }
+    }
+    if (overflowed) {
+      req.destroy()
+      res.writeHead(413, cors)
+      return res.end('audio too large')
+    }
+
+    try {
+      const started = Date.now()
+      const result = await transcribeMultivoiceLocalWav(Buffer.concat(chunks))
+      res.writeHead(200, {
+        ...cors,
+        'content-type': 'application/json',
+        'cache-control': 'no-cache',
+        'x-orbia-voice-provider': result.provider,
+      })
+      return res.end(
+        JSON.stringify({
+          ok: true,
+          ...result,
+          durationMs: Date.now() - started,
+        }),
+      )
+    } catch (err) {
+      const code =
+        typeof err?.code === 'string'
+          ? err.code
+          : 'DIARIZATION_FAILED'
+      const status =
+        code === 'DIARIZATION_UNAVAILABLE'
+          ? 503
+          : code === 'DIARIZATION_INVALID_AUDIO' ||
+              code === 'DIARIZATION_UNSUPPORTED_AUDIO'
+            ? 400
+            : 502
       res.writeHead(status, {
         ...cors,
         'content-type': 'application/json',
