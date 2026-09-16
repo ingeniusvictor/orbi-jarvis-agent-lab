@@ -437,6 +437,12 @@ export const diag = {
   nonSpeech: 0,
   /** Rapid duplicate STT segments ignored before assembly. */
   duplicates: 0,
+  /** Current local STT queue depth. */
+  queueDepth: 0,
+  /** Highest queue depth observed this session. */
+  maxQueueDepth: 0,
+  /** Background/guard segments dropped to keep voice responsive. */
+  queueDrops: 0,
   /** Milliseconds the last transcription round-trip took. */
   idleMs: 0,
 }
@@ -532,6 +538,59 @@ async function startVadBridgeVoice(
   let lastTranscriptAt = 0
   let lastTranscriptEpoch = -1
 
+  const refreshQueueDiag = () => {
+    diag.queueDepth = pendingAudio.length
+    diag.maxQueueDepth = Math.max(diag.maxQueueDepth, pendingAudio.length)
+  }
+
+  const queueAudio = (
+    blob: Blob,
+    capturedMode: FocusVoiceMode,
+    epoch: number,
+  ) => {
+    // Dormant/background and guard audio are observational only. Keeping every
+    // fragment creates a transcription backlog in a real household, so retain
+    // only the newest pending segment of each non-command class.
+    if (capturedMode === 'wake' || capturedMode === 'guard') {
+      for (let i = pendingAudio.length - 1; i >= 0; i--) {
+        if (pendingAudio[i].capturedMode === capturedMode) {
+          pendingAudio.splice(i, 1)
+          diag.queueDrops++
+        }
+      }
+    }
+
+    // A real command has priority over any old background/guard work. Preserve
+    // earlier command fragments from the same turn because natural pauses may
+    // legitimately split one sentence across several VAD segments.
+    if (capturedMode === 'command') {
+      for (let i = pendingAudio.length - 1; i >= 0; i--) {
+        const pending = pendingAudio[i]
+        if (
+          pending.capturedMode !== 'command' ||
+          pending.epoch !== epoch
+        ) {
+          pendingAudio.splice(i, 1)
+          diag.queueDrops++
+        }
+      }
+    }
+
+    pendingAudio.push({ blob, capturedMode, epoch })
+
+    // Hard ceiling: local voice must stay interactive even in a noisy room.
+    while (pendingAudio.length > 4) {
+      const backgroundIndex = pendingAudio.findIndex(
+        (pending) => pending.capturedMode !== 'command',
+      )
+      if (backgroundIndex >= 0) pendingAudio.splice(backgroundIndex, 1)
+      else pendingAudio.shift()
+      diag.queueDrops++
+    }
+
+    refreshQueueDiag()
+  }
+
   /**
    * Transcripts become turns here rather than one-per-segment.
    * See makeAssembler for why.
@@ -543,6 +602,7 @@ async function startVadBridgeVoice(
       // speaker/turn and must not be appended just because it is already queued.
       captureEpoch++
       pendingAudio.length = 0
+      refreshQueueDiag()
       diag.dropped = ''
       diag.accepted++
       diag.holding = ''
@@ -731,6 +791,7 @@ async function startVadBridgeVoice(
     try {
       while (pendingAudio.length) {
         const pending = pendingAudio.shift()!
+        refreshQueueDiag()
         await transcribe(
           pending.blob,
           pending.capturedMode,
@@ -772,11 +833,11 @@ async function startVadBridgeVoice(
       }
     },
     onEnd: (blob) => {
-      pendingAudio.push({
+      queueAudio(
         blob,
-        capturedMode: h.mode() as FocusVoiceMode,
-        epoch: captureEpoch,
-      })
+        h.mode() as FocusVoiceMode,
+        captureEpoch,
+      )
       void drain()
     },
     onLevel: (v) => {
