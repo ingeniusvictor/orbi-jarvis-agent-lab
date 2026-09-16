@@ -206,6 +206,24 @@ export function parseVoiceRuntimeControl(prompt) {
   ) {
     return { action: 'set_auto' }
   }
+  if (
+    text.includes('modo de voz local') ||
+    text.includes('modo local de voz') ||
+    text.includes('activa modo local') ||
+    text.includes('usa modo local')
+  ) {
+    return { action: 'set_mode', mode: 'local' }
+  }
+
+  if (
+    text.includes('modo de voz navegador') ||
+    text.includes('modo navegador de voz') ||
+    text.includes('activa modo navegador') ||
+    text.includes('usa modo navegador')
+  ) {
+    return { action: 'set_mode', mode: 'browser' }
+  }
+
 
   if (
     text.includes('reconocimiento local') ||
