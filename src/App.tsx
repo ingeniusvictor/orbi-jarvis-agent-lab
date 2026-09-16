@@ -354,6 +354,7 @@ export default function App() {
       id: event.id,
       text: event.text,
       provider: event.provider,
+      kind: event.kind,
       mode: event.capturedMode,
       at: event.at,
     })
