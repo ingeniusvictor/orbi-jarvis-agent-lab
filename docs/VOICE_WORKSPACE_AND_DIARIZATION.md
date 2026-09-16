@@ -150,3 +150,41 @@ Pending:
 - connect diarized timestamps to Whisper text;
 - certify 1, 2 and overlapping speaker scenarios;
 - optional authorized speaker enrollment.
+
+## Current implementation boundary
+
+VF-02 has now advanced beyond the readiness probe, but remains intentionally
+**off the normal conversation hot path**.
+
+Implemented:
+
+- Windows bootstrap: `npm run voice:setup:diarization`;
+- experimental `sherpa-onnx-node` local runtime installation without changing
+  the project package manifest;
+- official pyannote segmentation + 3D-Speaker embedding model download;
+- mono PCM16 WAV decoder for diarization;
+- offline speaker segmentation adapter;
+- same-speaker segment merge logic;
+- per-speaker WAV slicing;
+- experimental per-speaker Whisper transcription;
+- explicit bridge route: `POST /stt/multivoice`;
+- benchmark command:
+  `npm run voice:benchmark:multivoice -- "<path-to-16k-mono-pcm16.wav>"`.
+
+The normal `/stt/local` path does **not** invoke diarization yet. That is
+deliberate: running diarization plus several Whisper passes on every utterance
+could reintroduce the same latency/backlog problem that Speaker Shield just
+removed.
+
+Activation gate:
+
+1. current single-speaker + Speaker Shield path passes local testing;
+2. diarization runtime is installed and `voice:doctor` reports READY;
+3. CPU latency is measured on a real 2-speaker WAV;
+4. only then decide whether diarization should run always, conditionally, or
+   only in an explicit multivoice mode.
+
+Anonymous labels remain per clip (`SPEAKER 1`, `SPEAKER 2`, ...). No attempt
+is made to identify family members until a separate opt-in enrollment design is
+implemented.
+
