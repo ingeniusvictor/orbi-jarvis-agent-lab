@@ -28,7 +28,8 @@
     "certify:amr": "node scripts/certify-amr-model-runtime.mjs",
     "certify:vrm": "node scripts/certify-vrm-runtime.mjs",
     "certify:c1:voice-probe": "node scripts/certify-c1-local-voice-probe.mjs",
-    "certify:c1:voice-adapters": "node scripts/certify-c1-local-voice-adapters.mjs"
+    "certify:c1:voice-adapters": "node scripts/certify-c1-local-voice-adapters.mjs",
+    "voice:doctor": "node scripts/voice-doctor.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
