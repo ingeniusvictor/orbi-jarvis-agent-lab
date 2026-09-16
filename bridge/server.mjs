@@ -40,6 +40,9 @@ if (!['claude', 'ollama'].includes(PROVIDER)) {
   throw new Error(`Unsupported JARVIS_PROVIDER="${PROVIDER}". Use claude or ollama.`)
 }
 
+const CONSOLE_TAG = PROVIDER === 'ollama' ? '[lumia]' : '[jarvis]'
+const ASSISTANT_NAME = PROVIDER === 'ollama' ? 'L.U.M.I.A.' : 'JARVIS'
+
 /**
  * A crash here takes the whole assistant down mid-sentence, and most of what
  * can reject is out of our hands — a socket dying under a write, an upstream
@@ -47,7 +50,7 @@ if (!['claude', 'ollama'].includes(PROVIDER)) {
  * its own error to the browser.
  */
 process.on('unhandledRejection', (err) => {
-  console.error('[jarvis] unhandled rejection:', err)
+  console.error(CONSOLE_TAG, 'unhandled rejection:', err)
 })
 
 /**
@@ -633,7 +636,7 @@ async function proxyRemote(req, res, cors, { kinds, maxBytes, timeoutMs, ranged 
     if (sent > maxBytes) {
       // Headers went out long ago, so a truncated body is the only way left to
       // say no. The player sees a short read; we see this line in the log.
-      console.warn(`[jarvis] proxy cut ${target.href} at ${maxBytes} bytes`)
+      console.warn(`${CONSOLE_TAG} proxy cut ${target.href} at ${maxBytes} bytes`)
       upstream.destroy()
       res.destroy()
       return
@@ -675,7 +678,7 @@ const http = await import('node:http')
 const handleRequest = async (req, res) => {
   const origin = req.headers.origin
   if (origin && !originAllowed(origin)) {
-    console.warn(`[jarvis] refused http request from origin ${origin}`)
+    console.warn(`${CONSOLE_TAG} refused http request from origin ${origin}`)
     res.writeHead(403, { vary: 'origin' })
     return res.end('forbidden')
   }
@@ -980,7 +983,7 @@ const server = http.createServer((req, res) => {
   // unhandled rejection and leave the browser waiting on a socket that is
   // never going to answer.
   handleRequest(req, res).catch((err) => {
-    console.error('[jarvis] request failed:', err)
+    console.error(CONSOLE_TAG, 'request failed:', err)
     if (!res.headersSent) res.writeHead(500)
     res.end()
   })
@@ -995,12 +998,12 @@ const wss = new WebSocketServer({
   verifyClient: ({ origin, req }, done) => {
     const path = (req.url ?? '/').split('?')[0]
     if (path !== '/' && path !== '/ws') {
-      console.warn(`[jarvis] rejected websocket on path ${path}`)
+      console.warn(`${CONSOLE_TAG} rejected websocket on path ${path}`)
       return done(false, 403, 'Forbidden')
     }
     if (!originAllowed(origin)) {
       console.warn(
-        `[jarvis] rejected websocket from origin ${origin ?? '(none)'}` +
+        `${CONSOLE_TAG} rejected websocket from origin ${origin ?? '(none)'}` +
           ' — set JARVIS_ALLOWED_ORIGINS to permit it',
       )
       return done(false, 403, 'Forbidden')
@@ -1010,39 +1013,39 @@ const wss = new WebSocketServer({
 })
 server.listen(PORT)
 
-console.log(`[jarvis] bridge listening on ws://localhost:${PORT}`)
+console.log(`${CONSOLE_TAG} bridge listening on ws://localhost:${PORT}`)
 console.log(
-  `[jarvis] speech ${elevenKey() ? 'via ElevenLabs (key from MCP config)' : 'using browser fallback voice'}`,
+  `${CONSOLE_TAG} speech ${elevenKey() ? 'via ElevenLabs (key from MCP config)' : 'using browser fallback voice'}`,
 )
-console.log(`[jarvis] provider ${PROVIDER}`)
+console.log(`${CONSOLE_TAG} provider ${PROVIDER}`)
 if (PROVIDER === 'ollama') {
-  console.log(`[jarvis] local model ${OLLAMA_MODEL} · ${OLLAMA_URL}`)
+  console.log(`${CONSOLE_TAG} local model ${OLLAMA_MODEL} · ${OLLAMA_URL}`)
   void probeOllama().then(({ ok, models }) => {
     if (!ok) {
-      console.warn('[jarvis] Ollama is not reachable — start Ollama before asking a question')
+      console.warn(`${CONSOLE_TAG} Ollama is not reachable — start Ollama before asking a question`)
       return
     }
     console.log(
       models.includes(OLLAMA_MODEL)
-        ? `[jarvis] Ollama ready · ${OLLAMA_MODEL} installed`
-        : `[jarvis] Ollama reachable, but ${OLLAMA_MODEL} is not installed`,
+        ? `${CONSOLE_TAG} Ollama ready · ${OLLAMA_MODEL} installed`
+        : `${CONSOLE_TAG} Ollama reachable, but ${OLLAMA_MODEL} is not installed`,
     )
     if (models.includes(OLLAMA_MODEL)) {
       void warmOllama().then((warm) => {
         console.log(
           warm
-            ? `[jarvis] local model warm · ${OLLAMA_MODEL} kept resident`
-            : '[jarvis] local model warm-up did not complete — first answer may be slower',
+            ? `${CONSOLE_TAG} local model warm · ${OLLAMA_MODEL} kept resident`
+            : `${CONSOLE_TAG} local model warm-up did not complete — first answer may be slower`,
         )
       })
     }
   })
 } else {
-  console.log(`[jarvis] model ${MODEL} · effort ${EFFORT}`)
+  console.log(`${CONSOLE_TAG} model ${MODEL} · effort ${EFFORT}`)
 }
 console.log(
-  `[jarvis] writes ${ALLOW_WRITES ? 'ENABLED' : 'disabled'}` +
-    (ALLOW_WRITES ? '' : ' — set JARVIS_ALLOW_WRITES=1 to permit shell/file/device actions'),
+  `${CONSOLE_TAG} writes ${ALLOW_WRITES ? 'ENABLED' : 'disabled'}` +
+    (ALLOW_WRITES ? '' : ' — restart with --writes to permit shell/file/device actions'),
 )
 // Asynchronous, so it lands a beat after the rest of the banner. Worth printing
 // at all because an extension that is simply not running is indistinguishable
@@ -1051,13 +1054,13 @@ console.log(
 void chromeAvailable().then((ok) => {
   console.log(
     ok
-      ? `[jarvis] browser control ready${ALLOW_WRITES ? '' : ' (reading only — clicking and typing need JARVIS_ALLOW_WRITES=1)'}`
-      : '[jarvis] browser control unavailable — open Chrome with the Claude extension enabled',
+      ? `${CONSOLE_TAG} browser control ready${ALLOW_WRITES ? '' : ' (reading only — clicking and typing require write mode)'}`
+      : `${CONSOLE_TAG} browser control unavailable — open Chrome with the Claude extension enabled`,
   )
 })
 
 console.log(
-  '[jarvis] accepting local dev origins' +
+  `${CONSOLE_TAG} accepting local dev origins` +
     (EXTRA_ORIGINS.size ? ` plus ${[...EXTRA_ORIGINS].join(', ')}` : '') +
     (ALLOW_NO_ORIGIN ? ' and clients that send no origin' : ''),
 )
@@ -1075,7 +1078,7 @@ const RESULT_FAILURES = {
 }
 
 wss.on('connection', (socket) => {
-  console.log('[jarvis] client connected')
+  console.log(`${CONSOLE_TAG} client connected`)
 
   // Phase 1A: preserve the browser/voice transport but swap only the brain.
   // Tools deliberately stay out of this first local milestone; once local
@@ -1307,7 +1310,7 @@ wss.on('connection', (socket) => {
       // reliable; an absence of a call here is not proof nothing ran.
       canUseTool: async (toolName) => {
         const ok = decideTool(toolName)
-        console.log(`[jarvis] tool ${toolName} -> ${ok ? 'allow' : 'deny'}`)
+        console.log(`${CONSOLE_TAG} tool ${toolName} -> ${ok ? 'allow' : 'deny'}`)
         return ok
           ? { behavior: 'allow' }
           : {
@@ -1315,7 +1318,7 @@ wss.on('connection', (socket) => {
               // Every word of this can end up spoken, so it carries no command
               // to read out — the persona is forbidden from saying one aloud.
               message:
-                'Blocked: JARVIS is running in read-only mode and cannot take' +
+                `Blocked: ${ASSISTANT_NAME} is running in read-only mode and cannot take` +
                 ' actions that change anything. Tell the user this action is' +
                 ' unavailable until they enable write access on the machine.',
             }
@@ -1394,7 +1397,7 @@ wss.on('connection', (socket) => {
               })
             } else {
               console.error(
-                `[jarvis] turn failed: ${msg.subtype}`,
+                `${CONSOLE_TAG} turn failed: ${msg.subtype}`,
                 msg.errors ?? '',
               )
               sendTurn({
@@ -1420,13 +1423,13 @@ wss.on('connection', (socket) => {
                 .filter((s) => s.status !== 'needs-auth' && s.status !== 'failed')
                 .map((s) => s.name)
               send({ type: 'ready', servers: usable })
-              console.log(`[jarvis] ${usable.length} MCP servers available`)
+              console.log(`${CONSOLE_TAG} ${usable.length} MCP servers available`)
             }
             break
         }
       }
     } catch (err) {
-      console.error('[jarvis] session error:', err)
+      console.error(CONSOLE_TAG, 'session error:', err)
       send({ type: 'error', message: String(err?.message ?? err) })
       // The stream is finished either way — nothing will ever be read from it
       // again. Leaving the socket open would leave the client believing it has
@@ -1499,7 +1502,7 @@ wss.on('connection', (socket) => {
   })
 
   socket.on('close', () => {
-    console.log('[jarvis] client disconnected')
+    console.log(`${CONSOLE_TAG} client disconnected`)
     closed = true
     deliver?.(null)
     session.close?.()
