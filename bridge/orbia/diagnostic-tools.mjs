@@ -9,7 +9,12 @@
 import { getConversationHistory } from './conversation.mjs'
 import { buildKnowledgeContext } from './knowledge.mjs'
 
-export function createReadOnlyDiagnosticTools({ provider = 'ollama', model = 'unknown', getModel } = {}) {
+export function createReadOnlyDiagnosticTools({
+  provider = 'ollama',
+  model = 'unknown',
+  getModel,
+  getVoiceRuntime,
+} = {}) {
   return Object.freeze([
     Object.freeze({
       name: 'orbi_runtime_status',
@@ -58,6 +63,16 @@ export function createReadOnlyDiagnosticTools({ provider = 'ollama', model = 'un
           exchangeCount: Math.floor(history.length / 2),
         }
       },
+    }),
+    Object.freeze({
+      name: 'orbi_voice_runtime_status',
+      description: 'Returns the requested/effective local voice runtime modes without changing them.',
+      risk: 'read-only',
+      validate: (input) => input == null || (typeof input === 'object' && !Array.isArray(input)),
+      execute: () =>
+        typeof getVoiceRuntime === 'function'
+          ? getVoiceRuntime()
+          : { status: 'UNKNOWN', reason: 'voice-runtime-not-connected' },
     }),
   ])
 }
