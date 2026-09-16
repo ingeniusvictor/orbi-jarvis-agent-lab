@@ -181,3 +181,22 @@ Confirmed on the target Windows workstation:
 Next certification gate: manual Companion STT validation with short Spanish commands,
 long dictation, technical vocabulary (Qwen/Ollama/O.R.B.I.A./L.U.M.I.A.) and
 barge-in before installing Kokoro.
+
+## Voice Focus household hardening
+
+After the first live Whisper test, household cross-talk exposed a delayed-segment
+race: live microphone activity from a second speaker could be mistaken for a
+continuation of an older Whisper segment.
+
+VF-00 is now implemented:
+
+- capture-mode tagging for queued VAD audio;
+- stale queued command audio rejection after the turn closes;
+- finished Whisper segments no longer inherit unrelated current mic activity;
+- `staleSegments` diagnostic counter;
+- certification command: `npm run certify:voice-focus`.
+
+True simultaneous speakers inside one audio segment remain a separate problem
+and are explicitly deferred to the Voice Focus roadmap rather than being
+misrepresented as solved.
+
