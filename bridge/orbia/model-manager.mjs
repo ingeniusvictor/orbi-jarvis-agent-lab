@@ -23,6 +23,36 @@ const normalize = (value) =>
     .replace(/\s+/g, ' ')
     .trim()
 
+const compactModelText = (value) =>
+  normalize(value)
+    .replace(/\b(?:modelo|model)\b/g, '')
+    .replace(/[^a-z0-9.]+/g, '')
+
+const QWEN_SPEECH_ALIASES = [
+  'qwen',
+  'qwin',
+  'qween',
+  'queen',
+  'qeen',
+  'quen',
+  'kwen',
+  'cuen',
+]
+
+function soundsLikeQwen(value) {
+  const compact = compactModelText(value)
+  return QWEN_SPEECH_ALIASES.some((alias) => compact.includes(alias))
+}
+
+function requestedSize(value) {
+  const text = normalize(value)
+    .replace(/(\d)\s+b\b/g, '$1b')
+    .replace(/(\d)\s*[.,]\s*(\d)\s*b\b/g, '$1.$2b')
+
+  const match = text.match(/\b(1\.7b|4b|7b|8b|14b|32b|70b)\b/)
+  return match?.[1] ?? null
+}
+
 export function getActiveModel() {
   return activeModel
 }
@@ -64,6 +94,26 @@ export function resolveModelRequest(requested, installedModels) {
   if (exact) return exact
 
   const q = normalize(requested)
+  const compact = compactModelText(requested)
+  const size = requestedSize(requested)
+  const qwenRequested = soundsLikeQwen(requested)
+
+  // Browser speech recognition often hears "Qwen" as queen/qeen/qwin and may
+  // insert spaces around generation/size numbers. Resolve the family + size
+  // deterministically before falling back to general aliases.
+  if (qwenRequested && size) {
+    const qwenBySize = firstMatching(installed, [
+      (n) => compactModelText(n).includes('qwen') && requestedSize(n) === size,
+    ])
+    if (qwenBySize) return qwenBySize
+  }
+
+  // Canonical compact matching ignores punctuation such as qwen3:4b vs
+  // speech text "qwen 3 4b".
+  const compactExact = installed.find(
+    (name) => compactModelText(name) === compact,
+  )
+  if (compactExact) return compactExact
 
   if (
     q.includes('rapido') ||
@@ -83,8 +133,7 @@ export function resolveModelRequest(requested, installedModels) {
     q.includes('balanceado') ||
     q.includes('principal') ||
     q.includes('balanced') ||
-    q === '4b' ||
-    q.includes('qwen 4')
+    q === '4b'
   ) {
     return firstMatching(installed, [
       (n) => n.includes('orbia-lumia:4b'),
@@ -113,6 +162,8 @@ export function resolveModelRequest(requested, installedModels) {
   }
 
   return firstMatching(installed, [
+    (n) => compactModelText(n).includes(compact),
+    (n) => compact.includes(compactModelText(n)),
     (n) => n.includes(q.replace(/\s+/g, '')),
     (n) => n.includes(q),
   ])
