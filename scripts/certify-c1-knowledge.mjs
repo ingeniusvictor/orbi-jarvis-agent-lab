@@ -18,6 +18,11 @@ assert.ok(studio.totalCharacters <= MAX_CONTEXT_CHARACTERS)
 assert.ok(studio.entries.some((entry) => entry.id === 'lumia-studio-mode'))
 assert.match(knowledgeContextToPrompt(studio), /CONTEXTO ORBI CONTROLADO/)
 
+const mppt = buildKnowledgeContext('¿Qué es un MPPT en paneles solares?')
+assert.ok(mppt.entries.some((entry) => entry.id === 'solar-mppt-basics'))
+assert.match(knowledgeContextToPrompt(mppt), /Maximum Power Point Tracking/)
+assert.match(knowledgeContextToPrompt(mppt), /No es un protocolo de comunicaciones/)
+
 const unknown = buildKnowledgeContext('ornitorrinco cuántico de marte')
 assert.equal(unknown.entries.length, 0)
 
