@@ -24,13 +24,18 @@ import {
   watchBlades,
   watchCapture,
   watchUi,
+  watchVoiceRuntime,
   watchConnection,
   connectedLabels,
   usingBridge,
   type Msg,
 } from './lib/brain'
 import { startAnalyser, micLevel } from './lib/audio'
-import { probeCapabilities } from './lib/capabilities'
+import {
+  applyVoiceRuntimeSnapshot,
+  caps,
+  probeCapabilities,
+} from './lib/capabilities'
 import { env } from './config'
 
 /**
@@ -91,6 +96,7 @@ export default function App() {
   const booting = useRef(false)
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const voicePoll = useRef<ReturnType<typeof setInterval> | null>(null)
+  const voiceRestart = useRef(0)
 
   // -- helpers --------------------------------------------------------------
 
@@ -338,6 +344,27 @@ export default function App() {
     store.getState().setError(message)
   }
 
+  const restartVoice = async () => {
+    const generation = ++voiceRestart.current
+    voice.current?.stop()
+
+    const next = await startVoice({
+      mode,
+      onWake,
+      onSpeechStart,
+      onPartial,
+      onUtterance,
+      onError: onVoiceError,
+    })
+
+    if (generation !== voiceRestart.current) {
+      next.stop()
+      return
+    }
+
+    voice.current = next
+  }
+
   // -- power on -------------------------------------------------------------
 
   const powerOn = async () => {
@@ -473,6 +500,25 @@ export default function App() {
           console.warn('[jarvis] unknown ui op:', op, args)
       }
     })
+    watchVoiceRuntime((runtime) => {
+      const beforeStt = caps().voice?.effective?.effectiveStt
+      applyVoiceRuntimeSnapshot(runtime)
+      const afterStt = caps().voice?.effective?.effectiveStt
+
+      store.getState().setVoice(currentVoiceName())
+
+      // TTS changes are read lazily by createSpeaker and need no restart.
+      // STT owns a long-lived recogniser/VAD loop, so replace only that loop
+      // when its effective provider changes.
+      const phase = store.getState().phase
+      if (
+        beforeStt !== afterStt &&
+        phase !== 'offline' &&
+        phase !== 'boot'
+      ) {
+        void restartVoice()
+      }
+    })
     // In bridge mode the conversation lives in the agent session, which is tied
     // to the socket — so a drop silently wipes his memory while the transcript
     // on screen still shows it. Better to say so than to let him quietly forget.
@@ -549,15 +595,9 @@ export default function App() {
     await intro.end()
     speaker.current = null
 
-    // One voice loop, started once, running until the page closes.
-    voice.current = await startVoice({
-      mode,
-      onWake,
-      onSpeechStart,
-      onPartial,
-      onUtterance,
-      onError: onVoiceError,
-    })
+    // One voice loop at a time. VRM may replace it later if the user switches
+    // between browser recognition and local Whisper.
+    await restartVoice()
 
     store.getState().setPhase('dormant')
   }
@@ -722,6 +762,7 @@ export default function App() {
       window.removeEventListener('keydown', onKey)
       clearIdle()
       if (voicePoll.current) clearInterval(voicePoll.current)
+      voiceRestart.current++
       voice.current?.stop()
       speaker.current?.cancel()
       // The camera must not outlive the page that turned it on.
