@@ -11,6 +11,7 @@ import { caps } from './capabilities'
 import { audioBlobToPcmWav } from './wav'
 import {
   isNonSpeechTranscript,
+  isRapidDuplicateTranscript,
   shouldDropStaleVoiceSegment,
   shouldInterruptBusyAssistant,
   transcriptSegmentIsStillActive,
@@ -433,6 +434,8 @@ export const diag = {
   speakerShield: false,
   /** Whisper acoustic annotations discarded before command assembly. */
   nonSpeech: 0,
+  /** Rapid duplicate STT segments ignored before assembly. */
+  duplicates: 0,
   /** Milliseconds the last transcription round-trip took. */
   idleMs: 0,
 }
@@ -524,6 +527,9 @@ async function startVadBridgeVoice(
   }> = []
   let draining = false
   let captureEpoch = 0
+  let lastTranscript = ''
+  let lastTranscriptAt = 0
+  let lastTranscriptEpoch = -1
 
   /**
    * Transcripts become turns here rather than one-per-segment.
@@ -604,6 +610,23 @@ async function startVadBridgeVoice(
         drop('nothing intelligible in the segment')
         return
       }
+
+      const now = Date.now()
+      if (
+        epoch === lastTranscriptEpoch &&
+        isRapidDuplicateTranscript(
+          lastTranscript,
+          said,
+          now - lastTranscriptAt,
+        )
+      ) {
+        diag.duplicates++
+        drop('rapid duplicate transcription ignored')
+        return
+      }
+      lastTranscript = said
+      lastTranscriptAt = now
+      lastTranscriptEpoch = epoch
 
       // L.U.M.I.A. is on loudspeakers, so the microphone can receive her
       // own answer as if a second person were talking. For audio captured while
