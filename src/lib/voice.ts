@@ -4,6 +4,11 @@ import { speakingNow, speakingSince } from './tts'
 import { startVad, type Vad } from './vad'
 import { caps } from './capabilities'
 import { audioBlobToPcmWav } from './wav'
+import {
+  shouldDropStaleVoiceSegment,
+  transcriptSegmentIsStillActive,
+  type FocusVoiceMode,
+} from './voice-focus'
 
 /**
  * The voice loop.
@@ -391,6 +396,8 @@ export const diag = {
   selfGuarded: 0,
   /** Transcription failures (network, or the bridge speech proxy). */
   restarts: 0,
+  /** Queued audio discarded because its original turn already closed. */
+  staleSegments: 0,
   /** Milliseconds the last transcription round-trip took. */
   idleMs: 0,
 }
@@ -475,7 +482,10 @@ async function startVadBridgeVoice(
    * Order is preserved because the drain is single-flight, which matters —
    * "London" arriving before "what's the weather in" is worse than either.
    */
-  const pendingAudio: Blob[] = []
+  const pendingAudio: Array<{
+    blob: Blob
+    capturedMode: FocusVoiceMode
+  }> = []
   let draining = false
 
   /**
@@ -500,9 +510,20 @@ async function startVadBridgeVoice(
    * transcript arriving — and the transcript belongs to the mode the user is in
    * now, not the one they interrupted.
    */
-  const transcribe = async (blob: Blob) => {
+  const transcribe = async (
+    blob: Blob,
+    capturedMode: FocusVoiceMode,
+  ) => {
     const mode = h.mode()
     if (mode === 'deaf') return
+
+    if (shouldDropStaleVoiceSegment(capturedMode, mode)) {
+      diag.staleSegments++
+      drop(
+        `stale ${capturedMode} audio ignored after mode changed to ${mode}`,
+      )
+      return
+    }
     const t0 = performance.now()
     try {
       const requestBlob =
@@ -556,9 +577,12 @@ async function startVadBridgeVoice(
         return
       }
 
-      // Not a turn yet — a piece of one. The assembler decides when the thought
-      // is finished, reading the words and whether the room is still noisy.
-      assemble.feed(said, vad?.meter().speaking ?? false)
+      // Not a turn yet — a piece of one. This segment has already ended before
+      // Whisper starts decoding it. Do not look at the microphone's *current*
+      // activity here: that may be a child, television or another speaker who
+      // began talking while transcription was still running. The assembler
+      // decides continuation from the returned text and bounded timing instead.
+      assemble.feed(said, transcriptSegmentIsStillActive())
     } catch (err) {
       diag.restarts++
       diag.lastError = String(err)
@@ -576,7 +600,8 @@ async function startVadBridgeVoice(
     draining = true
     try {
       while (pendingAudio.length) {
-        await transcribe(pendingAudio.shift()!)
+        const pending = pendingAudio.shift()!
+        await transcribe(pending.blob, pending.capturedMode)
       }
     } finally {
       draining = false
@@ -605,7 +630,10 @@ async function startVadBridgeVoice(
       }
     },
     onEnd: (blob) => {
-      pendingAudio.push(blob)
+      pendingAudio.push({
+        blob,
+        capturedMode: h.mode() as FocusVoiceMode,
+      })
       void drain()
     },
     onLevel: (v) => {
