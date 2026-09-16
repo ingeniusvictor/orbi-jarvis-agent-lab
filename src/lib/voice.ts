@@ -8,10 +8,10 @@ import { audioBlobToPcmWav } from './wav'
 /**
  * The voice loop.
  *
- * One recogniser, running for the life of the page. It is never torn down for
- * a turn, and that single fact is most of what separates this from a kiosk:
- * the microphone is still open while JARVIS is talking, so you can cut him off
- * the way you would cut off a person.
+ * One active recogniser/VAD loop runs for the life of the selected voice mode.
+ * VRM can replace that loop when the user switches between browser recognition
+ * and local Whisper. The microphone remains available during answers so
+ * L.U.M.I.A. can preserve barge-in where the active engine supports it.
  *
  * The obvious design — one recogniser hunting for the wake word, a second one
  * capturing the command, stopping the first to start the second because the
@@ -408,12 +408,11 @@ if (typeof window !== 'undefined') {
 /**
  * Pick the voice engine and start it.
  *
- * Two engines, chosen by what the bridge reported at boot (see capabilities.ts):
- *   - ElevenLabs available -> local voice-activity detection for instant
- *     barge-in, and ElevenLabs Scribe for the words. The reliable path.
- *   - nothing configured -> the browser's own SpeechRecognition, so a student
- *     with no keys still has a working assistant. Less robust, but free and
- *     zero-setup, and guarded by a heartbeat so its silent death is recovered.
+ * Engines are selected through VRM using bridge readiness:
+ *   - local -> VAD + local Whisper.cpp when installed;
+ *   - browser -> browser SpeechRecognition;
+ *   - auto -> local Whisper when ready, otherwise ElevenLabs if configured,
+ *     otherwise the browser fallback.
  *
  * The microphone is opened once here so a denied permission is reported loudly
  * rather than surfacing later as an unexplained deafness, whichever engine runs.
@@ -455,7 +454,7 @@ export async function startVoice(h: VoiceHandlers): Promise<Voice> {
   return startBrowserVoice(h)
 }
 
-/** VAD + ElevenLabs Scribe. */
+/** VAD + bridge transcription: local Whisper.cpp or ElevenLabs Scribe. */
 async function startVadBridgeVoice(
   h: VoiceHandlers,
   provider: 'elevenlabs' | 'local',
