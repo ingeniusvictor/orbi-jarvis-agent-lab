@@ -21,10 +21,11 @@ const statusText: Record<Phase, string> = {
 function heardLaneLabel(
   kind: 'speech' | 'self-echo' | 'non-speech',
   mode: Phase | 'wake' | 'command' | 'guard' | 'deaf',
+  wakeMatched: boolean,
 ): string {
   if (kind === 'self-echo') return 'ECO LUMI'
   if (kind === 'non-speech') return 'NO VOZ'
-  if (mode === 'wake') return 'ACTIVACIÓN'
+  if (mode === 'wake') return wakeMatched ? 'ACTIVACIÓN' : 'FONDO'
   if (mode === 'guard') return 'GUARD'
   if (mode === 'deaf') return 'BLOQUEADO'
   return 'STT'
@@ -308,7 +309,7 @@ export function Hud() {
                   exit={{ opacity: 0 }}
                 >
                   <span className="voice-line-mode">
-                    {heardLaneLabel(line.kind, line.mode)}
+                    {heardLaneLabel(line.kind, line.mode, line.wakeMatched)}
                   </span>
                   <span className="voice-line-text">{line.text}</span>
                 </motion.div>
