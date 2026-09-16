@@ -250,3 +250,35 @@ Fix:
 This specifically prevents acknowledgements such as "¡Aquí!" from becoming
 `COMANDO A O.R.B.I.A.`.
 
+
+## VF-01D — latency/backlog hardening — IMPLEMENTED, LOCAL CERTIFICATION PENDING
+
+Live household tests showed response delays approaching tens of seconds even
+after Speaker Shield removed most self-echo.
+
+Two concrete latency sources were present in the implementation:
+
+1. every local VAD segment launched a fresh `whisper-cli` process, forcing the
+   Whisper model to be loaded repeatedly;
+2. background/wake/guard segments were queued in strict FIFO order, so a real
+   command could wait behind stale household audio.
+
+Current hardening:
+
+- prefer a persistent local `whisper-server` on loopback port 8179;
+- preload the Whisper model at bridge boot and keep it resident;
+- retain `whisper-cli` as an automatic fallback if the server executable is
+  unavailable or startup fails;
+- collapse pending dormant/guard audio to the newest segment;
+- remove stale background/guard work when a real command arrives;
+- preserve same-turn command fragments so long speech with natural pauses still
+  assembles correctly;
+- hard-cap the pending STT queue at four segments;
+- expose current/max queue depth, queue drops and last STT latency in the
+  diagnostics panel;
+- double the visible voice workspace height and retain substantially more raw
+  transcript history.
+
+Diarization remains outside the normal hot path until this latency gate is
+certified on the target workstation.
+
