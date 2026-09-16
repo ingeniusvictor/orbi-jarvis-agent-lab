@@ -171,28 +171,6 @@ function powershell(args) {
   }
 }
 
-async function installWhisper() {
-  info(`Whisper.cpp baseline: ${WHISPER_VERSION}`)
-  await mkdir(whisperBin, { recursive: true })
-  await mkdir(whisperModels, { recursive: true })
-
-  const exe = join(whisperBin, 'whisper-cli.exe')
-  if (force || !existsSync(exe)) {
-    const asset = await fetchWhisperAsset()
-    const temp = await mkdir(
-      join(tmpdir(), `orbia-whisper-${Date.now()}`),
-      { recursive: true },
-    ).then(() => join(tmpdir(), `orbia-whisper-${Date.now()}`))
-    // The timestamp above changes between calls; create a stable temp path instead.
-  }
-
-  await download(
-    WHISPER_MODEL_URL,
-    join(whisperModels, 'ggml-base.bin'),
-    100 * 1024 * 1024,
-  )
-}
-
 async function installWhisperRuntime() {
   const exe = join(whisperBin, 'whisper-cli.exe')
   if (!force && existsSync(exe)) {
@@ -248,7 +226,11 @@ function pythonLauncher() {
   for (const candidate of candidates) {
     const probe = spawnSync(
       candidate.command,
-      [...candidate.args, '-c', 'import sys; print(sys.version_info[:2])'],
+      [
+        ...candidate.args,
+        '-c',
+        'import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] < (3, 14) else 1)',
+      ],
       { encoding: 'utf8', windowsHide: true },
     )
     if (probe.status === 0) {
