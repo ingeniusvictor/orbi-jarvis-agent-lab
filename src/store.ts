@@ -64,7 +64,7 @@ export type HeardLine = {
   id: string
   text: string
   provider: 'browser' | 'whisper-local' | 'elevenlabs'
-  kind: 'speech' | 'self-echo'
+  kind: 'speech' | 'self-echo' | 'non-speech'
   mode: Phase | 'wake' | 'command' | 'guard' | 'deaf'
   at: number
 }
