@@ -29,6 +29,23 @@ assert.equal(
   'qwen2.5-coder:7b',
 )
 
+assert.equal(
+  resolveModelRequest('qwen3 4b', installed),
+  'qwen3:4b',
+)
+assert.equal(
+  resolveModelRequest('qeen 4b', installed),
+  'qwen3:4b',
+)
+assert.equal(
+  resolveModelRequest('queen 3 4 b', installed),
+  'qwen3:4b',
+)
+assert.equal(
+  resolveModelRequest('qwin 1.7 b', installed),
+  'qwen3:1.7b',
+)
+
 assert.deepEqual(
   parseModelControl('Lumi, ¿qué modelos puedo usar?'),
   { action: 'list' },
