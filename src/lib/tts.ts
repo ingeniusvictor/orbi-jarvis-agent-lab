@@ -63,7 +63,7 @@ const ECHO_TAIL_MS = 1800
  * indistinguishable. This tells them apart at a glance.
  */
 export const diag = {
-  engine: 'system' as 'system' | 'kokoro' | 'elevenlabs',
+  engine: 'system' as 'system' | 'kokoro' | 'kokoro-local' | 'elevenlabs',
   /** Utterances handed to an engine — the OS voice or an audio element. */
   spoken: 0,
   /**
@@ -251,6 +251,23 @@ function pickVoice(): SpeechSynthesisVoice | null {
  *  always naming a speechSynthesis voice that a cloud or neural engine has
  *  quietly replaced. */
 export function currentVoiceName(): string {
+  const runtime = caps().voice
+  const requested = runtime?.requested?.ttsMode ?? 'auto'
+
+  if (
+    requested === 'local' &&
+    runtime?.local?.ttsAvailable
+  ) {
+    return (
+      runtime.activeProfile?.displayName ??
+      'L.U.M.I.A. · Kokoro local'
+    )
+  }
+
+  if (requested === 'system') {
+    return pickVoice()?.name ?? 'default'
+  }
+
   if (USE_ELEVENLABS || caps().tts) return 'ElevenLabs'
   if (TTS_ENGINE === 'kokoro' && !kokoro.isUnavailable()) {
     return KOKORO_VOICE.replace(/^bm_/, '')
@@ -380,17 +397,31 @@ export function createSpeaker(): Speaker {
 
   /** null means "no audio pipeline, use the system voice directly". */
   function synthesise(text: string): Promise<string | null> | null {
-    // Prefer the ElevenLabs voice whenever the bridge reports it is available —
-    // for a demo the timbre is worth the round trip, and this is what makes the
-    // premium path automatic with no flag to set. It falls back to the browser
-    // voice on any failure, so a student without a key still hears him speak.
-    // `nativeBroken` latches on once the system voice has proved unusable.
+    const runtime = caps().voice
+    const requested = runtime?.requested?.ttsMode ?? 'auto'
+    const localReady = Boolean(runtime?.local?.ttsAvailable)
+
+    // Explicit VRM choices override legacy automatic premium selection.
+    if (requested === 'system') {
+      diag.engine = 'system'
+      return null
+    }
+
+    if (requested === 'local') {
+      if (!localReady) {
+        diag.engine = 'system'
+        return null
+      }
+      diag.engine = 'kokoro-local'
+      return fetchLocalAudio(
+        text,
+        runtime?.activeProfile?.speakerRef ?? 'ef_dora',
+      ).catch(() => null)
+    }
+
+    // Auto mode keeps the established low-latency behaviour until AMR-02 has
+    // enough hardware telemetry to decide when neural local TTS is worthwhile.
     if (USE_ELEVENLABS || caps().tts || nativeBroken) {
-      // Recorded at the moment the tier is chosen rather than only when the
-      // native voice latches over. Without this the panel reported 'system'
-      // for a session that had spoken every one of its sentences through
-      // ElevenLabs, which makes the one field naming the engine useless
-      // exactly when you are trying to work out which engine is at fault.
       diag.engine = 'elevenlabs'
       return fetchCloudAudio(text).catch(() => null)
     }
@@ -598,7 +629,12 @@ export function createSpeaker(): Speaker {
       // see the onplaying handler below.
       diag.spoken++
       diag.lastText = text.slice(0, 60)
-      diag.voice = diag.engine === 'kokoro' ? KOKORO_VOICE : 'ElevenLabs'
+      diag.voice =
+        diag.engine === 'kokoro'
+          ? KOKORO_VOICE
+          : diag.engine === 'kokoro-local'
+            ? (caps().voice?.activeProfile?.displayName ?? 'ef_dora')
+            : 'ElevenLabs'
 
       let read: (() => number) | null = null
       const ctx = outputContext()
@@ -740,6 +776,24 @@ export function createSpeaker(): Speaker {
       settleDrained()
     },
     level: () => outLevel,
+  }
+}
+
+async function fetchLocalAudio(
+  text: string,
+  speaker: string,
+): Promise<string | null> {
+  if (BACKEND !== 'bridge') return null
+  try {
+    const res = await fetch(`${BRIDGE_HTTP_URL}/tts/local`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text, speaker }),
+    })
+    if (!res.ok) return null
+    return URL.createObjectURL(await res.blob())
+  } catch {
+    return null
   }
 }
 
