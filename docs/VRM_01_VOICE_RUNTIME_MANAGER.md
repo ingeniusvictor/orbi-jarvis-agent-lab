@@ -228,3 +228,18 @@ npm run voice:doctor
 The certification scripts verify contracts and fallback routing. A PASS does not
 by itself certify real Whisper/Kokoro audio; that requires the local runtime
 assets and a manual Companion voice test.
+
+## Target workstation runtime state — 2026-09-15
+
+```text
+STT requested: auto
+STT effective: local
+TTS requested: auto
+TTS effective: system
+Voice profile: lumia-system
+Whisper: READY
+Kokoro: NOT READY
+```
+
+This is the first confirmed mixed VRM stack on the target workstation:
+local Whisper input with system voice output.
