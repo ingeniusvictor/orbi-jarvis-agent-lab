@@ -11,7 +11,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { localVoicePaths, probeLocalVoiceCapabilities } from './local-voice-probe.mjs'
-import { ORBI_SPEECH_INITIAL_PROMPT } from './speech-vocabulary.mjs'
+import {
+  normalizeTechnicalSpeechText,
+  ORBI_SPEECH_INITIAL_PROMPT,
+} from './speech-vocabulary.mjs'
 
 const runFile = promisify(execFile)
 
@@ -110,13 +113,15 @@ export async function transcribeLocalWav(
       fail('VOICE_STT_FAILED', 'Local Whisper transcription failed.')
     }
 
-    const text = String(
-      await readFile(`${outputPrefix}.txt`, 'utf8').catch(() =>
-        fail('VOICE_STT_FAILED', 'Local Whisper transcription output was unavailable.'),
-      ),
+    const text = normalizeTechnicalSpeechText(
+      String(
+        await readFile(`${outputPrefix}.txt`, 'utf8').catch(() =>
+          fail('VOICE_STT_FAILED', 'Local Whisper transcription output was unavailable.'),
+        ),
+      )
+        .replace(/\s+/g, ' ')
+        .trim(),
     )
-      .replace(/\s+/g, ' ')
-      .trim()
 
     if (!text) {
       fail('VOICE_STT_EMPTY_RESULT', 'Local Whisper produced an empty transcription.')
