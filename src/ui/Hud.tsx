@@ -283,12 +283,16 @@ export function Hud() {
               {heardLines.slice(-4).map((line) => (
                 <motion.div
                   key={line.id}
-                  className="voice-line voice-line-heard"
+                  className={`voice-line voice-line-heard ${
+                    line.kind === 'self-echo' ? 'voice-line-echo' : ''
+                  }`}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0 }}
                 >
-                  <span className="voice-line-mode">{line.mode}</span>
+                  <span className="voice-line-mode">
+                    {line.kind === 'self-echo' ? 'ECO LUMI' : line.mode}
+                  </span>
                   <span className="voice-line-text">{line.text}</span>
                 </motion.div>
               ))}
