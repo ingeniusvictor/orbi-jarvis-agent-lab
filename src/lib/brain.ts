@@ -69,6 +69,13 @@ export function watchUi(fn: (op: string, args: any) => void): void {
   if (usingBridge) bridge.watchUi(fn)
 }
 
+/** Voice Runtime Manager updates after spoken STT/TTS/profile controls. */
+export function watchVoiceRuntime(
+  fn: Parameters<typeof bridge.watchVoiceRuntime>[0],
+): void {
+  if (usingBridge) bridge.watchVoiceRuntime(fn)
+}
+
 /**
  * The one thing the bridge asks US for.
  *
