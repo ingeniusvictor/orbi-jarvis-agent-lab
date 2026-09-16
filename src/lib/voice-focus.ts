@@ -70,3 +70,20 @@ export function shouldInterruptBusyAssistant(
 
   return wake.test(said)
 }
+
+
+/**
+ * Whisper sometimes emits bracketed acoustic annotations for music/noise.
+ * They are useful evidence in ESCUCHANDO but must never become commands.
+ */
+export function isNonSpeechTranscript(text: string): boolean {
+  const value = String(text ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  return /^(?:\[|\()?\s*(?:musica|music|silencio|silence|ruido|noise|aplausos|applause|risas|laughter)\s*(?:\]|\))?[.!?]*$/.test(
+    value,
+  )
+}
