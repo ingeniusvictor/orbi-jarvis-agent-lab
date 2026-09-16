@@ -356,6 +356,22 @@ body::after {
   opacity: 0.62;
 }
 
+.voice-line-echo {
+  opacity: 0.48;
+}
+
+.voice-line-echo .voice-line-mode {
+  color: #f3b45c;
+  opacity: 0.78;
+}
+
+.voice-line-echo .voice-line-text {
+  color: #d7b986;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(215, 185, 134, 0.22);
+}
+
 .voice-line-lumi {
   display: block;
 }
