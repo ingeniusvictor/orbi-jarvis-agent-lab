@@ -188,3 +188,27 @@ Anonymous labels remain per clip (`SPEAKER 1`, `SPEAKER 2`, ...). No attempt
 is made to identify family members until a separate opt-in enrollment design is
 implemented.
 
+
+## Raw STT vs accepted command
+
+Household testing showed that a raw Whisper lane alone can still be misleading.
+Acoustic annotations such as `[Música]` and short recognition fragments are
+evidence of what the recogniser heard, but they are not necessarily what
+O.R.B.I.A. received as the user command.
+
+The HUD now distinguishes:
+
+- `STT`: raw recognised speech segment;
+- `GUARD`: speech heard while L.U.M.I.A. is busy;
+- `ECO LUMI`: confirmed self-echo;
+- `NO VOZ`: acoustic annotation such as music/silence/noise;
+- `COMANDO A O.R.B.I.A.`: the final assembled user turn actually submitted
+  to the assistant.
+
+Known Whisper non-speech annotations remain visible for debugging but are
+dropped before turn assembly.
+
+This separation is important before enabling diarization: multivoice logic must
+operate on real speech evidence rather than music/noise annotations or
+loudspeaker echo.
+
