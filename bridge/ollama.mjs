@@ -110,6 +110,19 @@ export function selectReadOnlyTool(prompt, conversationId, requestId) {
   return null
 }
 
+function modelInventoryToSpeech(models) {
+  const inventory = buildModelInventory(models)
+  if (!inventory.length) {
+    return 'No encuentro modelos locales instalados en Ollama.'
+  }
+
+  const names = inventory
+    .map((item) => item.active ? `${item.name}, activo` : item.name)
+    .join(', ')
+
+  return `Tengo disponibles ${names}.`
+}
+
 export function toolResultToPrompt(execution) {
   if (!execution?.result) return ''
   if (!execution.result.ok) {
@@ -424,6 +437,59 @@ export function attachOllamaSession(socket) {
       let answer = ''
       try {
         const history = getConversationHistory(conversationId)
+        const modelControl = parseModelControl(prompt)
+
+        if (modelControl) {
+          const toolName =
+            modelControl.action === 'list'
+              ? 'orbi_model_registry'
+              : 'orbi_model_switch'
+
+          send({ type: 'tool', ask, name: toolName })
+
+          const probe = await probeOllama()
+          if (!probe.ok) {
+            answer = 'No puedo consultar los modelos locales porque Ollama no está disponible.'
+          } else if (modelControl.action === 'list') {
+            answer = modelInventoryToSpeech(probe.models)
+          } else {
+            const target = resolveModelRequest(modelControl.requested, probe.models)
+
+            if (!target) {
+              answer =
+                'No encuentro un modelo instalado que coincida con esa solicitud. ' +
+                modelInventoryToSpeech(probe.models)
+            } else if (target === getActiveModel()) {
+              answer = `Ese modelo ya está activo. Estoy usando ${target}.`
+            } else {
+              const previous = getActiveModel()
+              const warm = await warmOllama(target)
+
+              if (!warm) {
+                answer =
+                  `No pude preparar ${target}. Mantengo activo ${previous}.`
+              } else {
+                setActiveModel(target)
+                answer = `Listo. Ahora estoy usando ${target}.`
+              }
+            }
+          }
+
+          if (closed || controller.signal.aborted) return
+
+          appendConversationExchange(conversationId, prompt, answer)
+          send({ type: 'text', ask, delta: answer })
+          send({
+            type: 'done',
+            ask,
+            conversationId,
+            text: answer,
+            modelName: getActiveModel(),
+            modelControl: modelControl.action,
+          })
+          return
+        }
+
         const knowledgeContext = buildKnowledgeContext(prompt)
         const toolRequest = selectReadOnlyTool(
           prompt,
