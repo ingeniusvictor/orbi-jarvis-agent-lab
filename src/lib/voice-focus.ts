@@ -52,12 +52,21 @@ export function shouldInterruptBusyAssistant(
   {
     wake,
     override,
+    bareWake,
   }: {
     wake: RegExp
     override: RegExp
+    bareWake?: RegExp
   },
 ): boolean {
   const said = String(text ?? '').trim()
   if (!said) return false
-  return wake.test(said) || override.test(said)
+  if (override.test(said)) return true
+
+  // A bare "Lumi" in GUARD is much more likely to be loudspeaker residue than
+  // an intentional household interruption. Require actual trailing speech
+  // ("Lumi, para", "Lumi, escucha...") while busy.
+  if (bareWake?.test(said)) return false
+
+  return wake.test(said)
 }
