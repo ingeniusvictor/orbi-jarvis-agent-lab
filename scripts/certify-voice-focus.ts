@@ -43,11 +43,13 @@ console.log('Guard -> command remains allowed for legitimate barge-in transcript
 
 const wake = /\b(?:lumi|lumia)\b/i
 const override = /^(?:para|espera|cancela)$/i
+const bareWake = /^(?:lumi|lumia)[,.!?]*$/i
 
 assert.equal(
   shouldInterruptBusyAssistant('mi hijo está hablando al lado', {
     wake,
     override,
+    bareWake,
   }),
   false,
 )
@@ -55,6 +57,7 @@ assert.equal(
   shouldInterruptBusyAssistant('Lumi, espera un momento', {
     wake,
     override,
+    bareWake,
   }),
   true,
 )
@@ -62,6 +65,23 @@ assert.equal(
   shouldInterruptBusyAssistant('para', {
     wake,
     override,
+    bareWake,
+  }),
+  true,
+)
+assert.equal(
+  shouldInterruptBusyAssistant('Lumi.', {
+    wake,
+    override,
+    bareWake,
+  }),
+  false,
+)
+assert.equal(
+  shouldInterruptBusyAssistant('Lumi, para', {
+    wake,
+    override,
+    bareWake,
   }),
   true,
 )
