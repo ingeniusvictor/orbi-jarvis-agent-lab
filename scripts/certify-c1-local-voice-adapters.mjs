@@ -51,6 +51,10 @@ assert.equal(
   normalizeTechnicalSpeechText('Escuché solo una M.'),
   'Escuché solo una M.',
 )
+assert.equal(
+  normalizeTechnicalSpeechText('Explícame qué es un UMPPT.'),
+  'Explícame qué es un MPPT.',
+)
 
 console.log('C1-E local voice adapter contract smoke test: PASS')
 console.log('STT: PCM WAV guard + bounded invalid-input handling')
