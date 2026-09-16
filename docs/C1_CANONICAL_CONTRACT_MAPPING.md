@@ -2,7 +2,7 @@
 
 ## Status
 
-**C1 STARTED — CONTRACT FOUNDATION CREATED**
+**C1-A THROUGH C1-D CERTIFIED; C1-E IMPLEMENTED WITH LOCAL AUDIO CERTIFICATION PENDING**
 
 This document maps the current holographic Companion runtime against the mature
 legacy LUMI core so the two products converge without a bulk repository merge.
@@ -42,14 +42,13 @@ Current strengths:
 - camera/gesture experiments;
 - inherited Claude/MCP bridge and permission logic.
 
-Current weaknesses relative to legacy LUMI:
+Remaining convergence gaps relative to the target product:
 
-- identity is encoded directly in the provider prompt;
-- conversation history belongs to a WebSocket session;
-- no canonical KnowledgeContext in the local Ollama path;
-- local Ollama tool loop is not implemented;
-- browser voice path remains transitional;
-- provider/runtime/tool envelopes are not yet unified with Studio.
+- conversation persistence is still process-local rather than durable;
+- local Whisper/Kokoro assets still require target-workstation installation and audio certification;
+- effectful tools remain intentionally outside the local C1 permission boundary;
+- Studio Mode has not yet been migrated onto the canonical contracts;
+- channel/productization layers remain deferred.
 
 ## Legacy LUMI source
 
@@ -265,12 +264,32 @@ disconnected until this foundation passes local certification.
 
 ### C1-E — Local voice
 
-After the conversation/provider path remains stable:
+**IMPLEMENTED — LOCAL AUDIO CERTIFICATION PENDING.**
 
-- Whisper.cpp primary STT;
-- Kokoro primary TTS;
-- browser/SAPI controlled fallback;
-- preserve barge-in.
+Current implementation:
+
+- provider-neutral Voice Runtime Manager (VRM);
+- selectable browser/local/auto modes;
+- independent STT/TTS control;
+- Whisper.cpp local adapter and bridge route;
+- Kokoro local adapter and bridge route;
+- existing browser/system paths preserved as fallback;
+- live runtime switching without page reload;
+- technical recognition hints for ORBI/LUMIA/Qwen/Ollama vocabulary;
+- voice profiles with owner/consent metadata for future authorized custom voices;
+- readiness diagnostics through `npm run voice:doctor`.
+
+Validate with:
+
+```bash
+npm run certify:voice
+npm run lint
+npm run build
+npm run voice:doctor
+```
+
+Actual Whisper/Kokoro audio remains uncertified until the local runtime binaries
+and weights are present on the target workstation.
 
 ## Explicit deferrals
 
