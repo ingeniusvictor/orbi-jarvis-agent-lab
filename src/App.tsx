@@ -5,7 +5,12 @@ import { Boot } from './ui/Boot'
 import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
 import { useStore } from './store'
-import { startVoice, type Voice, type VoiceMode } from './lib/voice'
+import {
+  startVoice,
+  type Voice,
+  type VoiceMode,
+  type VoiceTranscriptEvent,
+} from './lib/voice'
 import { createSpeaker, cycleVoice, currentVoiceName } from './lib/tts'
 import * as sfx from './lib/sfx'
 import * as music from './lib/music'
@@ -339,6 +344,16 @@ export default function App() {
     store.getState().setCaption(text)
   }
 
+  const onTranscript = (event: VoiceTranscriptEvent) => {
+    store.getState().pushHeardLine({
+      id: event.id,
+      text: event.text,
+      provider: event.provider,
+      mode: event.capturedMode,
+      at: event.at,
+    })
+  }
+
   const onVoiceError = (message: string) => {
     store.getState().setError(message)
   }
@@ -356,6 +371,7 @@ export default function App() {
       onWake,
       onSpeechStart,
       onPartial,
+      onTranscript,
       onUtterance,
       onError: onVoiceError,
     })
