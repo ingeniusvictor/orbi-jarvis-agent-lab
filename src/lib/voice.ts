@@ -168,7 +168,7 @@ const MAX_HOLD_MS = 6000
  * not dispatched after the first small pause.
  */
 const BROWSER_SILENCE_MS = 1200
-const BROWSER_SETTLE_MS = 900
+const BROWSER_SETTLE_MS = 300
 const BROWSER_CONTINUE_MS = 2400
 const BROWSER_MAX_HOLD_MS = 30000
 
