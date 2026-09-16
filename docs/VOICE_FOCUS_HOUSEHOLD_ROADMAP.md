@@ -194,3 +194,27 @@ Browser acoustic echo cancellation remains enabled. The software reference
 filter is an additional layer because laptop loudspeaker leakage can survive
 browser AEC, especially when local Whisper decodes delayed audio.
 
+
+## VF-01B — guard-name and visible-lane hardening — IMPLEMENTED
+
+Household testing after Speaker Shield showed small residual GUARD fragments such
+as "L.U.M.I.A." even though full answer echo was no longer feeding back.
+
+Current policy:
+
+- a bare assistant name in GUARD (`Lumi`, `Lumia`, `L.U.M.I.A.`) does not
+  interrupt the current answer;
+- an explicit instruction such as `Lumi, para`, `Lumi, espera` or
+  `Lumi, escucha...` remains a valid interruption;
+- raw STT rows are rendered as `TURNO`, `GUARD`, `ECO LUMI` or
+  `BLOQUEADO` instead of exposing internal mode names as if they were all
+  equivalent commands;
+- L.U.M.I.A.'s identity prompt explicitly states that "Lumi" is the assistant's
+  name, not the user's;
+- a deterministic final-output guard removes an accidental trailing vocative
+  such as "¿En qué puedo ayudarte hoy, Lumi?" without rewriting legitimate
+  self-identification such as "Mi nombre es Lumi."
+
+These changes keep identity errors and residual wake-name echo from masquerading
+as genuine user turns.
+
