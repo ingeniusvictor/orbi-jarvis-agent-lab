@@ -18,12 +18,18 @@ import {
 import { createToolRequest } from './orbia/contracts.mjs'
 import { createReadOnlyDiagnosticTools } from './orbia/diagnostic-tools.mjs'
 import { ToolExecutor, ToolRegistry } from './orbia/tool-engine.mjs'
+import {
+  buildModelInventory,
+  getActiveModel,
+  parseModelControl,
+  resolveModelRequest,
+  setActiveModel,
+} from './orbia/model-manager.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
-const DEFAULT_MODEL = 'qwen3:4b'
-
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
-export const OLLAMA_MODEL = process.env.JARVIS_OLLAMA_MODEL ?? DEFAULT_MODEL
+export const OLLAMA_MODEL = getActiveModel()
+export const getOllamaModel = getActiveModel
 export const OLLAMA_KEEP_ALIVE = process.env.JARVIS_OLLAMA_KEEP_ALIVE ?? '2h'
 export const OLLAMA_VOICE_NUM_PREDICT = Math.max(
   48,
@@ -33,7 +39,7 @@ export const OLLAMA_VOICE_NUM_PREDICT = Math.max(
 const localToolRegistry = new ToolRegistry()
 for (const tool of createReadOnlyDiagnosticTools({
   provider: 'ollama',
-  model: OLLAMA_MODEL,
+  getModel: getActiveModel,
 })) {
   localToolRegistry.register(tool)
 }
@@ -124,13 +130,13 @@ export function toolResultToPrompt(execution) {
   ].join('\n')
 }
 
-let warmPromise = null
+const warmPromises = new Map()
 
-export function warmOllama() {
-  if (warmPromise) return warmPromise
+export function warmOllama(model = getActiveModel()) {
+  if (warmPromises.has(model)) return warmPromises.get(model)
 
   const started = Date.now()
-  warmPromise = (async () => {
+  const promise = (async () => {
     try {
       // A blank /api/generate request can load weights without exercising the
       // chat template/context path. The first spoken question then still pays
@@ -140,7 +146,7 @@ export function warmOllama() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: OLLAMA_MODEL,
+          model,
           messages: [
             { role: 'system', content: ORBI_LOCAL_SYSTEM_PROMPT },
             { role: 'user', content: 'Responde únicamente: listo.' },
@@ -158,7 +164,7 @@ export function warmOllama() {
       const ok = res.ok
       if (ok) {
         console.log(
-          `[jarvis] LUMIA chat warm-up completed in ${((Date.now() - started) / 1000).toFixed(1)}s`,
+          `[jarvis] LUMIA chat warm-up completed · ${model} · ${((Date.now() - started) / 1000).toFixed(1)}s`,
         )
       }
       return ok
@@ -167,13 +173,14 @@ export function warmOllama() {
     }
   })()
 
-  // A failed warm-up must not poison the process forever. The first real turn
-  // is allowed to retry instead of reusing one permanently-false promise.
-  warmPromise.then((ok) => {
-    if (!ok) warmPromise = null
+  warmPromises.set(model, promise)
+
+  // A failed warm-up must not poison that model forever.
+  promise.then((ok) => {
+    if (!ok) warmPromises.delete(model)
   })
 
-  return warmPromise
+  return promise
 }
 
 export async function probeOllama() {
@@ -213,9 +220,10 @@ export async function streamOllama({
   signal,
   onText,
 }) {
-  // Reuse the startup warm-up request if it is still loading the model.
-  // This avoids two concurrent cold loads on the first spoken turn.
-  await warmOllama()
+  const model = getActiveModel()
+
+  // Reuse the warm-up for the model selected at the start of this turn.
+  await warmOllama(model)
   const messages = [
     {
       role: 'system',
@@ -249,7 +257,7 @@ export async function streamOllama({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: OLLAMA_MODEL,
+        model,
         messages: requestMessages,
         stream: false,
         think: false,
@@ -285,7 +293,7 @@ export async function streamOllama({
       evalMs > 0 && evalCount > 0 ? (evalCount / evalMs) * 1000 : 0
 
     console.log(
-      '[orbia] LUMIA local latency' +
+      `[orbia] LUMIA local latency model=${model}` +
         ` total=${totalMs.toFixed(0)}ms` +
         ` prompt=${promptMs.toFixed(0)}ms` +
         ` generate=${evalMs.toFixed(0)}ms` +
