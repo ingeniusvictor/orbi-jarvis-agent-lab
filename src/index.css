@@ -372,6 +372,46 @@ body::after {
   text-decoration-color: rgba(215, 185, 134, 0.22);
 }
 
+.voice-line-noise {
+  opacity: 0.38;
+}
+
+.voice-line-noise .voice-line-mode {
+  color: #92a2a8;
+  opacity: 0.72;
+}
+
+.voice-line-noise .voice-line-text {
+  color: #93a6ac;
+  font-style: italic;
+}
+
+.voice-command-final {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 9px;
+  margin-top: 8px;
+  padding: 8px 0 2px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.voice-command-label {
+  padding-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 7px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.78;
+}
+
+.voice-command-text {
+  color: #f4feff;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
 .voice-line-lumi {
   display: block;
 }
