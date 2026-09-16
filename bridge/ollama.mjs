@@ -177,7 +177,7 @@ export function warmOllama(model = getActiveModel()) {
       const ok = res.ok
       if (ok) {
         console.log(
-          `[jarvis] LUMIA chat warm-up completed · ${model} · ${((Date.now() - started) / 1000).toFixed(1)}s`,
+          `[lumia] chat warm-up completed · ${model} · ${((Date.now() - started) / 1000).toFixed(1)}s`,
         )
       }
       return ok
