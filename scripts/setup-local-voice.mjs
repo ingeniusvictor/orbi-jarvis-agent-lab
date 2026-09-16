@@ -112,9 +112,9 @@ async function findFile(directory, name) {
   return null
 }
 
-async function fetchWhisperAsset() {
+async function readWhisperRelease(tag) {
   const releaseUrl =
-    `https://api.github.com/repos/ggml-org/whisper.cpp/releases/tags/${WHISPER_VERSION}`
+    `https://api.github.com/repos/ggml-org/whisper.cpp/releases/tags/${tag}`
   const response = await fetch(releaseUrl, {
     headers: {
       accept: 'application/vnd.github+json',
@@ -123,15 +123,21 @@ async function fetchWhisperAsset() {
   })
   if (!response.ok) {
     throw new Error(
-      `Could not read whisper.cpp release ${WHISPER_VERSION} (HTTP ${response.status}).`,
+      `Could not read whisper.cpp release ${tag} (HTTP ${response.status}).`,
     )
   }
-  const release = await response.json()
+  return response.json()
+}
+
+function selectWhisperWindowsCpuAsset(release) {
   const assets = Array.isArray(release?.assets) ? release.assets : []
 
-  const preferred =
+  return (
     assets.find((asset) =>
-      /^whisper-bin-(?:win-)?x64\.zip$/i.test(String(asset?.name ?? '')),
+      /^whisper-bin-x64\.zip$/i.test(String(asset?.name ?? '')),
+    ) ??
+    assets.find((asset) =>
+      /^whisper-bin-win-(?:cpu-)?x64\.zip$/i.test(String(asset?.name ?? '')),
     ) ??
     assets.find((asset) => {
       const name = String(asset?.name ?? '').toLowerCase()
@@ -140,22 +146,57 @@ async function fetchWhisperAsset() {
         name.includes('whisper-bin') &&
         name.includes('x64') &&
         !name.includes('cuda') &&
+        !name.includes('cublas') &&
         !name.includes('vulkan') &&
         !name.includes('openvino') &&
-        !name.includes('arm')
+        !name.includes('arm') &&
+        !name.includes('win32')
       )
     })
+  )
+}
+
+function nightlyTagFromRelease(release) {
+  const body = String(release?.body ?? '')
+  return (
+    body.match(/\*\*Nightly build:\*\*\s*\[(b\d+)\]/i)?.[1] ??
+    body.match(/releases\/tag\/(b\d+)/i)?.[1] ??
+    null
+  )
+}
+
+async function fetchWhisperAsset() {
+  const stable = await readWhisperRelease(WHISPER_VERSION)
+  let source = stable
+  let sourceTag = WHISPER_VERSION
+  let preferred = selectWhisperWindowsCpuAsset(stable)
+
+  // whisper.cpp stable releases can be source-only. Their release notes point
+  // at the matching nightly build, which carries the prebuilt Windows binaries.
+  if (!preferred) {
+    const nightlyTag = nightlyTagFromRelease(stable)
+    if (nightlyTag) {
+      info(
+        `stable ${WHISPER_VERSION} has no Windows binaries; using matching nightly ${nightlyTag}`,
+      )
+      source = await readWhisperRelease(nightlyTag)
+      sourceTag = nightlyTag
+      preferred = selectWhisperWindowsCpuAsset(source)
+    }
+  }
 
   if (!preferred?.browser_download_url) {
+    const assets = Array.isArray(source?.assets) ? source.assets : []
     const names = assets.map((asset) => asset?.name).filter(Boolean).join(', ')
     throw new Error(
-      `No CPU x64 whisper.cpp Windows asset found for ${WHISPER_VERSION}. Assets: ${names || 'none'}`,
+      `No CPU x64 whisper.cpp Windows asset found for ${sourceTag}. Assets: ${names || 'none'}`,
     )
   }
 
   return {
     name: preferred.name,
     url: preferred.browser_download_url,
+    sourceTag,
   }
 }
 
