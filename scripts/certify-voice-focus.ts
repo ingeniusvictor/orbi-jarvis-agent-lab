@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   shouldDropStaleVoiceSegment,
+  shouldInterruptBusyAssistant,
   transcriptSegmentIsStillActive,
 } from '../src/lib/voice-focus'
 
@@ -38,3 +39,33 @@ console.log('Voice Focus V0 turn isolation smoke test: PASS')
 console.log('Queued command audio cannot leak into a later answer.')
 console.log('Finished Whisper segments do not inherit unrelated live mic activity.')
 console.log('Guard -> command remains allowed for legitimate barge-in transcription.')
+
+
+const wake = /\b(?:lumi|lumia)\b/i
+const override = /^(?:para|espera|cancela)$/i
+
+assert.equal(
+  shouldInterruptBusyAssistant('mi hijo está hablando al lado', {
+    wake,
+    override,
+  }),
+  false,
+)
+assert.equal(
+  shouldInterruptBusyAssistant('Lumi, espera un momento', {
+    wake,
+    override,
+  }),
+  true,
+)
+assert.equal(
+  shouldInterruptBusyAssistant('para', {
+    wake,
+    override,
+  }),
+  true,
+)
+
+console.log('Household Focus guard policy: PASS')
+console.log('Ambient busy-time speech stays observable but cannot hijack the turn.')
+console.log('Explicit Lumi/interrupt phrases remain valid barge-in controls.')
