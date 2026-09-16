@@ -1,20 +1,15 @@
 import { BACKEND, BRIDGE_HTTP_URL, env } from '../config'
 
 /**
- * What speech engines are actually available, decided once at boot.
+ * Speech capability/readiness snapshot.
  *
- * The whole point is that the app runs for anyone. A student who has done
- * nothing but install Claude Code and log in gets the browser's own speech
- * recognition and voice — no keys, no accounts, it just works. A student who
- * also has an ElevenLabs key (in their Claude Code config or a .env) gets Scribe
- * transcription and the ElevenLabs voice instead, automatically, with no flag to
- * set. This module is how the rest of the app learns which of those two worlds
- * it is in, so voice.ts and tts.ts never have to guess.
+ * The bridge reports the provider-neutral VRM state plus local Whisper/Kokoro
+ * readiness. Legacy ElevenLabs booleans remain for compatibility. The snapshot
+ * can also be updated live after a spoken voice-mode command, allowing the
+ * Companion to switch engines without a page reload.
  *
- * The premium paths both live behind the bridge — it holds the key and makes
- * the calls, so the browser never sees a secret. In direct mode (no bridge)
- * only a key baked into the bundle could reach ElevenLabs for speech, and that
- * is not a path worth encouraging, so direct mode is treated as browser-only.
+ * Direct mode remains browser-only because local bridge runtimes and bridge-held
+ * credentials are intentionally unavailable there.
  */
 
 export type VoiceRuntimeCapabilities = {
