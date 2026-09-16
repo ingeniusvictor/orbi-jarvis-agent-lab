@@ -30,6 +30,7 @@ type VoiceDiag = {
   accepted: number
   restarts: number
   staleSegments: number
+  householdIgnored: number
   idleMs: number
 }
 
@@ -114,6 +115,7 @@ export function Diagnostics() {
       />
       <Row k="forced restarts" v={String(v.restarts ?? 0)} bad={(v.restarts ?? 0) > 0} />
       <Row k="stale segments" v={String(v.staleSegments ?? 0)} />
+      <Row k="household ignored" v={String(v.householdIgnored ?? 0)} />
       <Row k="mode" v={`${v.mode ?? '—'} (phase ${phase})`} />
       <Row k="accepted" v={String(v.accepted ?? 0)} bad={(v.accepted ?? 0) === 0} />
       <Row k="wakes" v={String(v.wakes ?? 0)} />
