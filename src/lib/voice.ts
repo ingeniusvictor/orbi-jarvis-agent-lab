@@ -53,6 +53,7 @@ export type VoiceTranscriptEvent = {
   text: string
   provider: 'browser' | 'whisper-local' | 'elevenlabs'
   kind: 'speech' | 'self-echo' | 'non-speech'
+  wakeMatched: boolean
   capturedMode: VoiceMode
   at: number
 }
@@ -648,6 +649,7 @@ async function startVadBridgeVoice(
         text: said,
         provider: provider === 'local' ? 'whisper-local' : 'elevenlabs',
         kind: selfEcho ? 'self-echo' : nonSpeech ? 'non-speech' : 'speech',
+        wakeMatched: capturedMode === 'wake' && WAKE.test(said),
         capturedMode: capturedMode as VoiceMode,
         at: Date.now(),
       })
@@ -915,6 +917,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
       text,
       provider: 'browser',
       kind: selfEcho ? 'self-echo' : nonSpeech ? 'non-speech' : 'speech',
+      wakeMatched: mode === 'wake' && WAKE.test(text),
       capturedMode: mode,
       at: Date.now(),
     })
