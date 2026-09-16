@@ -317,6 +317,11 @@ export default function App() {
       music.working(false)
       sfx.duck(false)
       music.duck(false)
+
+      // A bare "Lumi" or "para" intentionally stops the answer but may not carry
+      // a new command in the same breath. Keep a bounded listening window open.
+      listen(AWAIT_SPEECH_MS)
+      return
     }
     store.getState().setPhase('listening')
   }
