@@ -50,9 +50,22 @@ let speaking = ''
 let recent = ''
 let recentUntil = 0
 
+type EchoMemoryItem = {
+  text: string
+  at: number
+}
+
+const echoMemory: EchoMemoryItem[] = []
+
 /** Recognition lags the speakers by a few hundred milliseconds, so a sentence
  *  keeps arriving at the microphone well after it has finished playing. */
 const ECHO_TAIL_MS = 1800
+/** Local Whisper can finish decoding several seconds after playback began.
+ *  Keep a bounded rolling reference of what L.U.M.I.A. actually attempted to
+ *  say so an older sentence cannot come back as a fake second speaker. */
+const ECHO_MEMORY_MS = 18000
+const ECHO_MEMORY_MAX_ITEMS = 12
+const ECHO_MEMORY_MAX_CHARS = 2600
 
 /**
  * Why you cannot hear him.
@@ -112,10 +125,24 @@ export function speakingSince(): number {
   return speaking ? speakingAt : 0
 }
 
+function rememberEcho(text: string) {
+  const clean = text.trim()
+  if (!clean) return
+  const now = Date.now()
+  echoMemory.push({ text: clean, at: now })
+  while (
+    echoMemory.length > ECHO_MEMORY_MAX_ITEMS ||
+    (echoMemory[0] && now - echoMemory[0].at > ECHO_MEMORY_MS)
+  ) {
+    echoMemory.shift()
+  }
+}
+
 function setSpeaking(text: string) {
   if (text) {
     speaking = text
     speakingAt = Date.now()
+    rememberEcho(text)
     return
   }
   if (speaking) {
@@ -137,6 +164,23 @@ function setSpeaking(text: string) {
 export function speakingNow(): string {
   const tail = Date.now() < recentUntil ? recent : ''
   return `${speaking} ${tail}`.trim()
+}
+
+/**
+ * Rolling text reference for software echo rejection.
+ *
+ * speakingNow() is intentionally narrow and answers "what is audible right
+ * now?". Whisper needs a wider reference because it can return a transcript
+ * after L.U.M.I.A. has already moved to another sentence.
+ */
+export function speakingEchoReference(): string {
+  const now = Date.now()
+  while (echoMemory[0] && now - echoMemory[0].at > ECHO_MEMORY_MS) {
+    echoMemory.shift()
+  }
+
+  const joined = echoMemory.map((item) => item.text).join(' ')
+  return joined.slice(-ECHO_MEMORY_MAX_CHARS)
 }
 
 // ---------------------------------------------------------------------------
