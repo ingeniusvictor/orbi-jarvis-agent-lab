@@ -230,10 +230,9 @@ export default function App() {
         // would accept her own answer as a new user request and answer it again,
         // creating the visible/spoken repetition loop.
         await new Promise((r) => setTimeout(r, POST_SPEECH_GUARD_MS))
-        if (stale()) return
 
         // Stay open for a natural follow-up once the echo tail is safely gone.
-        listen(FOLLOW_UP_MS)
+        if (!stale()) listen(FOLLOW_UP_MS)
       }
     }
   }
@@ -342,6 +341,10 @@ export default function App() {
 
   const onVoiceError = (message: string) => {
     store.getState().setError(message)
+  }
+
+  const invalidateVoiceRestart = () => {
+    voiceRestart.current += 1
   }
 
   const restartVoice = async () => {
@@ -762,7 +765,7 @@ export default function App() {
       window.removeEventListener('keydown', onKey)
       clearIdle()
       if (voicePoll.current) clearInterval(voicePoll.current)
-      voiceRestart.current++
+      invalidateVoiceRestart()
       voice.current?.stop()
       speaker.current?.cancel()
       // The camera must not outlive the page that turned it on.
