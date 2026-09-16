@@ -611,6 +611,33 @@ export function attachOllamaSession(socket) {
       let answer = ''
       try {
         const history = getConversationHistory(conversationId)
+        const voiceControl = parseVoiceRuntimeControl(prompt)
+
+        if (voiceControl) {
+          send({ type: 'tool', ask, name: 'orbi_voice_runtime_control' })
+          const applied = applyVoiceRuntimeControl(voiceControl)
+          answer = applied.answer
+
+          if (closed || controller.signal.aborted) return
+
+          appendConversationExchange(conversationId, prompt, answer)
+          send({
+            type: 'voice_runtime',
+            ask,
+            voice: applied.status,
+          })
+          send({ type: 'text', ask, delta: answer })
+          send({
+            type: 'done',
+            ask,
+            conversationId,
+            text: answer,
+            voiceControl: voiceControl.action,
+            voiceChanged: applied.changed,
+          })
+          return
+        }
+
         const modelControl = parseModelControl(prompt)
 
         if (modelControl) {
