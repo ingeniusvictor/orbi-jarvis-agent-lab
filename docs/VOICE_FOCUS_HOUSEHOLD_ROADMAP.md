@@ -218,3 +218,35 @@ Current policy:
 These changes keep identity errors and residual wake-name echo from masquerading
 as genuine user turns.
 
+
+## VF-01C — bare-wake acknowledgement isolation — IMPLEMENTED
+
+A live HUD test exposed a deterministic self-command:
+
+```text
+ACTIVACIÓN: "L.U.M.I.A."
+L.U.M.I.A. says: "¡Aquí!"
+                    ↓
+local mic / Whisper
+                    ↓
+COMANDO A O.R.B.I.A.: "¡Aquí!"
+```
+
+Root cause: the UI phase `waking` was mapped to voice mode `command`. That
+allowed the assistant's own acknowledgement to bypass the GUARD/Speaker Shield
+path and be submitted as a user turn.
+
+Fix:
+
+- `waking` now maps to `guard`;
+- local capture is shielded while either physical output is active or the TTS
+  echo reference is still alive;
+- same-breath commands such as "Lumi, explícame..." still bypass the greeting
+  and execute immediately through the existing trailing-command path;
+- rapid exact Whisper duplicates inside 2.5 seconds are dropped before turn
+  assembly;
+- raw wake-word evidence is labeled `ACTIVACIÓN` in the HUD.
+
+This specifically prevents acknowledgements such as "¡Aquí!" from becoming
+`COMANDO A O.R.B.I.A.`.
+
