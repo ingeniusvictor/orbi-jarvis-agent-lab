@@ -162,6 +162,8 @@ export function Hud() {
   const looking = useStore((s) => s.looking)
   const ui = useStore((s) => s.ui)
 
+  const latestHeard = heardLines[heardLines.length - 1]
+
   // accentFor folds JARVIS's overrides in over the phase colour, so one
   // variable on the root carries a theme change into every .hud-* rule without
   // a single component knowing a theme exists.
@@ -271,9 +273,9 @@ export function Hud() {
             <div className="voice-pane-head">
               <span>ESCUCHANDO</span>
               <span className="voice-pane-sub">
-                {heardLines.at(-1)?.provider === 'whisper-local'
+                {latestHeard?.provider === 'whisper-local'
                   ? 'WHISPER LOCAL'
-                  : heardLines.at(-1)?.provider?.toUpperCase() || 'STT'}
+                  : latestHeard?.provider?.toUpperCase() || 'STT'}
               </span>
             </div>
 
