@@ -1,0 +1,184 @@
+/*
+ * L.U.M.I.A. Voice Workspace — holographic presentation override.
+ *
+ * The voice workspace keeps the large readable zones introduced for local STT
+ * debugging, but removes the visible "card" treatment. The result is closer
+ * to the center caption: information has a stable spatial lane without drawing
+ * a rectangular container over the 3D hologram.
+ */
+
+.voice-pane {
+  /* Preserve the large working area while making the container itself vanish. */
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+
+  /* Give glyphs contrast against bright particles without painting a panel. */
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.96),
+    0 0 12px color-mix(in srgb, var(--accent) 11%, transparent);
+
+  /* The content remains scrollable programmatically, but no scrollbar chrome
+     should reveal the invisible bounds of the lane. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  /* Soft vertical falloff: text feels projected into space rather than clipped
+     by a hard rectangle. */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 18px,
+    #000 calc(100% - 22px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 18px,
+    #000 calc(100% - 22px),
+    transparent 100%
+  );
+}
+
+.voice-pane::-webkit-scrollbar {
+  display: none;
+}
+
+/* No hidden rectangle should reappear on the future multivoice lane. */
+.voice-pane-multi {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Titles stay as faint instrumentation marks, not card headers. */
+.voice-pane-head {
+  padding: 0 0 6px;
+  margin-bottom: 8px;
+  opacity: 0.52;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 0 10px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.voice-pane-sub {
+  opacity: 0.42;
+}
+
+/* Remove row separators that visually reconstruct a table/card boundary. */
+.voice-line + .voice-line {
+  border-top: 0;
+}
+
+.voice-line {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.voice-line-text {
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.98),
+    0 0 10px rgba(0, 0, 0, 0.55);
+}
+
+.voice-line-lumi .voice-line-text {
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.98),
+    0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* The accepted command remains visually important, but without a horizontal
+   rule that makes the entire lane read as a box. */
+.voice-command-final {
+  position: relative;
+  border-top: 0;
+  margin-top: 12px;
+  padding-top: 11px;
+}
+
+.voice-command-final::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 38%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 48%, transparent),
+    transparent
+  );
+  opacity: 0.45;
+}
+
+.voice-command-text {
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.98),
+    0 0 16px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+/* Live partial text should feel like the existing center caption: floating
+   typography with a small activity point, not the footer of a panel. */
+.voice-live {
+  border-top: 0;
+  margin-top: 10px;
+  padding-top: 4px;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.98),
+    0 0 14px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+/* Fade the inner edge of each lane toward the hologram. This preserves the
+   central character as the visual focus even when long text fills the sides. */
+.voice-pane-heard {
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 22px), transparent 100%),
+    linear-gradient(to right, #000 0, #000 78%, transparent 100%);
+  mask-image:
+    linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 22px), transparent 100%),
+    linear-gradient(to right, #000 0, #000 78%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  padding-right: 34px;
+}
+
+.voice-pane-lumi {
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 22px), transparent 100%),
+    linear-gradient(to left, #000 0, #000 78%, transparent 100%);
+  mask-image:
+    linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 22px), transparent 100%),
+    linear-gradient(to left, #000 0, #000 78%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  padding-left: 34px;
+}
+
+/* On narrower displays keep the invisible-lane treatment, but avoid an overly
+   aggressive center fade that would reduce usable text width. */
+@media (max-width: 1100px) {
+  .voice-pane-heard,
+  .voice-pane-lumi {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 16px,
+      #000 calc(100% - 18px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 16px,
+      #000 calc(100% - 18px),
+      transparent 100%
+    );
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
