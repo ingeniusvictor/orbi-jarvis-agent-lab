@@ -5,14 +5,26 @@
  * bridge process remains alive, but it is not durable memory. That matches the
  * C1 goal of separating conversation identity from socket lifetime before file
  * persistence is introduced.
+ *
+ * Companion voice must stay responsive on small local models. Keeping a long
+ * verbatim chat transcript makes prompt evaluation slower on every subsequent
+ * turn, so the hot voice context is intentionally bounded. Durable/long-horizon
+ * memory belongs to a separate memory layer rather than the LLM prompt itself.
  */
 
 const MAX_CONVERSATIONS = 100
-const MAX_MESSAGES = 16
+/** Four recent user/assistant exchanges in the hot prompt. */
+const MAX_MESSAGES = 8
+/** Prevent one unusually long reply from dominating later prompt evaluation. */
+const MAX_MESSAGE_CHARS = 1200
 
 const conversations = new Map()
 
 const cleanId = (value) => String(value ?? '').trim().slice(0, 160)
+const cleanMessage = (value) =>
+  String(value ?? '')
+    .trim()
+    .slice(0, MAX_MESSAGE_CHARS)
 
 export function getConversationHistory(conversationId) {
   const id = cleanId(conversationId)
@@ -36,8 +48,8 @@ export function appendConversationExchange(conversationId, userText, assistantTe
   }
 
   turns.push(
-    Object.freeze({ role: 'user', content: String(userText ?? '') }),
-    Object.freeze({ role: 'assistant', content: String(assistantText ?? '') }),
+    Object.freeze({ role: 'user', content: cleanMessage(userText) }),
+    Object.freeze({ role: 'assistant', content: cleanMessage(assistantText) }),
   )
 
   if (turns.length > MAX_MESSAGES) {
