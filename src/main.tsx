@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import './voice-workspace-holographic.css'
 import App from './App.tsx'
 
 // Deliberately no StrictMode: its double-invoked effects would open the
