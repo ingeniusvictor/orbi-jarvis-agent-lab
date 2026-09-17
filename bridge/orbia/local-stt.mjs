@@ -69,27 +69,36 @@ export async function transcribeLocalWav(
     fail('VOICE_STT_UNAVAILABLE', 'Local Whisper runtime or model is unavailable.')
   }
 
-  const persistent = await transcribeWithWhisperServer(bytes, {
-    env,
-    timeoutMs,
-    initialPrompt,
-  }).catch(() => null)
+  /**
+   * Stability first: the persistent whisper-server experiment is now opt-in.
+   * Live household tests showed better throughput but substantially more
+   * hallucinated wake/background text. The previously stable CLI path remains
+   * the default while we benchmark the server separately.
+   */
+  const usePersistentServer = env.ORBIA_WHISPER_SERVER_ENABLED === '1'
+  if (usePersistentServer) {
+    const persistent = await transcribeWithWhisperServer(bytes, {
+      env,
+      timeoutMs,
+      initialPrompt,
+    }).catch(() => null)
 
-  if (persistent?.text) {
-    const text = normalizeTechnicalSpeechText(persistent.text)
-    if (!text) {
-      fail('VOICE_STT_EMPTY_RESULT', 'Local Whisper produced an empty transcription.')
-    }
-    if (text.length > MAX_LOCAL_TRANSCRIPTION_CHARS) {
-      fail('VOICE_STT_FAILED', 'Local Whisper transcription exceeds the allowed size.')
-    }
+    if (persistent?.text) {
+      const text = normalizeTechnicalSpeechText(persistent.text)
+      if (!text) {
+        fail('VOICE_STT_EMPTY_RESULT', 'Local Whisper produced an empty transcription.')
+      }
+      if (text.length > MAX_LOCAL_TRANSCRIPTION_CHARS) {
+        fail('VOICE_STT_FAILED', 'Local Whisper transcription exceeds the allowed size.')
+      }
 
-    return Object.freeze({
-      text,
-      language: 'es',
-      provider: persistent.provider,
-      latencyMs: persistent.latencyMs,
-    })
+      return Object.freeze({
+        text,
+        language: 'es',
+        provider: persistent.provider,
+        latencyMs: persistent.latencyMs,
+      })
+    }
   }
 
   const { whisperCommand, whisperModel } = localVoicePaths(env)
@@ -100,23 +109,25 @@ export async function transcribeLocalWav(
   try {
     await writeFile(audioPath, bytes)
 
+    const args = [
+      '-m',
+      whisperModel,
+      '-f',
+      audioPath,
+      '-l',
+      'es',
+    ]
+
+    if (String(initialPrompt ?? '').trim()) {
+      args.push('--prompt', String(initialPrompt).trim())
+    }
+
+    args.push('-nt', '-otxt', '-of', outputPrefix)
+
     try {
       await runFile(
         whisperCommand,
-        [
-          '-m',
-          whisperModel,
-          '-f',
-          audioPath,
-          '-l',
-          'es',
-          '--prompt',
-          initialPrompt,
-          '-nt',
-          '-otxt',
-          '-of',
-          outputPrefix,
-        ],
+        args,
         {
           timeout: Math.max(5_000, Number(timeoutMs) || LOCAL_STT_TIMEOUT_MS),
           maxBuffer: 64 * 1024,
