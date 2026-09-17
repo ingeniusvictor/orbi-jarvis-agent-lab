@@ -110,7 +110,16 @@ const port = process.env.PORT
 const bridgeEnv = {
   ...(writes ? { JARVIS_ALLOW_WRITES: '1' } : {}),
   ...(local ? { JARVIS_PROVIDER: 'ollama' } : {}),
-  ...(lumia ? { JARVIS_OLLAMA_MODEL: process.env.ORBIA_LUMIA_MODEL ?? 'orbia-lumia:4b' } : {}),
+  ...(lumia
+    ? {
+        JARVIS_OLLAMA_MODEL:
+          process.env.ORBIA_LUMIA_MODEL ?? 'orbia-lumia:4b',
+        // Companion mode values first response time over long-form prose.
+        // Users can still override this explicitly in the environment.
+        JARVIS_OLLAMA_NUM_PREDICT:
+          process.env.JARVIS_OLLAMA_NUM_PREDICT ?? '96',
+      }
+    : {}),
 }
 if (port) {
   bridgeEnv.JARVIS_ALLOWED_ORIGINS = `http://localhost:${port},http://127.0.0.1:${port}`
