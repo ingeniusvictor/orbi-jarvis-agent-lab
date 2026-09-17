@@ -1,10 +1,8 @@
 /**
  * Persistent whisper.cpp server for low-latency local STT.
  *
- * The previous adapter launched whisper-cli for every VAD segment, which
- * reloads the model each time. In a noisy room several queued segments can turn
- * that startup cost into tens of seconds. whisper-server keeps the model hot and
- * accepts bounded local WAV uploads over loopback only.
+ * Experimental/opt-in. It keeps the model resident but must not own a global
+ * recognition prompt: wake/guard audio and command audio need different bias.
  */
 
 import { existsSync } from 'node:fs'
@@ -126,8 +124,6 @@ export async function ensureWhisperServer({
       '-nt',
       '-sns',
       '-nc',
-      '--prompt',
-      ORBI_SPEECH_INITIAL_PROMPT,
     ]
 
     const threads = Number(env.ORBI_WHISPER_THREADS)
@@ -212,7 +208,9 @@ export async function transcribeWithWhisperServer(
   form.append('response_format', 'json')
   form.append('language', 'es')
   form.append('temperature', '0.0')
-  form.append('prompt', initialPrompt)
+  if (String(initialPrompt ?? '').trim()) {
+    form.append('prompt', String(initialPrompt).trim())
+  }
   form.append('no_context', 'true')
   form.append('suppress_nst', 'true')
 
