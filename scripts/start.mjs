@@ -64,6 +64,7 @@ function run(name, command, args, colour, env) {
   const child = spawn(command, args, {
     env: { ...process.env, ...env },
     shell: false,
+    windowsHide: true,
   })
   child.stdout.on('data', (d) => process.stdout.write(label(d) + '\n'))
   child.stderr.on('data', (d) => process.stderr.write(label(d) + '\n'))
