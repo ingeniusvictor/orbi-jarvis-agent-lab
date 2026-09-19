@@ -22,6 +22,8 @@ import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
 import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, probeOllama, warmOllama } from './ollama.mjs'
+import { attachOpenAISession, OPENAI_MODEL, openAIConfigured } from './providers/openai.mjs'
+import { brainProviderStatus, resolveBrainProvider } from './providers/registry.mjs'
 import { homedir, tmpdir } from 'node:os'
 import { readFileSync, realpathSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
@@ -43,16 +45,15 @@ import { ensureWhisperServer } from './orbia/whisper-server-runtime.mjs'
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
 
 /**
- * Brain provider. Claude remains available for upstream compatibility, while
- * Phase 1 adds an explicit local Ollama path that does not require Claude CLI.
+ * Provider-neutral brain selection.
+ *
+ * ORBIA_BRAIN_PROVIDER is the canonical setting. JARVIS_PROVIDER remains a
+ * compatibility alias so existing launchers/configurations continue to work.
  */
-const PROVIDER = (process.env.JARVIS_PROVIDER ?? 'claude').toLowerCase()
-if (!['claude', 'ollama'].includes(PROVIDER)) {
-  throw new Error(`Unsupported JARVIS_PROVIDER="${PROVIDER}". Use claude or ollama.`)
-}
-
-const CONSOLE_TAG = PROVIDER === 'ollama' ? '[lumia]' : '[jarvis]'
-const ASSISTANT_NAME = PROVIDER === 'ollama' ? 'L.U.M.I.A.' : 'JARVIS'
+const BRAIN_PROVIDER = resolveBrainProvider()
+const PROVIDER = BRAIN_PROVIDER.id
+const CONSOLE_TAG = PROVIDER === 'claude' ? '[jarvis]' : '[lumia]'
+const ASSISTANT_NAME = BRAIN_PROVIDER.assistantName
 
 /**
  * A crash here takes the whole assistant down mid-sentence, and most of what
@@ -712,6 +713,7 @@ const handleRequest = async (req, res) => {
         ok: true,
         tts: eleven,
         stt: eleven,
+        brain: brainProviderStatus(),
         voice: {
           ...voice,
           elevenlabs: {
@@ -1311,6 +1313,11 @@ if (PROVIDER === 'ollama') {
       })
     }
   })
+} else if (PROVIDER === 'openai') {
+  console.log(
+    `${CONSOLE_TAG} cloud model ${OPENAI_MODEL} · OpenAI Responses API · ` +
+      (openAIConfigured() ? 'API key configured' : 'API key MISSING'),
+  )
 } else {
   console.log(`${CONSOLE_TAG} model ${MODEL} · effort ${EFFORT}`)
 }
@@ -1357,6 +1364,11 @@ wss.on('connection', (socket) => {
   // permission gate rather than bypassing it for convenience.
   if (PROVIDER === 'ollama') {
     attachOllamaSession(socket)
+    return
+  }
+
+  if (PROVIDER === 'openai') {
+    attachOpenAISession(socket)
     return
   }
 
