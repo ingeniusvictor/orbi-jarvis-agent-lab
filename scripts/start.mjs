@@ -115,6 +115,15 @@ const bridgeEnv = {
     ? {
         JARVIS_OLLAMA_MODEL:
           process.env.ORBIA_LUMIA_MODEL ?? 'orbia-lumia:4b',
+        // L.U.M.I.A. is local-first by design. Each explicit local preference
+        // still falls back safely through the VRM when an asset is unavailable,
+        // so a missing Kokoro install never prevents the desktop app from booting.
+        ORBIA_STT_MODE:
+          process.env.ORBIA_STT_MODE ?? 'local',
+        ORBIA_TTS_MODE:
+          process.env.ORBIA_TTS_MODE ?? 'local',
+        ORBIA_VOICE_PROFILE:
+          process.env.ORBIA_VOICE_PROFILE ?? 'lumia-kokoro',
         // Companion mode values first response time over long-form prose.
         // Users can still override this explicitly in the environment.
         JARVIS_OLLAMA_NUM_PREDICT:
