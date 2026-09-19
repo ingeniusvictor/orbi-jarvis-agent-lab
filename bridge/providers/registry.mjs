@@ -99,8 +99,10 @@ export function brainProviderStatus(env = process.env) {
     configured:
       provider.id === 'openai'
         ? Boolean(env.OPENAI_API_KEY?.trim())
-        : provider.id === 'hybrid'
-          ? true
-          : true,
+        : true,
+    cloudConfigured:
+      provider.id === 'hybrid'
+        ? Boolean(env.OPENAI_API_KEY?.trim())
+        : undefined,
   })
 }
