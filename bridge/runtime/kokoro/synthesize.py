@@ -11,6 +11,7 @@ from pathlib import Path
 
 import soundfile as sf
 from kokoro_onnx import Kokoro
+from misaki import espeak
 from misaki.espeak import EspeakG2P
 
 sys.stdin.reconfigure(encoding="utf-8")
@@ -21,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[3] / ".local-runtime" / "kokoro"
 MODEL = ROOT / "models" / "kokoro-v1.0.onnx"
 VOICES = ROOT / "models" / "voices-v1.0.bin"
 MAX_TEXT = 4000
-G2P = EspeakG2P(language="es")
+# Initialise the bundled eSpeak-ng fallback before Spanish G2P. This mirrors\n# the certified kokoro-onnx Spanish path and keeps Windows independent of a\n# separate system-wide eSpeak installation.\nESPEAK_FALLBACK = espeak.EspeakFallback(british=False)\nG2P = EspeakG2P(language="es")
 
 
 def main():
