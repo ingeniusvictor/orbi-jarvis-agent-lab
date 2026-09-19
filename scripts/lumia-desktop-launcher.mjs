@@ -60,19 +60,25 @@ async function bridgeReady() {
 }
 
 async function findFace() {
+  // Vite may bind localhost to IPv6 (::1) on Windows instead of 127.0.0.1.
+  // Probe both loopback names so a healthy interface is not reported missing.
+  const hosts = ['localhost', '127.0.0.1']
+
   for (let port = 5173; port <= 5199; port++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${port}/`, {
-        signal: AbortSignal.timeout(450),
-        cache: 'no-store',
-      })
-      if (!res.ok) continue
-      const html = await res.text()
-      if (/L\.U\.M\.I\.A\.|orbia-lumia-companion/i.test(html)) {
-        return `http://localhost:${port}`
+    for (const host of hosts) {
+      try {
+        const res = await fetch(`http://${host}:${port}/`, {
+          signal: AbortSignal.timeout(650),
+          cache: 'no-store',
+        })
+        if (!res.ok) continue
+        const html = await res.text()
+        if (/L\.U\.M\.I\.A\.|orbia-lumia-companion/i.test(html)) {
+          return `http://${host}:${port}`
+        }
+      } catch {
+        // try the other loopback name, then the next dev port
       }
-    } catch {
-      // try next dev port
     }
   }
   return null
