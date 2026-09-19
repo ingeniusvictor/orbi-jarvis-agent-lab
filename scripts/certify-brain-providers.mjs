@@ -14,6 +14,8 @@ assert.equal(normalizeBrainProvider('local'), 'ollama')
 assert.equal(normalizeBrainProvider('qwen'), 'ollama')
 assert.equal(normalizeBrainProvider('gpt'), 'openai')
 assert.equal(normalizeBrainProvider('chatgpt'), 'openai')
+assert.equal(normalizeBrainProvider('hybrid'), 'hybrid')
+assert.equal(normalizeBrainProvider('hibrido'), 'hybrid')
 assert.equal(normalizeBrainProvider('anthropic'), 'claude')
 
 assert.equal(
@@ -33,7 +35,7 @@ assert.throws(
 const providers = listBrainProviders()
 assert.deepEqual(
   providers.map((provider) => provider.id),
-  ['ollama', 'openai', 'claude'],
+  ['ollama', 'openai', 'hybrid', 'claude'],
 )
 
 assert.equal(openAIConfigured({}), false)
@@ -56,5 +58,21 @@ assert.equal(
 )
 
 console.log('BPA-01 brain provider abstraction: PASS')
-console.log('Providers: ollama local · openai cloud · claude compatibility')
+console.log('Providers: ollama local · openai cloud · hybrid router · claude compatibility')
 console.log('OpenAI key remains server-side environment state')
+
+assert.equal(
+  brainProviderStatus({ ORBIA_BRAIN_PROVIDER: 'hybrid' }).configured,
+  true,
+)
+assert.equal(
+  brainProviderStatus({ ORBIA_BRAIN_PROVIDER: 'hybrid' }).cloudConfigured,
+  false,
+)
+assert.equal(
+  brainProviderStatus({
+    ORBIA_BRAIN_PROVIDER: 'hybrid',
+    OPENAI_API_KEY: 'test-key',
+  }).cloudConfigured,
+  true,
+)
