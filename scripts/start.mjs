@@ -110,7 +110,15 @@ process.on('SIGTERM', () => shutdown(0))
 const port = process.env.PORT
 const bridgeEnv = {
   ...(writes ? { JARVIS_ALLOW_WRITES: '1' } : {}),
-  ...(local ? { JARVIS_PROVIDER: 'ollama' } : {}),
+  ...(local
+    ? {
+        JARVIS_PROVIDER: 'ollama',
+        ORBIA_BRAIN_PROVIDER:
+          process.env.ORBIA_BRAIN_PROVIDER ??
+          process.env.JARVIS_PROVIDER ??
+          'ollama',
+      }
+    : {}),
   ...(lumia
     ? {
         JARVIS_OLLAMA_MODEL:
