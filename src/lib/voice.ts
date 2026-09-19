@@ -645,6 +645,9 @@ async function startVadBridgeVoice(
           'content-type':
             requestBlob.type ||
             (provider === 'local' ? 'audio/wav' : 'audio/webm'),
+          ...(provider === 'local'
+            ? { 'x-orbia-voice-mode': capturedMode }
+            : {}),
         },
         body: requestBlob,
       })
