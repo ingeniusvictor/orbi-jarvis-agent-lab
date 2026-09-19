@@ -6,6 +6,7 @@ import { BladeSweep, Blades } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
 import { GestureGuide } from './GestureGuide'
+import { brainLabel } from '../lib/capabilities'
 
 const statusText: Record<Phase, string> = {
   offline: 'DESCONECTADA',
@@ -399,6 +400,12 @@ export function Hud() {
             <>
               {' · '}
               <kbd>V</kbd> voz: {voice.replace(/\(.*?\)/g, '').trim()}
+            </>
+          )}
+          {brainLabel() && (
+            <>
+              {' · '}
+              cerebro: {brainLabel()}
             </>
           )}
         </span>
