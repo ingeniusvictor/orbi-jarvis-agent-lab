@@ -1259,6 +1259,19 @@ console.log(
     ` · Kokoro ${voiceRuntimeAtBoot.local.ttsAvailable ? 'ready' : 'not ready'}`,
 )
 
+if (!voiceRuntimeAtBoot.local.ttsAvailable) {
+  const missingKokoro = [
+    !voiceRuntimeAtBoot.local.kokoro.pythonReady && 'python',
+    !voiceRuntimeAtBoot.local.kokoro.scriptReady && 'adapter',
+    !voiceRuntimeAtBoot.local.kokoro.modelReady && 'model',
+    !voiceRuntimeAtBoot.local.kokoro.voicesReady && 'voices',
+  ].filter(Boolean)
+
+  console.warn(
+    `${CONSOLE_TAG} Kokoro missing: ${missingKokoro.join(', ') || 'unknown'} · run INSTALAR_VOZ_LOCAL_LUMIA.cmd`,
+  )
+}
+
 if (
   voiceRuntimeAtBoot.local.sttAvailable &&
   process.env.ORBIA_WHISPER_SERVER_ENABLED === '1'
