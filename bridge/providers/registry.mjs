@@ -1,3 +1,5 @@
+import { resolveOpenAIKey } from './secure-secrets.mjs'
+
 /**
  * O.R.B.I.A. Brain Provider Registry — BPA-01.
  *
@@ -98,11 +100,11 @@ export function brainProviderStatus(env = process.env) {
     assistantName: provider.assistantName,
     configured:
       provider.id === 'openai'
-        ? Boolean(env.OPENAI_API_KEY?.trim())
+        ? Boolean(resolveOpenAIKey(env))
         : true,
     cloudConfigured:
       provider.id === 'hybrid'
-        ? Boolean(env.OPENAI_API_KEY?.trim())
+        ? Boolean(resolveOpenAIKey(env))
         : undefined,
   })
 }
