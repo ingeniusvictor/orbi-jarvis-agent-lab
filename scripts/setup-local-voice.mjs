@@ -298,6 +298,65 @@ function run(command, args, options = {}) {
   })
 }
 
+async function verifyKokoroSynthesis(venvPython) {
+  const adapter = resolve(root, 'bridge', 'runtime', 'kokoro', 'synthesize.py')
+  const tempDir = join(tmpdir(), `orbia-kokoro-smoke-${process.pid}-${Date.now()}`)
+  const output = join(tempDir, 'lumia-smoke.wav')
+
+  await mkdir(tempDir, { recursive: true })
+  try {
+    info('verifying Kokoro with a real Spanish synthesis...')
+
+    const result = await new Promise((resolvePromise, reject) => {
+      const child = spawn(venvPython, [adapter], {
+        cwd: root,
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+
+      let stdout = ''
+      let stderr = ''
+
+      child.stdout.on('data', (chunk) => {
+        stdout += String(chunk)
+        if (stdout.length > 16_384) stdout = stdout.slice(-16_384)
+      })
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk)
+        if (stderr.length > 16_384) stderr = stderr.slice(-16_384)
+      })
+
+      child.once('error', reject)
+      child.once('exit', (code) => {
+        resolvePromise({ code, stdout, stderr })
+      })
+
+      child.stdin.end(
+        JSON.stringify({
+          text: 'Hola. Soy Lumia. La voz local está preparada.',
+          outputPath: output,
+          speaker: 'ef_dora',
+        }),
+      )
+    })
+
+    if (result.code !== 0) {
+      throw new Error(
+        `Kokoro synthesis smoke test failed. ${String(result.stderr || result.stdout).trim()}`,
+      )
+    }
+
+    const wav = await stat(output).catch(() => null)
+    if (!wav || wav.size <= 44) {
+      throw new Error('Kokoro synthesis smoke test did not produce a valid WAV file.')
+    }
+
+    info(`Kokoro synthesis verified: ${Math.round(wav.size / 1024)} KB WAV`)
+  } finally {
+    await rm(tempDir, { recursive: true, force: true })
+  }
+}
+
 async function installKokoro() {
   const launcher = pythonLauncher()
   if (!launcher) {
@@ -350,6 +409,7 @@ async function installKokoro() {
     20 * 1024 * 1024,
   )
 
+  await verifyKokoroSynthesis(venvPython)
   info(`Kokoro runtime ready: ${venvPython}`)
 }
 
