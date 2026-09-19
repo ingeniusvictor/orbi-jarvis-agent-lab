@@ -5,6 +5,7 @@ import {
   readBrainSettings,
   writeBrainSettings,
 } from '../bridge/providers/brain-settings.mjs'
+import { openAIConfigured } from '../bridge/providers/openai.mjs'
 
 const rl = createInterface({ input, output })
 
@@ -69,7 +70,7 @@ try {
 
     if (
       (provider === 'hybrid' || provider === 'openai') &&
-      !process.env.OPENAI_API_KEY
+      !openAIConfigured()
     ) {
       console.log(
         'Si todavía no configuraste OpenAI, ejecuta CONFIGURAR_API_OPENAI_LUMIA.cmd.',
