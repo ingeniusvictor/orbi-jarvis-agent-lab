@@ -463,8 +463,8 @@ if (typeof window !== 'undefined') {
  * Engines are selected through VRM using bridge readiness:
  *   - local -> VAD + local Whisper.cpp when installed;
  *   - browser -> browser SpeechRecognition;
- *   - auto -> local Whisper when ready, otherwise ElevenLabs if configured,
- *     otherwise the browser fallback.
+ *   - auto -> stable browser SpeechRecognition first; local Whisper remains an
+ *     explicit selectable mode until its always-on path is household-certified.
  *
  * The microphone is opened once here so a denied permission is reported loudly
  * rather than surfacing later as an unexplained deafness, whichever engine runs.
@@ -483,16 +483,19 @@ export async function startVoice(h: VoiceHandlers): Promise<Voice> {
   }
   const capability = caps()
   const requested = capability.voice?.requested?.sttMode ?? 'auto'
+  const effective =
+    capability.voice?.effective?.effectiveStt ??
+    (requested === 'local' ? 'local' : 'browser')
   const localReady = Boolean(capability.voice?.local?.sttAvailable)
 
-  if (requested === 'browser') {
-    diag.engine = 'browser'
-    return startBrowserVoice(h)
-  }
-
-  if ((requested === 'local' || requested === 'auto') && localReady) {
+  if (effective === 'local' && localReady) {
     diag.engine = 'whisper-local'
     return startVadBridgeVoice(h, 'local')
+  }
+
+  if (effective === 'browser') {
+    diag.engine = 'browser'
+    return startBrowserVoice(h)
   }
 
   if (requested === 'auto' && capability.stt) {
@@ -500,8 +503,8 @@ export async function startVoice(h: VoiceHandlers): Promise<Voice> {
     return startVadBridgeVoice(h, 'elevenlabs')
   }
 
-  // An explicitly requested local runtime that is not ready falls back safely
-  // rather than leaving L.U.M.I.A. deaf.
+  // Any unavailable/uncertified local path falls back to the browser rather
+  // than leaving L.U.M.I.A. deaf or processing household noise indefinitely.
   diag.engine = 'browser'
   return startBrowserVoice(h)
 }
