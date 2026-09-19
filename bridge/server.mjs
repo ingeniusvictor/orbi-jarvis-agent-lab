@@ -23,6 +23,7 @@ import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
 import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, probeOllama, warmOllama } from './ollama.mjs'
 import { attachOpenAISession, OPENAI_MODEL, openAIConfigured } from './providers/openai.mjs'
+import { attachHybridSession } from './providers/hybrid.mjs'
 import { brainProviderStatus, resolveBrainProvider } from './providers/registry.mjs'
 import { homedir, tmpdir } from 'node:os'
 import { readFileSync, realpathSync } from 'node:fs'
@@ -1318,6 +1319,11 @@ if (PROVIDER === 'ollama') {
     `${CONSOLE_TAG} cloud model ${OPENAI_MODEL} · OpenAI Responses API · ` +
       (openAIConfigured() ? 'API key configured' : 'API key MISSING'),
   )
+} else if (PROVIDER === 'hybrid') {
+  console.log(
+    `${CONSOLE_TAG} ORBI Hybrid Router · local=${OLLAMA_MODEL} · cloud=${OPENAI_MODEL} · ` +
+      (openAIConfigured() ? 'cloud ready' : 'cloud optional/not configured'),
+  )
 } else {
   console.log(`${CONSOLE_TAG} model ${MODEL} · effort ${EFFORT}`)
 }
@@ -1369,6 +1375,11 @@ wss.on('connection', (socket) => {
 
   if (PROVIDER === 'openai') {
     attachOpenAISession(socket)
+    return
+  }
+
+  if (PROVIDER === 'hybrid') {
+    attachHybridSession(socket)
     return
   }
 
