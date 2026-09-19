@@ -40,6 +40,19 @@ resolved = resolveVoiceRuntime({
 })
 assert.equal(resolved.effectiveStt, 'browser')
 
+setSttMode('auto')
+resolved = resolveVoiceRuntime({
+  localSttAvailable: true,
+  browserSttAvailable: true,
+  localTtsAvailable: false,
+  systemTtsAvailable: true,
+})
+assert.equal(
+  resolved.effectiveStt,
+  'browser',
+  'auto must prefer the household-stable browser recogniser until local always-on STT is certified',
+)
+
 const custom = createVoiceProfile({
   id: 'cert-custom-voice',
   displayName: 'Certification custom voice',
