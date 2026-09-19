@@ -16,6 +16,10 @@ import {
 import { buildVoiceRuntimeStatus } from '../orbia/voice-status.mjs'
 import { applyVoiceRuntimeControl } from '../orbia/voice-control.mjs'
 import { parseVoiceRuntimeControl } from '../orbia/voice-runtime.mjs'
+import {
+  openAIKeySource,
+  resolveOpenAIKey,
+} from './secure-secrets.mjs'
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1'
 export const OPENAI_BASE_URL = (
@@ -32,7 +36,11 @@ export const OPENAI_MAX_OUTPUT_TOKENS = Math.max(
 )
 
 export function openAIConfigured(env = process.env) {
-  return Boolean(env.OPENAI_API_KEY?.trim())
+  return Boolean(resolveOpenAIKey(env))
+}
+
+export function openAIConfigurationSource(env = process.env) {
+  return openAIKeySource(env)
 }
 
 function responseInput(history, prompt) {
@@ -71,7 +79,7 @@ export async function streamOpenAI({
   signal,
   onText,
 }) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = resolveOpenAIKey()
   if (!apiKey) {
     throw new Error(
       'OpenAI API is not configured. Set OPENAI_API_KEY in the local bridge environment.',
