@@ -331,10 +331,10 @@ export function resolveVoiceRuntime({
       ? localSttAvailable ? 'local' : browserSttAvailable ? 'browser' : 'unavailable'
       : state.sttMode === 'browser'
         ? browserSttAvailable ? 'browser' : localSttAvailable ? 'local' : 'unavailable'
-        : localSttAvailable
-          ? 'local'
-          : browserSttAvailable
-            ? 'browser'
+        : browserSttAvailable
+          ? 'browser'
+          : localSttAvailable
+            ? 'local'
             : 'unavailable'
 
   const effectiveTts =
