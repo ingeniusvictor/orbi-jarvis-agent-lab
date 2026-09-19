@@ -17,6 +17,7 @@ import {
 import { buildKnowledgeContext } from '../orbia/knowledge.mjs'
 import { applyVoiceRuntimeControl } from '../orbia/voice-control.mjs'
 import { parseVoiceRuntimeControl } from '../orbia/voice-runtime.mjs'
+import { readBrainSettings } from './brain-settings.mjs'
 import { streamOllama, getOllamaModel } from '../ollama.mjs'
 import {
   OPENAI_MODEL,
@@ -247,7 +248,13 @@ export function attachHybridSession(socket) {
             answer = await streamOpenAI({
               prompt: route.prompt,
               history:
-                process.env.ORBIA_HYBRID_CLOUD_HISTORY === '0'
+                (
+                  process.env.ORBIA_HYBRID_CLOUD_HISTORY === '0' ||
+                  (
+                    process.env.ORBIA_HYBRID_CLOUD_HISTORY == null &&
+                    readBrainSettings().cloudHistory === false
+                  )
+                )
                   ? []
                   : history,
               systemPrompt: composeLumiaVoiceSystemPrompt({
