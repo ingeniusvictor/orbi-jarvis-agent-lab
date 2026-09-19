@@ -23,6 +23,10 @@ assert.equal(
   'openai',
 )
 assert.equal(
+  resolveBrainProvider({ ORBIA_BRAIN_PROVIDER: 'hybrid' }).id,
+  'hybrid',
+)
+assert.equal(
   resolveBrainProvider({ JARVIS_PROVIDER: 'ollama' }).id,
   'ollama',
 )
@@ -57,10 +61,6 @@ assert.equal(
   true,
 )
 
-console.log('BPA-01 brain provider abstraction: PASS')
-console.log('Providers: ollama local · openai cloud · hybrid router · claude compatibility')
-console.log('OpenAI key remains server-side environment state')
-
 assert.equal(
   brainProviderStatus({ ORBIA_BRAIN_PROVIDER: 'hybrid' }).configured,
   true,
@@ -76,3 +76,7 @@ assert.equal(
   }).cloudConfigured,
   true,
 )
+
+console.log('BPA-01 brain provider abstraction: PASS')
+console.log('Providers: ollama local · openai cloud · hybrid router · claude compatibility')
+console.log('OpenAI key remains server-side environment state')
