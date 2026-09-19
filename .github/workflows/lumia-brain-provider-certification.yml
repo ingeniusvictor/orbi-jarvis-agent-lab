@@ -1,0 +1,39 @@
+name: LUMIA Brain Provider Certification
+
+on:
+  push:
+    branches:
+      - feature/lumia-brain-provider-abstraction
+  pull_request:
+    branches:
+      - feature/lumia-brain-provider-abstraction
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Brain provider contracts
+        run: npm run certify:brain
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
