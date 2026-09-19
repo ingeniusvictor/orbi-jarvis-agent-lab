@@ -7,6 +7,7 @@ import {
   OPENAI_BASE_URL,
   OPENAI_MODEL,
   openAIConfigured,
+  openAIConfigurationSource,
 } from '../bridge/providers/openai.mjs'
 import {
   OLLAMA_URL,
@@ -47,6 +48,7 @@ if (selected.id === 'openai') {
   console.log(
     `OPENAI_API_KEY:     ${openAIConfigured() ? 'CONFIGURED' : 'MISSING'}`,
   )
+  console.log(`Key source:          ${openAIConfigurationSource()}`)
   console.log('API key value:      [never displayed]')
 }
 
@@ -56,6 +58,7 @@ if (selected.id === 'hybrid') {
   console.log(
     `Cloud available:     ${openAIConfigured() ? 'YES' : 'NO · local fallback active'}`,
   )
+  console.log(`Key source:          ${openAIConfigurationSource()}`)
   console.log('API key value:      [never displayed]')
 }
 
