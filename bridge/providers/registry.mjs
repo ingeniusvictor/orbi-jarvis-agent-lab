@@ -21,6 +21,13 @@ const PROVIDERS = Object.freeze({
     assistantName: 'L.U.M.I.A.',
     transport: 'external-session',
   }),
+  hybrid: Object.freeze({
+    id: 'hybrid',
+    displayName: 'ORBI Hybrid Router',
+    kind: 'router',
+    assistantName: 'L.U.M.I.A.',
+    transport: 'external-session',
+  }),
   claude: Object.freeze({
     id: 'claude',
     displayName: 'Claude Agent SDK',
@@ -38,6 +45,10 @@ const ALIASES = Object.freeze({
   gpt: 'openai',
   chatgpt: 'openai',
   openai: 'openai',
+  hybrid: 'hybrid',
+  hibrido: 'hybrid',
+  automatico: 'hybrid',
+  auto: 'hybrid',
   anthropic: 'claude',
   claude: 'claude',
 })
@@ -67,7 +78,7 @@ export function resolveBrainProvider(env = process.env) {
 
   if (!provider) {
     throw new Error(
-      `Unsupported brain provider="${requested}". Use ollama, openai or claude.`,
+      `Unsupported brain provider="${requested}". Use ollama, openai, hybrid or claude.`,
     )
   }
 
@@ -88,6 +99,8 @@ export function brainProviderStatus(env = process.env) {
     configured:
       provider.id === 'openai'
         ? Boolean(env.OPENAI_API_KEY?.trim())
-        : true,
+        : provider.id === 'hybrid'
+          ? true
+          : true,
   })
 }
