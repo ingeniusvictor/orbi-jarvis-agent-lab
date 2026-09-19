@@ -1,4 +1,5 @@
 import { resolveOpenAIKey } from './secure-secrets.mjs'
+import { readBrainSettings } from './brain-settings.mjs'
 
 /**
  * O.R.B.I.A. Brain Provider Registry — BPA-01.
@@ -70,9 +71,16 @@ export function normalizeBrainProvider(value) {
 }
 
 export function resolveBrainProvider(env = process.env) {
+  const saved =
+    env === process.env
+      ? readBrainSettings()
+      : { provider: null }
+
   const requested =
     env.ORBIA_BRAIN_PROVIDER?.trim() ||
     env.JARVIS_PROVIDER?.trim() ||
+    saved.provider ||
+    env.ORBIA_BRAIN_DEFAULT?.trim() ||
     'claude'
 
   const id = normalizeBrainProvider(requested)
