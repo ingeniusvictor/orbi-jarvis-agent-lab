@@ -79,16 +79,14 @@ async function findFace() {
 }
 
 function openBrowser(url) {
-  const child = spawn(
-    'cmd.exe',
-    ['/d', '/s', '/c', 'start', '""', url],
-    {
-      cwd: root,
-      detached: true,
-      windowsHide: true,
-      stdio: 'ignore',
-    },
-  )
+  // explorer.exe delegates HTTP(S) URLs to the user's default browser and
+  // avoids the fragile cmd.exe "start" quoting rules on Windows.
+  const child = spawn('explorer.exe', [url], {
+    cwd: root,
+    detached: true,
+    windowsHide: true,
+    stdio: 'ignore',
+  })
   child.unref()
 }
 
@@ -313,14 +311,18 @@ async function main() {
     return null
   })()
 
-  if (bridge && face) {
+  if (face) {
     openBrowser(face)
-    log(`L.U.M.I.A. opened at ${face}`)
+    log(
+      bridge
+        ? `L.U.M.I.A. opened at ${face}`
+        : `L.U.M.I.A. interface opened at ${face}, but bridge is not ready; see ${runtimeLog}`,
+    )
     return
   }
 
   log(
-    `startup incomplete: bridge=${bridge ? 'ready' : 'missing'} face=${face ?? 'missing'}; see ${runtimeLog}`,
+    `startup incomplete: bridge=${bridge ? 'ready' : 'missing'} face=missing; see ${runtimeLog}`,
   )
 }
 
