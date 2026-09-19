@@ -110,17 +110,15 @@ process.on('SIGTERM', () => shutdown(0))
 const port = process.env.PORT
 const bridgeEnv = {
   ...(writes ? { JARVIS_ALLOW_WRITES: '1' } : {}),
-  ...(local
+  ...(local && !lumia
     ? {
         JARVIS_PROVIDER: 'ollama',
-        ORBIA_BRAIN_PROVIDER:
-          process.env.ORBIA_BRAIN_PROVIDER ??
-          process.env.JARVIS_PROVIDER ??
-          'ollama',
       }
     : {}),
   ...(lumia
     ? {
+        ORBIA_BRAIN_DEFAULT:
+          process.env.ORBIA_BRAIN_DEFAULT ?? 'ollama',
         JARVIS_OLLAMA_MODEL:
           process.env.ORBIA_LUMIA_MODEL ?? 'orbia-lumia:4b',
         // L.U.M.I.A. is local-first by design. Each explicit local preference
