@@ -714,7 +714,17 @@ const handleRequest = async (req, res) => {
         ok: true,
         tts: eleven,
         stt: eleven,
-        brain: brainProviderStatus(),
+        brain: {
+          ...brainProviderStatus(),
+          model:
+            PROVIDER === 'ollama'
+              ? OLLAMA_MODEL
+              : PROVIDER === 'openai'
+                ? OPENAI_MODEL
+                : PROVIDER === 'hybrid'
+                  ? `${OLLAMA_MODEL} + ${OPENAI_MODEL}`
+                  : MODEL,
+        },
         voice: {
           ...voice,
           elevenlabs: {
