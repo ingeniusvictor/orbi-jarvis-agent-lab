@@ -7,6 +7,7 @@ import {
 } from '../bridge/providers/registry.mjs'
 import {
   openAIConfigured,
+  openAIConfigurationSource,
   OPENAI_MODEL,
 } from '../bridge/providers/openai.mjs'
 
@@ -48,6 +49,11 @@ assert.equal(
   true,
 )
 assert.ok(OPENAI_MODEL)
+assert.equal(openAIConfigurationSource({}), 'missing')
+assert.equal(
+  openAIConfigurationSource({ OPENAI_API_KEY: 'test-key' }),
+  'environment',
+)
 
 assert.equal(
   brainProviderStatus({ ORBIA_BRAIN_PROVIDER: 'openai' }).configured,
