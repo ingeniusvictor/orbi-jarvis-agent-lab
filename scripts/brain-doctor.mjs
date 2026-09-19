@@ -50,6 +50,15 @@ if (selected.id === 'openai') {
   console.log('API key value:      [never displayed]')
 }
 
+if (selected.id === 'hybrid') {
+  console.log(`Local provider:      Ollama · ${getOllamaModel()}`)
+  console.log(`Cloud provider:      OpenAI · ${OPENAI_MODEL}`)
+  console.log(
+    `Cloud available:     ${openAIConfigured() ? 'YES' : 'NO · local fallback active'}`,
+  )
+  console.log('API key value:      [never displayed]')
+}
+
 if (selected.id === 'claude') {
   console.log('Claude path:        embedded Agent SDK compatibility')
 }
