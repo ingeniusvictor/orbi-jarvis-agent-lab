@@ -60,6 +60,16 @@ export type VoiceRuntimeCapabilities = {
   }
 }
 
+export type BrainRuntimeCapabilities = {
+  id?: string
+  displayName?: string
+  kind?: string
+  assistantName?: string
+  configured?: boolean
+  cloudConfigured?: boolean
+  model?: string
+}
+
 export type Capabilities = {
   /** ElevenLabs speech-to-text (Scribe) is reachable via the bridge. */
   stt: boolean
@@ -67,6 +77,8 @@ export type Capabilities = {
   tts: boolean
   /** Provider-neutral VRM/C1-E readiness. Optional for older bridge builds. */
   voice?: VoiceRuntimeCapabilities
+  /** Provider-neutral brain selection/readiness. */
+  brain?: BrainRuntimeCapabilities
 }
 
 /** Browser-only until the probe says otherwise. Safe default: the app works. */
@@ -128,11 +140,13 @@ export async function probeCapabilities(): Promise<Capabilities> {
         stt?: boolean
         tts?: boolean
         voice?: VoiceRuntimeCapabilities
+        brain?: BrainRuntimeCapabilities
       }
       current = {
         stt: Boolean(h.stt),
         tts: Boolean(h.tts),
         voice: h.voice,
+        brain: h.brain,
       }
     }
   } catch {
@@ -159,4 +173,18 @@ export function engineLabel(): string {
   // env.elevenKey is only meaningful in direct mode; harmless to mention.
   if (env.elevenKey && BACKEND !== 'bridge') return 'ElevenLabs (direct)'
   return 'browser speech'
+}
+
+/** Short provider/model label for the HUD. */
+export function brainLabel(): string {
+  const brain = current.brain
+  const model = brain?.model ? ` · ${brain.model}` : ''
+
+  if (brain?.id === 'ollama') return `LOCAL${model}`
+  if (brain?.id === 'openai') return `CLOUD · OpenAI${model}`
+  if (brain?.id === 'hybrid') {
+    return `HYBRID${brain.cloudConfigured === false ? ' · local fallback' : ''}`
+  }
+  if (brain?.id === 'claude') return `CLOUD · Claude${model}`
+  return ''
 }
