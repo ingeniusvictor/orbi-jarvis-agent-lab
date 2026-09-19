@@ -33,7 +33,7 @@ const normalize = (value) =>
 
 const CLOUD_HINTS = [
   /\b(?:analiza|analizar|analisis|compara|comparar|comparacion)\b/,
-  /\b(?:disena|diseñar|arquitectura|estrategia|planifica|planificacion)\b/,
+  /\b(?:disena|disenar|arquitectura|estrategia|planifica|planificacion)\b/,
   /\b(?:diagnostica|diagnosticar|depura|debug|optimiza|optimizar)\b/,
   /\b(?:programa|programar|codigo|coding|typescript|javascript|python)\b/,
   /\b(?:investiga|investigar|razona|razonar|demuestra|demostrar)\b/,
