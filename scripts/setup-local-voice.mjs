@@ -258,8 +258,10 @@ async function installWhisperRuntime() {
 
 function pythonLauncher() {
   const candidates = [
+    { command: 'py', args: ['-3.13'] },
     { command: 'py', args: ['-3.12'] },
     { command: 'py', args: ['-3.11'] },
+    { command: 'py', args: ['-3.10'] },
     { command: 'python', args: [] },
     { command: 'python3', args: [] },
   ]
