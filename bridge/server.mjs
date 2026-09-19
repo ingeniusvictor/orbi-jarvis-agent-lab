@@ -678,7 +678,7 @@ function corsFor(req) {
   const headers = { vary: 'origin' }
   if (origin) {
     headers['access-control-allow-origin'] = origin
-    headers['access-control-allow-headers'] = 'content-type'
+    headers['access-control-allow-headers'] = 'content-type, x-orbia-voice-mode'
   }
   return headers
 }
@@ -1006,7 +1006,15 @@ const handleRequest = async (req, res) => {
     }
 
     try {
-      const result = await transcribeLocalWav(Buffer.concat(chunks))
+      const voiceMode = String(
+        req.headers['x-orbia-voice-mode'] ?? '',
+      ).toLowerCase()
+      const result = await transcribeLocalWav(Buffer.concat(chunks), {
+        // Technical vocabulary is useful for an actual command, but it biases
+        // quiet wake/background audio toward inventing ORBI/Lumi/MPPT terms.
+        // Keep the prompt out of always-on listening.
+        initialPrompt: voiceMode === 'command' ? undefined : '',
+      })
       res.writeHead(200, {
         ...cors,
         'content-type': 'application/json',
@@ -1251,7 +1259,10 @@ console.log(
     ` · Kokoro ${voiceRuntimeAtBoot.local.ttsAvailable ? 'ready' : 'not ready'}`,
 )
 
-if (voiceRuntimeAtBoot.local.sttAvailable) {
+if (
+  voiceRuntimeAtBoot.local.sttAvailable &&
+  process.env.ORBIA_WHISPER_SERVER_ENABLED === '1'
+) {
   void ensureWhisperServer().then((status) => {
     if (status.ready) {
       console.log(
