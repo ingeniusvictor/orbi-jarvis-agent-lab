@@ -22,7 +22,12 @@ ROOT = Path(__file__).resolve().parents[3] / ".local-runtime" / "kokoro"
 MODEL = ROOT / "models" / "kokoro-v1.0.onnx"
 VOICES = ROOT / "models" / "voices-v1.0.bin"
 MAX_TEXT = 4000
-# Initialise the bundled eSpeak-ng fallback before Spanish G2P. This mirrors\n# the certified kokoro-onnx Spanish path and keeps Windows independent of a\n# separate system-wide eSpeak installation.\nESPEAK_FALLBACK = espeak.EspeakFallback(british=False)\nG2P = EspeakG2P(language="es")
+
+# Initialise the bundled eSpeak-ng fallback before Spanish G2P. This mirrors
+# the certified kokoro-onnx Spanish path and keeps Windows independent of a
+# separate system-wide eSpeak installation.
+ESPEAK_FALLBACK = espeak.EspeakFallback(british=False)
+G2P = EspeakG2P(language="es")
 
 
 def main():
@@ -49,18 +54,38 @@ def main():
             raise ValueError("VOICE_TTS_INVALID_TEXT")
 
         kokoro = Kokoro(str(MODEL), str(VOICES))
-        audio, sample_rate = kokoro.create(phonemes, speaker, is_phonemes=True)
+        audio, sample_rate = kokoro.create(
+            phonemes,
+            speaker,
+            is_phonemes=True,
+        )
         sf.write(target, audio, sample_rate, subtype="PCM_16")
 
         print(
             json.dumps(
-                {"ok": True, "sampleRate": sample_rate, "voice": speaker},
+                {
+                    "ok": True,
+                    "sampleRate": sample_rate,
+                    "voice": speaker,
+                },
                 ensure_ascii=False,
             )
         )
     except Exception as error:
-        code = str(error) if str(error).startswith("VOICE_TTS_") else "VOICE_TTS_FAILED"
-        print(json.dumps({"ok": False, "errorCode": code}, ensure_ascii=False))
+        code = (
+            str(error)
+            if str(error).startswith("VOICE_TTS_")
+            else "VOICE_TTS_FAILED"
+        )
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "errorCode": code,
+                },
+                ensure_ascii=False,
+            )
+        )
         sys.exit(1)
 
 
