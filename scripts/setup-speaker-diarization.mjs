@@ -154,6 +154,7 @@ async function installPackage() {
       'install',
       '--no-save',
       '--package-lock=false',
+      '--legacy-peer-deps',
       `sherpa-onnx-node@${SHERPA_VERSION}`,
     ],
     { cwd: root },
