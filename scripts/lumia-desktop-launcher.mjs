@@ -18,7 +18,7 @@ const runtimeDir = resolve(root, '.local-runtime')
 const pidFile = resolve(runtimeDir, 'lumia-desktop.pid.json')
 const launcherLog = resolve(runtimeDir, 'lumia-launcher.log')
 const runtimeLog = resolve(runtimeDir, 'lumia-desktop-runtime.log')
-const branch = 'feature/lumia-brain-provider-abstraction'
+const branch = 'feature/lumia-voice-gate-v1'
 
 mkdirSync(runtimeDir, { recursive: true })
 
