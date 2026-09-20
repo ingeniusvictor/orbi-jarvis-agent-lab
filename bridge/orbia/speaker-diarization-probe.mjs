@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
-const require = createRequire(import.meta.url)
+const projectRequire = createRequire(import.meta.url)
 const root = process.cwd()
 
 export function speakerDiarizationPaths(env = process.env) {
@@ -33,7 +33,36 @@ export function speakerDiarizationPaths(env = process.env) {
         'embedding',
         'speaker-embedding.onnx',
       ),
+    runtimePackageJson:
+      env.ORBIA_DIARIZATION_RUNTIME_PACKAGE?.trim() ||
+      resolve(
+        root,
+        '.local-runtime',
+        'diarization',
+        'node-runtime',
+        'package.json',
+      ),
   })
+}
+
+export function sherpaRuntimeRequire(env = process.env) {
+  const { runtimePackageJson } = speakerDiarizationPaths(env)
+  const isolatedRequire = createRequire(runtimePackageJson)
+
+  try {
+    isolatedRequire.resolve('sherpa-onnx-node')
+    return isolatedRequire
+  } catch {
+    // Compatibility with machines that installed the first experimental build
+    // in the project root. New installs live under .local-runtime/diarization.
+  }
+
+  try {
+    projectRequire.resolve('sherpa-onnx-node')
+    return projectRequire
+  } catch {
+    return null
+  }
 }
 
 export function probeSpeakerDiarization({
@@ -42,13 +71,8 @@ export function probeSpeakerDiarization({
 } = {}) {
   const paths = speakerDiarizationPaths(env)
 
-  let packageReady = false
-  try {
-    require.resolve('sherpa-onnx-node')
-    packageReady = true
-  } catch {
-    packageReady = false
-  }
+  const runtimeRequire = sherpaRuntimeRequire(env)
+  const packageReady = Boolean(runtimeRequire)
 
   const segmentationReady = exists(paths.segmentationModel)
   const embeddingReady = exists(paths.embeddingModel)
@@ -57,6 +81,12 @@ export function probeSpeakerDiarization({
     provider: 'sherpa-onnx-local',
     available: packageReady && segmentationReady && embeddingReady,
     packageReady,
+    packageLocation:
+      runtimeRequire && exists(paths.runtimePackageJson)
+        ? 'isolated-runtime'
+        : packageReady
+          ? 'project-compat'
+          : 'missing',
     segmentationReady,
     embeddingReady,
     paths,
