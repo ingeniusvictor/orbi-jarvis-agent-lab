@@ -13,6 +13,7 @@
  */
 
 import { probeSpeakerDiarization } from './speaker-diarization-probe.mjs'
+import { speakerVerificationStatus } from './speaker-verification.mjs'
 
 export const VOICE_GATE_STATES = Object.freeze([
   'live',
@@ -140,18 +141,25 @@ export function classifyVoiceGateEvidence(
 export function buildVoiceGateStatus({ env = process.env } = {}) {
   const config = voiceGateConfig(env)
   const diarization = probeSpeakerDiarization({ env })
+  const speaker = speakerVerificationStatus({ env })
 
   const capabilities = Object.freeze({
     wakeWordGate: true,
     householdFocus: true,
     diarization: diarization.available,
-    speakerVerification: false,
+    speakerVerificationEngine: speaker.engineReady,
+    speakerVerification: speaker.available,
     antiReplay: false,
   })
 
   return Object.freeze({
-    phase: 'VG-01',
-    status: diarization.available ? 'PARTIAL' : 'FOUNDATION',
+    phase: 'VG-02',
+    status:
+      !diarization.available
+        ? 'FOUNDATION'
+        : speaker.available
+          ? 'SPEAKER_READY'
+          : 'PARTIAL',
     mode: config.mode,
     hotPathIntegrated: false,
     safeToEnforce: false,
@@ -168,11 +176,20 @@ export function buildVoiceGateStatus({ env = process.env } = {}) {
       segmentationReady: diarization.segmentationReady,
       embeddingReady: diarization.embeddingReady,
     }),
+    speaker: Object.freeze({
+      provider: speaker.provider,
+      engineReady: speaker.engineReady,
+      enrolled: speaker.enrolled,
+      profilePresent: speaker.profilePresent,
+      profileProtected: speaker.profileProtected,
+      threshold: speaker.threshold,
+      available: speaker.available,
+    }),
     nextRequired: Object.freeze([
       ...(diarization.available
         ? []
         : ['speaker-diarization-runtime']),
-      'speaker-verification-enrollment',
+      ...(speaker.available ? [] : ['speaker-verification-enrollment']),
       'anti-replay-liveness-provider',
       'calibration-and-threshold-benchmark',
       'hot-path-enforcement',
