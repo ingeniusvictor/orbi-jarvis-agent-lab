@@ -164,6 +164,7 @@ export function buildVoiceGateStatus({ env = process.env } = {}) {
       provider: diarization.provider,
       available: diarization.available,
       packageReady: diarization.packageReady,
+      packageLocation: diarization.packageLocation,
       segmentationReady: diarization.segmentationReady,
       embeddingReady: diarization.embeddingReady,
     }),
