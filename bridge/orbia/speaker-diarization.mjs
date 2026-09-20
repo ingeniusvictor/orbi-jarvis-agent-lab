@@ -9,11 +9,11 @@
  * Output: anonymous per-clip speaker segments.
  */
 
-import { createRequire } from 'node:module'
-import { probeSpeakerDiarization } from './speaker-diarization-probe.mjs'
-import { speakerDiarizationPaths } from './speaker-diarization-probe.mjs'
-
-const require = createRequire(import.meta.url)
+import {
+  probeSpeakerDiarization,
+  sherpaRuntimeRequire,
+  speakerDiarizationPaths,
+} from './speaker-diarization-probe.mjs'
 
 export class SpeakerDiarizationError extends Error {
   constructor(code, message) {
@@ -126,7 +126,9 @@ function createRuntime(env = process.env) {
 
   let sherpa
   try {
-    sherpa = require('sherpa-onnx-node')
+    const runtimeRequire = sherpaRuntimeRequire(env)
+    if (!runtimeRequire) throw new Error('runtime missing')
+    sherpa = runtimeRequire('sherpa-onnx-node')
   } catch {
     fail(
       'DIARIZATION_UNAVAILABLE',
