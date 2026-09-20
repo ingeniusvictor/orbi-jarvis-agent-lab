@@ -129,9 +129,28 @@ async function installPackage() {
   }
 
   info(`installing sherpa-onnx-node ${SHERPA_VERSION} as a local experiment...`)
+
+  // Spawning npm.cmd directly can fail with EINVAL on newer Windows/Node
+  // combinations. npm exposes the actual JS entry point in npm_execpath when
+  // this setup runs through "npm run", so launch that with the same node.exe
+  // instead of asking Windows to execute a .cmd shim.
+  const npmCliCandidates = [
+    process.env.npm_execpath?.trim(),
+    resolve(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+  ].filter(Boolean)
+  const npmCli = npmCliCandidates.find((candidate) => existsSync(candidate))
+
+  if (!npmCli) {
+    throw new Error(
+      'npm-cli.js could not be located. Run this installer with "npm run voice:setup:diarization".',
+    )
+  }
+
+  info(`using npm runtime: ${npmCli}`)
   await run(
-    process.platform === 'win32' ? 'npm.cmd' : 'npm',
+    process.execPath,
     [
+      npmCli,
       'install',
       '--no-save',
       '--package-lock=false',
