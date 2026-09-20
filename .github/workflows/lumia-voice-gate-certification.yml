@@ -28,6 +28,9 @@ jobs:
       - name: Voice Gate contracts
         run: npm run certify:voice-gate
 
+      - name: Speaker verification contracts
+        run: npm run certify:speaker-verification
+
       - name: Build
         run: npm run build
 
