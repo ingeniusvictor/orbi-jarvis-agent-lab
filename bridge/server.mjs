@@ -33,6 +33,12 @@ import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { renderPage } from './page.mjs'
 import { buildVoiceRuntimeStatus } from './orbia/voice-status.mjs'
 import { buildVoiceGateStatus } from './orbia/voice-gate.mjs'
+import { renderSpeakerEnrollmentPage } from './orbia/speaker-enrollment-page.mjs'
+import {
+  enrollSpeakerFromWavs,
+  speakerVerificationStatus,
+  verifySpeakerWav,
+} from './orbia/speaker-verification.mjs'
 import {
   LocalSpeechToTextError,
   transcribeLocalWav,
@@ -45,6 +51,9 @@ import { transcribeMultivoiceLocalWav } from './orbia/multivoice-stt.mjs'
 import { ensureWhisperServer } from './orbia/whisper-server-runtime.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
+const speakerEnrollmentSamples = []
+const SPEAKER_SAMPLE_LIMIT = 10 * 1024 * 1024
+
 
 /**
  * Provider-neutral brain selection.
@@ -112,7 +121,9 @@ function originAllowed(origin) {
   }
   if (url.protocol !== 'http:') return false
   if (!LOCAL_HOSTS.has(url.hostname)) return false
-  return isDevPort(Number(url.port))
+  const port = Number(url.port)
+  if (port === PORT) return true
+  return isDevPort(port)
 }
 
 /**
@@ -689,6 +700,32 @@ function corsFor(req) {
 // One HTTP server for both the speech proxy and the WebSocket upgrade.
 const http = await import('node:http')
 
+async function readSpeakerWav(req) {
+  const type = String(req.headers['content-type'] || '').toLowerCase()
+  if (
+    !type.includes('audio/wav') &&
+    !type.includes('audio/wave') &&
+    !type.includes('audio/x-wav')
+  ) {
+    const error = new Error('audio/wav required')
+    error.status = 415
+    throw error
+  }
+
+  const chunks = []
+  let size = 0
+  for await (const chunk of req) {
+    size += chunk.length
+    if (size > SPEAKER_SAMPLE_LIMIT) {
+      const error = new Error('audio too large')
+      error.status = 413
+      throw error
+    }
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks)
+}
+
 const handleRequest = async (req, res) => {
   const origin = req.headers.origin
   if (origin && !originAllowed(origin)) {
@@ -736,6 +773,113 @@ const handleRequest = async (req, res) => {
         },
       }),
     )
+  }
+
+  if (req.method === 'GET' && req.url === '/voice/speaker/enroll') {
+    res.writeHead(200, {
+      ...cors,
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'content-security-policy':
+        "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; media-src 'self'",
+    })
+    return res.end(renderSpeakerEnrollmentPage())
+  }
+
+  if (req.method === 'GET' && req.url === '/voice/speaker/status') {
+    res.writeHead(200, {
+      ...cors,
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+    })
+    return res.end(
+      JSON.stringify({
+        ok: true,
+        ...speakerVerificationStatus(),
+        pendingEnrollmentSamples: speakerEnrollmentSamples.length,
+      }),
+    )
+  }
+
+  if (req.method === 'POST' && req.url === '/voice/speaker/enroll/sample') {
+    try {
+      const wav = await readSpeakerWav(req)
+      speakerEnrollmentSamples.push(wav)
+
+      if (speakerEnrollmentSamples.length < 3) {
+        res.writeHead(200, {
+          ...cors,
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+        })
+        return res.end(
+          JSON.stringify({
+            ok: true,
+            enrolled: false,
+            sampleCount: speakerEnrollmentSamples.length,
+          }),
+        )
+      }
+
+      const result = enrollSpeakerFromWavs(speakerEnrollmentSamples.slice(0, 3))
+      speakerEnrollmentSamples.splice(0, speakerEnrollmentSamples.length)
+      res.writeHead(200, {
+        ...cors,
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      })
+      return res.end(
+        JSON.stringify({
+          ok: true,
+          enrolled: true,
+          sampleCount: result.sampleCount,
+          dimensions: result.dimensions,
+          protected: true,
+        }),
+      )
+    } catch (err) {
+      // Discard partial enrollment after a failed sample so a bad/quiet clip
+      // cannot silently contaminate a future profile.
+      speakerEnrollmentSamples.splice(0, speakerEnrollmentSamples.length)
+      res.writeHead(Number(err?.status ?? 400), {
+        ...cors,
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      })
+      return res.end(
+        JSON.stringify({
+          ok: false,
+          errorCode: 'SPEAKER_ENROLLMENT_FAILED',
+          message: String(err?.message ?? 'speaker enrollment failed'),
+        }),
+      )
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/voice/speaker/verify') {
+    try {
+      const wav = await readSpeakerWav(req)
+      const result = verifySpeakerWav(wav)
+      res.writeHead(result.available ? 200 : 409, {
+        ...cors,
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      })
+      return res.end(JSON.stringify({ ok: result.available, ...result }))
+    } catch (err) {
+      res.writeHead(Number(err?.status ?? 400), {
+        ...cors,
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      })
+      return res.end(
+        JSON.stringify({
+          ok: false,
+          errorCode: 'SPEAKER_VERIFICATION_FAILED',
+          message: String(err?.message ?? 'speaker verification failed'),
+        }),
+      )
+    }
   }
 
   // Serve local image files to the page. Screenshots and generated art land on
