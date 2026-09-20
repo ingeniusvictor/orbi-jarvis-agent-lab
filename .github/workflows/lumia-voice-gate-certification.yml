@@ -1,0 +1,35 @@
+name: LUMIA Voice Gate Certification
+
+on:
+  push:
+    branches:
+      - feature/lumia-voice-gate-v1
+  pull_request:
+    branches:
+      - feature/lumia-brain-provider-abstraction
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Voice Gate contracts
+        run: npm run certify:voice-gate
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
