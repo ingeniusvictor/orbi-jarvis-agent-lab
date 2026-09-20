@@ -31,21 +31,42 @@ function recordedPid() {
   }
 }
 
-function discoverLumiaParents() {
-  if (process.platform !== 'win32') return []
+function bridgeListenerPids() {
+  const result = spawnSync(
+    'netstat.exe',
+    ['-ano', '-p', 'tcp'],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 10_000,
+    },
+  )
+  if (result.status !== 0) return []
 
-  const escapedRoot = root.replace(/'/g, "''")
+  const pids = new Set()
+  for (const line of String(result.stdout ?? '').split(/\r?\n/)) {
+    if (!/LISTENING/i.test(line)) continue
+    const columns = line.trim().split(/\s+/)
+    if (columns.length < 5) continue
+    const localAddress = columns[1] ?? ''
+    if (!/:8787$/.test(localAddress)) continue
+    const pid = Number(columns.at(-1))
+    if (Number.isInteger(pid) && pid > 0) pids.add(pid)
+  }
+  return [...pids]
+}
+
+function parentIfLumiaBridge(bridgePid) {
+  if (process.platform !== 'win32') return 0
+
   const script = [
     "$ErrorActionPreference='SilentlyContinue'",
-    `$root='${escapedRoot}'`,
-    "$matches=Get-CimInstance Win32_Process | Where-Object {",
-    "  $_.Name -match '^node(?:\.exe)?$' -and",
-    "  $_.CommandLine -and",
-    "  $_.CommandLine -like ('*' + $root + '*') -and",
-    "  $_.CommandLine -like '*scripts/start.mjs*' -and",
-    "  $_.CommandLine -like '*--lumia*'",
-    "}",
-    "$matches | ForEach-Object { [Console]::WriteLine($_.ProcessId) }",
+    `$bridge=Get-CimInstance Win32_Process -Filter "ProcessId=${bridgePid}"`,
+    "if (-not $bridge) { exit 0 }",
+    "$parent=Get-CimInstance Win32_Process -Filter ('ProcessId=' + $bridge.ParentProcessId)",
+    "if (-not $parent -or -not $parent.CommandLine) { exit 0 }",
+    "if ($parent.CommandLine -like '*scripts/start.mjs*' -and $parent.CommandLine -like '*--lumia*') { [Console]::Write($parent.ProcessId) }",
   ].join('; ')
 
   const result = spawnSync(
@@ -59,24 +80,25 @@ function discoverLumiaParents() {
     },
   )
 
-  if (result.status !== 0) return []
-
-  return String(result.stdout ?? '')
-    .split(/\r?\n/)
-    .map((value) => Number(value.trim()))
-    .filter((pid) => Number.isInteger(pid) && pid > 0)
+  if (result.status !== 0) return 0
+  const pid = Number(String(result.stdout ?? '').trim())
+  return Number.isInteger(pid) && pid > 0 ? pid : 0
 }
 
 const killed = new Set()
 const pid = recordedPid()
-if (pid && killTree(pid)) killed.add(pid)
 
-// The PID file can become stale after a crash or an older launcher build.
-// Fall back only to the exact L.U.M.I.A. parent command inside this repository;
-// never kill arbitrary node.exe or Ollama processes.
-for (const discovered of discoverLumiaParents()) {
-  if (killed.has(discovered)) continue
-  if (killTree(discovered)) killed.add(discovered)
+if (pid && killTree(pid)) {
+  killed.add(pid)
+}
+
+// A stale PID file can survive an older crash/launcher build. In that case,
+// anchor discovery to the bridge that actually owns L.U.M.I.A.'s local port,
+// verify its parent command is start.mjs --lumia, then kill only that tree.
+for (const bridgePid of bridgeListenerPids()) {
+  const parentPid = parentIfLumiaBridge(bridgePid)
+  if (!parentPid || killed.has(parentPid)) continue
+  if (killTree(parentPid)) killed.add(parentPid)
 }
 
 try {
@@ -84,6 +106,3 @@ try {
 } catch {
   // best effort
 }
-
-// Give the hidden shortcut a useful exit code for future diagnostics.
-process.exitCode = killed.size > 0 ? 0 : 0
