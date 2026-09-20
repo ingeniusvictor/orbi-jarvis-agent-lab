@@ -19,6 +19,7 @@ console.log(`  anti-replay/liveness:${gate.capabilities.antiReplay ? ' READY' : 
 console.log('')
 console.log('Diarization runtime:')
 console.log(`  package:             ${gate.diarization.packageReady ? 'READY' : 'MISSING'}`)
+console.log(`  package location:    ${gate.diarization.packageLocation ?? 'unknown'}`)
 console.log(`  segmentation model:  ${gate.diarization.segmentationReady ? 'READY' : 'MISSING'}`)
 console.log(`  embedding model:     ${gate.diarization.embeddingReady ? 'READY' : 'MISSING'}`)
 console.log('')
