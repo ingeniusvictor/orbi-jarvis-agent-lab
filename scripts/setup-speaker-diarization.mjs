@@ -14,6 +14,7 @@ import {
   rename,
   rm,
   stat,
+  writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -24,6 +25,8 @@ const root = process.cwd()
 const runtimeRoot = resolve(root, '.local-runtime', 'diarization')
 const segmentationRoot = join(runtimeRoot, 'segmentation')
 const embeddingRoot = join(runtimeRoot, 'embedding')
+const nodeRuntimeRoot = join(runtimeRoot, 'node-runtime')
+const nodeRuntimePackage = join(nodeRuntimeRoot, 'package.json')
 
 const SHERPA_VERSION =
   process.env.ORBIA_SHERPA_ONNX_VERSION?.trim() || '^1.13.8'
@@ -115,25 +118,40 @@ function hasCommand(command, args = ['--version']) {
 }
 
 async function installPackage() {
-  const probe = spawnSync(
-    process.execPath,
-    [
-      '-e',
-      "try{require.resolve('sherpa-onnx-node');process.exit(0)}catch{process.exit(1)}",
-    ],
-    { cwd: root, windowsHide: true },
+  const isolatedPackage = join(
+    nodeRuntimeRoot,
+    'node_modules',
+    'sherpa-onnx-node',
+    'package.json',
   )
-  if (!force && probe.status === 0) {
-    info('sherpa-onnx-node already present')
+
+  if (!force && existsSync(isolatedPackage)) {
+    info('sherpa-onnx-node isolated runtime already present')
     return
   }
 
-  info(`installing sherpa-onnx-node ${SHERPA_VERSION} as a local experiment...`)
+  await mkdir(nodeRuntimeRoot, { recursive: true })
+  if (!existsSync(nodeRuntimePackage)) {
+    await writeFile(
+      nodeRuntimePackage,
+      JSON.stringify(
+        {
+          name: 'orbia-lumia-diarization-runtime',
+          private: true,
+          version: '0.0.0',
+        },
+        null,
+        2,
+      ) + '\n',
+      'utf8',
+    )
+  }
+
+  info(`installing sherpa-onnx-node ${SHERPA_VERSION} in isolated runtime...`)
 
   // Spawning npm.cmd directly can fail with EINVAL on newer Windows/Node
   // combinations. npm exposes the actual JS entry point in npm_execpath when
-  // this setup runs through "npm run", so launch that with the same node.exe
-  // instead of asking Windows to execute a .cmd shim.
+  // this setup runs through "npm run", so launch that with node.exe.
   const npmCliCandidates = [
     process.env.npm_execpath?.trim(),
     resolve(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
@@ -147,11 +165,14 @@ async function installPackage() {
   }
 
   info(`using npm runtime: ${npmCli}`)
+  info(`isolated runtime: ${nodeRuntimeRoot}`)
   await run(
     process.execPath,
     [
       npmCli,
       'install',
+      '--prefix',
+      nodeRuntimeRoot,
       '--no-save',
       '--package-lock=false',
       '--legacy-peer-deps',
