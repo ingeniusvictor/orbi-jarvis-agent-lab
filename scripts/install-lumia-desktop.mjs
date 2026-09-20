@@ -13,7 +13,18 @@ function psLiteral(value) {
 
 const script = [
   "$ErrorActionPreference='Stop'",
-  "$desktop=[Environment]::GetFolderPath('Desktop')",
+  "$candidates=@()",
+  "$shellDesktop=[Environment]::GetFolderPath('Desktop')",
+  "if ($shellDesktop) { $candidates += $shellDesktop }",
+  "if ($env:OneDrive) { $candidates += (Join-Path $env:OneDrive 'Desktop'); $candidates += (Join-Path $env:OneDrive 'Escritorio') }",
+  "$candidates += (Join-Path $env:USERPROFILE 'Desktop')",
+  "$candidates += (Join-Path $env:USERPROFILE 'Escritorio')",
+  "$candidates = @($candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique)",
+  "$desktop=$shellDesktop",
+  "$existing=$null",
+  "foreach ($candidate in $candidates) { $probe=Join-Path $candidate 'L.U.M.I.A..lnk'; if (Test-Path $probe) { $existing=$probe; break } }",
+  "if ($existing) { $desktop=Split-Path -Parent $existing } elseif (-not $desktop -and $candidates.Count -gt 0) { $desktop=$candidates[0] }",
+  "if (-not $desktop) { throw 'No se pudo resolver la carpeta Escritorio de Windows.' }",
   "$ws=New-Object -ComObject WScript.Shell",
   `$s=$ws.CreateShortcut((Join-Path $desktop 'L.U.M.I.A..lnk'))`,
   `$s.TargetPath=(Join-Path $env:WINDIR 'System32\\wscript.exe')`,
@@ -25,12 +36,11 @@ const script = [
   `$q.TargetPath=(Join-Path $env:WINDIR 'System32\\wscript.exe')`,
   `$q.Arguments=${psLiteral(`"${stopVbs}"`)}`,
   `$q.WorkingDirectory=${psLiteral(root)}`,
-  "$q.Description='Cerrar L.U.M.I.A.'",
+  "$q.Description='Cerrar L.U.M.I.A. y detener su runtime local'",
   "$q.Save()",
+  "Write-Output $desktop",
 ].join('; ')
 
-// -EncodedCommand avoids cmd/PowerShell quoting problems when the repository
-// path contains spaces (for example: C:\\ORBI CODEX\\...).
 const encodedCommand = Buffer.from(script, 'utf16le').toString('base64')
 
 const result = spawnSync(
@@ -52,9 +62,12 @@ if (result.status !== 0) {
   process.exit(result.status ?? 1)
 }
 
+const desktop = String(result.stdout ?? '').trim()
+
 console.log('')
-console.log('Accesos directos creados en el Escritorio:')
+console.log('Accesos directos creados:')
 console.log('  L.U.M.I.A.         -> actualiza, inicia y abre la interfaz')
 console.log('  Cerrar L.U.M.I.A.  -> detiene el runtime iniciado por el acceso')
+if (desktop) console.log(`  Carpeta: ${desktop}`)
 console.log('')
-console.log('Desde ahora no necesitas abrir PowerShell para usar L.U.M.I.A.')
+console.log('El acceso de cierre se crea junto al acceso de inicio existente cuando Windows usa un Escritorio redirigido.')
