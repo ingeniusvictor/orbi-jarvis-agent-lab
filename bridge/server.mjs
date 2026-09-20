@@ -32,6 +32,7 @@ import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { renderPage } from './page.mjs'
 import { buildVoiceRuntimeStatus } from './orbia/voice-status.mjs'
+import { buildVoiceGateStatus } from './orbia/voice-gate.mjs'
 import {
   LocalSpeechToTextError,
   transcribeLocalWav,
@@ -707,6 +708,7 @@ const handleRequest = async (req, res) => {
     // while also exposing the provider-neutral VRM/C1-E readiness envelope.
     const eleven = Boolean(elevenKey())
     const voice = buildVoiceRuntimeStatus()
+    const gate = buildVoiceGateStatus()
 
     res.writeHead(200, { ...cors, 'content-type': 'application/json' })
     return res.end(
@@ -727,6 +729,7 @@ const handleRequest = async (req, res) => {
         },
         voice: {
           ...voice,
+          gate,
           elevenlabs: {
             available: eleven,
           },
