@@ -97,8 +97,35 @@ function createExtractor(env = process.env) {
   })
 }
 
-export function computeSpeakerEmbedding(audio, { env = process.env } = {}) {
+export function validateSpeakerSample(audio) {
   const decoded = decodeMonoPcm16Wav(audio)
+  const durationSeconds = decoded.samples.length / decoded.sampleRate
+  if (durationSeconds < 2 || durationSeconds > 10) {
+    throw new Error('Speaker sample must be between 2 and 10 seconds.')
+  }
+
+  let sumSquares = 0
+  let peak = 0
+  for (const sample of decoded.samples) {
+    sumSquares += sample * sample
+    peak = Math.max(peak, Math.abs(sample))
+  }
+  const rms = Math.sqrt(sumSquares / Math.max(1, decoded.samples.length))
+  if (!Number.isFinite(rms) || rms < 0.008 || peak < 0.03) {
+    throw new Error('Speaker sample is too quiet. Speak closer to the microphone.')
+  }
+
+  return Object.freeze({
+    sampleRate: decoded.sampleRate,
+    samples: decoded.samples,
+    durationSeconds,
+    rms,
+    peak,
+  })
+}
+
+export function computeSpeakerEmbedding(audio, { env = process.env } = {}) {
+  const decoded = validateSpeakerSample(audio)
   if (decoded.sampleRate !== 16000) {
     throw new Error(
       `Speaker verification requires 16000 Hz audio, received ${decoded.sampleRate} Hz.`,
