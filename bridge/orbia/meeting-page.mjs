@@ -70,6 +70,8 @@ export function renderMeetingPage() {
       </select>
       <label>Mi nombre en la reunión</label>
       <input id="localName" value="Víctor">
+      <label>Participantes esperados <span style="color:#557d85">(opcional)</span></label>
+      <input id="expectedParticipants" type="number" min="1" max="20" step="1" placeholder="Ej.: 3">
       <div class="buttons">
         <button id="start" class="good">Iniciar reunión</button>
         <button id="mic" disabled>🎙 Micrófono</button>
@@ -153,6 +155,11 @@ export function renderMeetingPage() {
   function render() {
     const speakers = new Set(
       transcript
+        .filter(x =>
+          x.speakerId ||
+          (x.speakerName &&
+           String(x.speakerName).toLowerCase() !== 'unknown speaker')
+        )
         .map(x => x.speakerId || x.speakerName)
         .filter(Boolean),
     )
@@ -171,14 +178,20 @@ export function renderMeetingPage() {
 
     if (speakerTracking) {
       $('trackingState').textContent =
-        'MI-02 activo · ' +
+        'MI-03 activo · ' +
         speakerTracking.anonymousSpeakerCount +
         ' voz(es) anónima(s)' +
+        (speakerTracking.expectedParticipants
+          ? ' · objetivo ' + speakerTracking.expectedParticipants
+          : '') +
+        (speakerTracking.merges?.length
+          ? ' · ' + speakerTracking.merges.length + ' fusión(es)'
+          : '') +
         (speakerTracking.primaryProfileAvailable ? ' · perfil local disponible' : '')
     } else {
       $('trackingState').textContent =
         $('platform').value === 'room'
-          ? 'MI-02 · esperando audio para identificar voces'
+          ? 'MI-03 · esperando audio para identificar voces'
           : 'Identidad por plataforma / diarización de respaldo'
     }
 
@@ -245,7 +258,8 @@ export function renderMeetingPage() {
     src.connect(node); node.connect(silent); silent.connect(ctx.destination)
 
     let parts = [], total = 0, chunkStart = elapsed(), chain = Promise.resolve()
-    const threshold = ctx.sampleRate * 8
+    const chunkSeconds = $('platform').value === 'room' ? 10 : 8
+    const threshold = ctx.sampleRate * chunkSeconds
 
     const send = (samples, offset) => {
       if (!samples.length || !meetingId) return
@@ -255,6 +269,7 @@ export function renderMeetingPage() {
         channel,
         offsetMs: String(Math.round(offset)),
         localName: $('localName').value.trim() || 'LOCAL USER',
+        expectedParticipants: $('expectedParticipants').value.trim(),
         platform: $('platform').value,
       })
       chain = chain.then(async () => {
