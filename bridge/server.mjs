@@ -1039,6 +1039,7 @@ const handleRequest = async (req, res) => {
         'cache-control': 'no-cache',
         'x-orbia-voice-provider': result.provider,
         'x-orbia-voice-speaker': result.speaker,
+        'x-orbia-voice-latency-ms': String(result.latencyMs ?? ''),
       })
       return res.end(Buffer.from(result.audio))
     } catch (err) {
@@ -1180,12 +1181,14 @@ const handleRequest = async (req, res) => {
         ...cors,
         'content-type': 'application/json',
         'x-orbia-voice-provider': result.provider,
+        'x-orbia-voice-latency-ms': String(result.latencyMs ?? ''),
       })
       return res.end(
         JSON.stringify({
           text: result.text,
           language: result.language,
           provider: result.provider,
+          latencyMs: result.latencyMs ?? null,
         }),
       )
     } catch (err) {
