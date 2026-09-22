@@ -18,7 +18,7 @@ const runtimeDir = resolve(root, '.local-runtime')
 const pidFile = resolve(runtimeDir, 'lumia-desktop.pid.json')
 const launcherLog = resolve(runtimeDir, 'lumia-launcher.log')
 const runtimeLog = resolve(runtimeDir, 'lumia-desktop-runtime.log')
-const branch = 'feature/lumia-mi02-speaker-tracking-ui'
+const branch = 'feature/lumia-mi03-speaker-consolidation'
 const meetingMode = process.argv.includes('--meeting')
 
 mkdirSync(runtimeDir, { recursive: true })
