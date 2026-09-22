@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "profile": "orbi-ecc-lumia-v0.6",
-  "status": "agent-harness-project-skill-materialized",
+  "profile": "orbi-ecc-lumia-v0.7",
+  "status": "context-budget-project-skill-materialized",
   "adoptionMode": "curated",
   "scope": "orbi-jarvis-agent-lab/lumia-voice-gate",
   "activeDevelopmentBase": "feature/lumia-voice-gate-v1",
@@ -103,6 +103,17 @@
       "observationSchema": ".orbi/lumia-agent-observation-v1.schema.json",
       "validator": "scripts/validate-lumia-agent-observation.mjs",
       "certification": "scripts/certify-lumia-agent-harness.mjs"
+    },
+    {
+      "name": "orbi-lumia-context-budget",
+      "path": ".agents/skills/orbi-lumia-context-budget/SKILL.md",
+      "version": "0.1.0",
+      "origin": "ORBI",
+      "upstreamInspiration": "ECC context-budget 2.2.2",
+      "authoritative": false,
+      "runtimeDependency": false,
+      "auditor": "scripts/ecc-lumia-context-budget.mjs",
+      "certification": "scripts/certify-lumia-context-budget.mjs"
     }
   ],
   "authority": {
@@ -199,6 +210,7 @@
       "npm run certify:brain",
       "npm run certify:voice-gate",
       "node scripts/certify-lumia-agent-harness.mjs",
+      "node scripts/certify-lumia-context-budget.mjs",
       "npm run build",
       "npm run lint"
     ],
@@ -257,7 +269,7 @@
     "tdd-workflow",
     "orbi-lumia-verification-loop",
     "orbi-lumia-security-review",
-    "context-budget",
+    "orbi-lumia-context-budget",
     "error-handling",
     "orbi-lumia-agent-harness"
   ],
@@ -285,9 +297,7 @@
     "autonomous-loop-skills",
     "mcp-memory-tooling"
   ],
-  "nextProjectSkills": [
-    "orbi-lumia-context-budget"
-  ],
+  "nextProjectSkills": [],
   "agentHarness": {
     "schemaVersion": 1,
     "schema": ".orbi/lumia-agent-observation-v1.schema.json",
@@ -295,5 +305,23 @@
     "certification": "scripts/certify-lumia-agent-harness.mjs",
     "runtimeDependency": false,
     "authoritative": false
+  },
+  "contextBudget": {
+    "model": "orbi-lumia-context-budget-estimate",
+    "auditor": "scripts/ecc-lumia-context-budget.mjs",
+    "certification": "scripts/certify-lumia-context-budget.mjs",
+    "persistentKinds": [
+      "always-instructions"
+    ],
+    "nonPersistentKinds": [
+      "discoverable-skill",
+      "config-reference"
+    ],
+    "reviewTriggers": {
+      "largeAlwaysInstructionLines": 150,
+      "largeSkillLines": 250,
+      "enforcing": false
+    },
+    "runtimeTelemetry": false
   }
 }
