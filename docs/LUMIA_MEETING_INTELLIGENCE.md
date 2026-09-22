@@ -1,4 +1,4 @@
-# L.U.M.I.A. Meeting Intelligence — MI-01
+# L.U.M.I.A. Meeting Intelligence — MI-02
 
 ## Goal
 
@@ -157,3 +157,35 @@ Not yet claimed as certified:
 
 Those capabilities must be added and certified independently rather than
 silently inferred.
+
+
+## MI-02 — persistent room speaker tracking
+
+Presential microphone capture now runs through local diarization before
+transcription. Each local diarization cluster is converted into a 512-dimensional
+speaker embedding and compared with the active meeting's in-memory centroids.
+
+The result is a stable meeting-local identity such as `SPEAKER 1` or
+`SPEAKER 2` across successive audio chunks. If the primary user's enrolled
+profile is available and matches, that speaker is labeled with the configured
+local user name instead.
+
+Privacy boundary:
+
+- anonymous participant embeddings exist only in process memory;
+- they are not written to `.local-runtime/meetings`;
+- raw audio remains OFF by default;
+- ending the meeting clears the in-memory tracker;
+- a bridge restart loses anonymous biometric continuity rather than persisting
+  other people's biometric templates.
+
+The default cross-chunk match threshold is conservative and configurable through
+`ORBIA_MEETING_SPEAKER_TRACK_THRESHOLD` (default 0.68).
+
+## MI-02 console layout
+
+Desktop Meeting Console now uses the available viewport rather than a fixed
+1100-pixel canvas. The controls live in a compact scrolling sidebar while the
+transcript receives the remaining horizontal and vertical space. The header
+shows MI-02 tracking state and anonymous speaker count when room tracking is
+active.
