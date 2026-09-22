@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/lumia-meeting-intelligence-v1
+      - feature/lumia-mi02-speaker-tracking-ui
   pull_request:
     branches:
       - feature/lumia-vg03-acoustic-intelligence
