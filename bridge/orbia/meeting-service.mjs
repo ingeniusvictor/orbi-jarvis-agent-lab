@@ -156,6 +156,7 @@ export async function ingestMeetingAudioChunk(
     offsetMs = 0,
     localSpeakerName = 'LOCAL USER',
     localSpeakerAuthorized = null,
+    expectedParticipants = null,
     platform = null,
   } = {},
   options = {},
@@ -174,6 +175,7 @@ export async function ingestMeetingAudioChunk(
       {
         offsetMs: baseOffset,
         primaryName: cleanName(localSpeakerName) || 'LOCAL USER',
+        expectedParticipants,
         env: options.env ?? process.env,
       },
     )
@@ -460,6 +462,52 @@ export async function queryMeeting(
   return answerMeetingQuestion(question, turns, options)
 }
 
+export function applySpeakerTrackingAliases(
+  turns = [],
+  tracking = null,
+) {
+  if (!tracking) return Object.freeze(turns.map((turn) => ({ ...turn })))
+
+  const aliases = new Map(
+    Array.isArray(tracking.aliases)
+      ? tracking.aliases.map((item) => [item.from, item.to])
+      : [],
+  )
+  const speakers = new Map(
+    Array.isArray(tracking.speakers)
+      ? tracking.speakers.map((speaker) => [speaker.id, speaker])
+      : [],
+  )
+
+  const resolve = (id) => {
+    let current = id
+    const seen = new Set()
+    while (current && aliases.has(current) && !seen.has(current)) {
+      seen.add(current)
+      current = aliases.get(current)
+    }
+    return current
+  }
+
+  return Object.freeze(
+    turns.map((turn) => {
+      if (!turn?.speakerId) return { ...turn }
+      const canonicalId = resolve(turn.speakerId)
+      if (!canonicalId || canonicalId === turn.speakerId) return { ...turn }
+      const canonical = speakers.get(canonicalId)
+      return {
+        ...turn,
+        speakerId: canonicalId,
+        speakerName:
+          canonical?.name ||
+          turn.speakerName ||
+          'Unknown speaker',
+        speakerIdentitySource: 'diarization',
+      }
+    }),
+  )
+}
+
 export function applyMeetingAnnotations(turns = [], annotations = []) {
   const important = annotations.filter((x) => x?.type === 'important')
   if (!important.length) return Object.freeze(turns.map((turn) => ({ ...turn })))
@@ -499,15 +547,51 @@ export async function meetingSnapshot(meetingId, options = {}) {
     readMeetingAnnotations(meetingId, options),
   ])
 
+  const speakerTracking = meetingSpeakerTrackerStatus(meetingId)
+  const aliased = applySpeakerTrackingAliases(transcript, speakerTracking)
+
   return Object.freeze({
     ...status,
-    transcript: applyMeetingAnnotations(transcript, annotations),
+    transcript: applyMeetingAnnotations(aliased, annotations),
     annotations,
-    speakerTracking: meetingSpeakerTrackerStatus(meetingId),
+    speakerTracking,
   })
 }
 
 export async function endMeeting(meetingId, options = {}) {
+  const tracking = meetingSpeakerTrackerStatus(meetingId)
+
+  if (tracking) {
+    const status = await meetingStatus(meetingId, options)
+    const turns = await canonicalMeetingTranscript(meetingId, options)
+    const canonical = applySpeakerTrackingAliases(turns, tracking)
+
+    await Promise.all([
+      writeMeetingDerivedArtifact(
+        meetingId,
+        'canonical-transcript.json',
+        canonical,
+        options,
+      ),
+      writeMeetingDerivedArtifact(
+        meetingId,
+        'transcript.md',
+        renderMeetingMarkdown({
+          metadata: status.metadata,
+          participants: status.participants,
+          turns: canonical,
+        }),
+        options,
+      ),
+      writeMeetingDerivedArtifact(
+        meetingId,
+        'transcript.vtt',
+        renderMeetingVtt(canonical),
+        options,
+      ),
+    ])
+  }
+
   const state = await endMeetingStore(meetingId, options)
   clearMeetingSpeakerTracker(meetingId)
   return state
