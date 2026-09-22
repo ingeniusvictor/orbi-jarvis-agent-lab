@@ -65,6 +65,7 @@ export async function ingestMeetingText(
     platformSpeakerName = null,
     localSpeakerName = null,
     localSpeakerAuthorized = null,
+    manualSpeakerName = null,
     diarizationSpeakerIndex = null,
     language = null,
     markedImportant = false,
@@ -88,6 +89,15 @@ export async function ingestMeetingText(
       name: localSpeakerName,
       source: 'local-speaker-profile',
       confidence: 1,
+    })
+  }
+
+  if (manualSpeakerName) {
+    candidates.push({
+      id: 'local-device',
+      name: manualSpeakerName,
+      source: 'manual',
+      confidence: 0.8,
     })
   }
 
@@ -147,8 +157,8 @@ export async function ingestMeetingAudioChunk(
           endedAtMs: baseOffset + chunkDurationMs,
           source: 'microphone',
           platform,
-          localSpeakerName: cleanName(localSpeakerName) || 'LOCAL USER',
-          localSpeakerAuthorized: true,
+          manualSpeakerName: cleanName(localSpeakerName) || 'LOCAL USER',
+          localSpeakerAuthorized: false,
           language: result.language,
         },
         options,
