@@ -433,6 +433,12 @@ export const diag = {
   selfEchoes: 0,
   /** Speaker Shield is active upstream while local TTS/system audio is audible. */
   speakerShield: false,
+  /** VG-03A adaptive acoustic evidence. */
+  acousticFloor: 0,
+  acousticEchoBaseline: 0,
+  acousticFloorRatio: 0,
+  acousticEchoRatio: 0,
+  acousticCalibrated: false,
   /** Whisper acoustic annotations discarded before command assembly. */
   nonSpeech: 0,
   /** Rapid duplicate STT segments ignored before assembly. */
@@ -875,6 +881,14 @@ async function startVadBridgeVoice(
       mode === 'guard' &&
       (speakerOutputActive() || Boolean(speakingNow()))
     vad?.setGuard(mode === 'guard')
+    if (vad) {
+      const meter = vad.meter()
+      diag.acousticFloor = meter.floor
+      diag.acousticEchoBaseline = meter.echoBaseline
+      diag.acousticFloorRatio = meter.floorRatio
+      diag.acousticEchoRatio = meter.echoRatio
+      diag.acousticCalibrated = meter.calibrated
+    }
     // He has stood down — by Escape, by the idle timeout, or by dropping back
     // to the wake word. Anything half-said belonged to a conversation that is
     // over, and letting the hold expire later would open the next one with a
