@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import { localVoicePaths, probeLocalVoiceCapabilities } from './local-voice-probe.mjs'
 
 export const MAX_LOCAL_TTS_CHARS = 4000
@@ -51,6 +52,7 @@ export async function synthesizeLocalSpeech(
     fail('VOICE_TTS_UNAVAILABLE', 'Local Kokoro runtime or model is unavailable.')
   }
 
+  const startedAt = performance.now()
   const { kokoroPython, kokoroScript } = localVoicePaths(env)
   const directory = await mkdtemp(join(tmpdir(), 'orbia-kokoro-'))
   const output = join(directory, 'speech.wav')
@@ -145,6 +147,7 @@ export async function synthesizeLocalSpeech(
       format: 'wav',
       provider: 'kokoro-local',
       speaker: String(speaker || 'ef_dora'),
+      latencyMs: Math.round(performance.now() - startedAt),
     })
   } finally {
     await rm(directory, { recursive: true, force: true })
