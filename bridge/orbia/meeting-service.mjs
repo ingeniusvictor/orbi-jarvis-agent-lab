@@ -35,6 +35,7 @@ import {
   renderMeetingSummaryMarkdown,
   renderMeetingVtt,
 } from './meeting-export.mjs'
+import { answerMeetingQuestion } from './meeting-query.mjs'
 
 const cleanName = (value) =>
   String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 160)
@@ -363,6 +364,15 @@ export async function markMeetingImportant(
     },
     options,
   )
+}
+
+export async function queryMeeting(
+  meetingId,
+  question,
+  options = {},
+) {
+  const turns = await canonicalMeetingTranscript(meetingId, options)
+  return answerMeetingQuestion(question, turns, options)
 }
 
 export async function meetingSnapshot(meetingId, options = {}) {
