@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orbi.local/schemas/lumia-agent-observation-v1.schema.json",
+  "title": "L.U.M.I.A. Agent Observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "status",
+    "summary",
+    "nextActions",
+    "artifacts",
+    "evidence",
+    "authorityImpact",
+    "localEvidenceRequired"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "status": {
+      "enum": [
+        "success",
+        "warning",
+        "error"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "nextActions": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "ref"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "file",
+              "commit",
+              "pull-request",
+              "workflow",
+              "artifact",
+              "runtime",
+              "url",
+              "other"
+            ]
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "ref",
+          "outcome"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "certification",
+              "build",
+              "lint",
+              "security-scan",
+              "workflow",
+              "workstation-doctor",
+              "runtime-probe",
+              "human-consent",
+              "diff",
+              "other"
+            ]
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "outcome": {
+            "enum": [
+              "pass",
+              "fail",
+              "pending",
+              "observed"
+            ]
+          }
+        }
+      }
+    },
+    "authorityImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "affected",
+        "domains",
+        "requiresHumanApproval",
+        "note"
+      ],
+      "properties": {
+        "affected": {
+          "type": "boolean"
+        },
+        "domains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "tool-writes",
+              "provider-secrets",
+              "speaker-identity",
+              "anti-replay",
+              "camera-microphone",
+              "local-runtime",
+              "network-ssrf",
+              "provider-preference",
+              "agent-memory",
+              "canonical-git"
+            ]
+          }
+        },
+        "requiresHumanApproval": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      }
+    },
+    "localEvidenceRequired": {
+      "type": "boolean"
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rootCauseHint",
+        "safeRetry",
+        "stopCondition"
+      ],
+      "properties": {
+        "rootCauseHint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "safeRetry": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "stopCondition": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "error"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "recovery"
+        ]
+      }
+    }
+  ]
+}
