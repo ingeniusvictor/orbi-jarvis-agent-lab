@@ -930,14 +930,33 @@ const handleRequest = async (req, res) => {
 
       if (req.method === 'POST' && action === 'audio') {
         const wav = await readSpeakerWav(req)
+        const channel =
+          meetingUrl.searchParams.get('channel') ?? 'microphone'
+
+        let localSpeakerAuthorized = null
+        if (channel === 'microphone') {
+          try {
+            const verification = verifySpeakerWav(wav)
+            if (verification.available) {
+              localSpeakerAuthorized = verification.authorized
+            }
+          } catch {
+            // Meeting capture must continue even if a short/noisy chunk is not
+            // suitable for speaker verification. The label then remains a
+            // local-device/manual identity rather than a biometric claim.
+            localSpeakerAuthorized = null
+          }
+        }
+
         const utterances = await ingestMeetingAudioChunk(
           meetingId,
           wav,
           {
-            channel: meetingUrl.searchParams.get('channel') ?? 'microphone',
+            channel,
             offsetMs: meetingUrl.searchParams.get('offsetMs') ?? 0,
             localSpeakerName:
               meetingUrl.searchParams.get('localName') ?? 'LOCAL USER',
+            localSpeakerAuthorized,
             platform: meetingUrl.searchParams.get('platform') ?? null,
           },
         )
