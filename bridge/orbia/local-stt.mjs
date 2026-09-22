@@ -10,6 +10,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { performance } from 'node:perf_hooks'
 import { localVoicePaths, probeLocalVoiceCapabilities } from './local-voice-probe.mjs'
 import {
   normalizeTechnicalSpeechText,
@@ -69,6 +70,8 @@ export async function transcribeLocalWav(
     fail('VOICE_STT_UNAVAILABLE', 'Local Whisper runtime or model is unavailable.')
   }
 
+  const startedAt = performance.now()
+
   /**
    * Stability first: the persistent whisper-server experiment is now opt-in.
    * Live household tests showed better throughput but substantially more
@@ -96,7 +99,7 @@ export async function transcribeLocalWav(
         text,
         language: 'es',
         provider: persistent.provider,
-        latencyMs: persistent.latencyMs,
+        latencyMs: Math.round(performance.now() - startedAt),
       })
     }
   }
@@ -169,6 +172,7 @@ export async function transcribeLocalWav(
       text,
       language: 'es',
       provider: 'whisper-cli-local',
+      latencyMs: Math.round(performance.now() - startedAt),
     })
   } finally {
     await rm(directory, { recursive: true, force: true })
