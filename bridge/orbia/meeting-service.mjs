@@ -8,7 +8,7 @@
 import {
   appendMeetingAnnotation,
   appendMeetingUtterance,
-  endMeeting,
+  endMeeting as endMeetingStore,
   meetingStatus,
   pauseMeeting,
   readMeetingAnnotations,
@@ -37,6 +37,11 @@ import {
   renderMeetingVtt,
 } from './meeting-export.mjs'
 import { answerMeetingQuestion } from './meeting-query.mjs'
+import {
+  clearMeetingSpeakerTracker,
+  meetingSpeakerTrackerStatus,
+  transcribeTrackedRoomChunk,
+} from './meeting-speaker-tracker.mjs'
 
 const cleanName = (value) =>
   String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 160)
@@ -67,6 +72,10 @@ export async function ingestMeetingText(
     localSpeakerAuthorized = null,
     manualSpeakerName = null,
     diarizationSpeakerIndex = null,
+    resolvedSpeakerId = null,
+    resolvedSpeakerName = null,
+    resolvedSpeakerIdentitySource = null,
+    resolvedSpeakerConfidence = null,
     language = null,
     markedImportant = false,
   } = {},
@@ -107,7 +116,18 @@ export async function ingestMeetingText(
     )
   }
 
-  const identity = resolveSpeakerIdentity(candidates)
+  const identity =
+    resolvedSpeakerName || resolvedSpeakerId
+      ? Object.freeze({
+          id: resolvedSpeakerId || null,
+          name: resolvedSpeakerName || 'Unknown speaker',
+          source: resolvedSpeakerIdentitySource || 'anonymous',
+          confidence:
+            Number.isFinite(Number(resolvedSpeakerConfidence))
+              ? Number(resolvedSpeakerConfidence)
+              : null,
+        })
+      : resolveSpeakerIdentity(candidates)
 
   return appendMeetingUtterance(
     meetingId,
@@ -146,6 +166,45 @@ export async function ingestMeetingAudioChunk(
     decoded.sampleRate > 0
       ? Math.round((decoded.samples.length / decoded.sampleRate) * 1000)
       : 0
+
+  if (channel === 'microphone' && platform === 'room') {
+    const tracked = await transcribeTrackedRoomChunk(
+      meetingId,
+      audio,
+      {
+        offsetMs: baseOffset,
+        primaryName: cleanName(localSpeakerName) || 'LOCAL USER',
+        env: options.env ?? process.env,
+      },
+    )
+
+    const out = []
+    for (const turn of tracked.turns) {
+      out.push(
+        await ingestMeetingText(
+          meetingId,
+          {
+            text: turn.text,
+            startedAtMs:
+              baseOffset + Math.max(0, Number(turn.start) || 0) * 1000,
+            endedAtMs:
+              baseOffset + Math.max(0, Number(turn.end) || 0) * 1000,
+            source: 'diarization',
+            platform,
+            resolvedSpeakerId: turn.speakerId,
+            resolvedSpeakerName: turn.speakerName,
+            resolvedSpeakerIdentitySource:
+              turn.speakerIdentitySource,
+            resolvedSpeakerConfidence:
+              turn.speakerConfidence,
+            language: turn.language || 'es',
+          },
+          options,
+        ),
+      )
+    }
+    return Object.freeze(out)
+  }
 
   if (channel === 'microphone') {
     const result = await transcribeLocalWav(audio, options)
@@ -444,11 +503,17 @@ export async function meetingSnapshot(meetingId, options = {}) {
     ...status,
     transcript: applyMeetingAnnotations(transcript, annotations),
     annotations,
+    speakerTracking: meetingSpeakerTrackerStatus(meetingId),
   })
 }
 
+export async function endMeeting(meetingId, options = {}) {
+  const state = await endMeetingStore(meetingId, options)
+  clearMeetingSpeakerTracker(meetingId)
+  return state
+}
+
 export {
-  endMeeting,
   pauseMeeting,
   resumeMeeting,
 }
