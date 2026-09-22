@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "profile": "orbi-ecc-lumia-v0.1",
-  "status": "inventory-and-instruction-baseline",
+  "profile": "orbi-ecc-lumia-v0.2",
+  "status": "agentshield-report-baseline",
   "adoptionMode": "curated",
   "scope": "orbi-jarvis-agent-lab/lumia-voice-gate",
   "activeDevelopmentBase": "feature/lumia-voice-gate-v1",
@@ -110,9 +110,18 @@
     "enabled": false
   },
   "agentShield": {
-    "mode": "not-enabled-yet",
-    "phase": "LUM-ECC-P2",
-    "baselineMustBeRepositorySpecific": true
+    "mode": "report-only",
+    "package": "ecc-agentshield",
+    "version": "1.6.0",
+    "repository": "affaan-m/agentshield",
+    "commit": "b0891303bdcd6037376a94263d45cfd2ff3dfb98",
+    "autoFix": false,
+    "ciEnforced": false,
+    "failOnFindings": false,
+    "onlineSupplyChainLookup": false,
+    "evidenceRetentionDays": 14,
+    "baselineClassification": "pending-first-run-review",
+    "inheritedAcceptedFindings": false
   },
   "ci": {
     "workflow": ".github/workflows/lumia-ecc-pr-gate.yml",
