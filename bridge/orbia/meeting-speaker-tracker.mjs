@@ -203,6 +203,11 @@ export function clearMeetingSpeakerTracker(meetingId) {
   return trackers.delete(String(meetingId ?? '').trim())
 }
 
+export function meetingSpeakerTrackerStatus(meetingId) {
+  const tracker = trackers.get(String(meetingId ?? '').trim())
+  return tracker ? tracker.status() : null
+}
+
 function concatenateClusterAudio(decoded, segments) {
   const maxSamples = Math.floor(decoded.sampleRate * MAX_EMBED_SECONDS)
   const chunks = []
