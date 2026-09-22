@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "profile": "orbi-ecc-lumia-v0.4",
-  "status": "first-project-skill-materialized",
+  "profile": "orbi-ecc-lumia-v0.5",
+  "status": "security-project-skill-materialized",
   "adoptionMode": "curated",
   "scope": "orbi-jarvis-agent-lab/lumia-voice-gate",
   "activeDevelopmentBase": "feature/lumia-voice-gate-v1",
@@ -80,6 +80,15 @@
       "version": "0.1.0",
       "origin": "ORBI",
       "upstreamInspiration": "ECC verification-loop 2.2.2",
+      "authoritative": false,
+      "runtimeDependency": false
+    },
+    {
+      "name": "orbi-lumia-security-review",
+      "path": ".agents/skills/orbi-lumia-security-review/SKILL.md",
+      "version": "0.1.0",
+      "origin": "ORBI",
+      "upstreamInspiration": "ECC security-review 2.2.2",
       "authoritative": false,
       "runtimeDependency": false
     }
@@ -234,7 +243,7 @@
     "contract-first",
     "tdd-workflow",
     "orbi-lumia-verification-loop",
-    "security-review",
+    "orbi-lumia-security-review",
     "context-budget",
     "error-handling",
     "agent-harness-construction"
@@ -264,7 +273,6 @@
     "mcp-memory-tooling"
   ],
   "nextProjectSkills": [
-    "orbi-lumia-security-review",
     "orbi-lumia-agent-harness",
     "orbi-lumia-context-budget"
   ]
