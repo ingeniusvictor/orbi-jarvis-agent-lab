@@ -41,8 +41,7 @@ function validateObservation(value) {
   } else {
     value.artifacts.forEach((item, i) => {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return errors.push(`artifacts[${i}] must be an object`)
-      const keys = Object.keys(item)
-      if (keys.some((k) => !['type','ref','note'].includes(k))) errors.push(`artifacts[${i}] has unexpected property`)
+      if (Object.keys(item).some((k) => !['type','ref','note'].includes(k))) errors.push(`artifacts[${i}] has unexpected property`)
       if (!ARTIFACT_TYPES.has(item.type)) errors.push(`artifacts[${i}].type is invalid`)
       if (!isString(item.ref, 1, 500)) errors.push(`artifacts[${i}].ref is invalid`)
       if (item.note !== undefined && !isString(item.note, 0, 500)) errors.push(`artifacts[${i}].note is invalid`)
@@ -68,7 +67,7 @@ function validateObservation(value) {
     if (Object.keys(authority).some((k) => !['affected','domains','requiresHumanApproval','note'].includes(k))) errors.push('authorityImpact has unexpected property')
     if (typeof authority.affected !== 'boolean') errors.push('authorityImpact.affected must be boolean')
     if (typeof authority.requiresHumanApproval !== 'boolean') errors.push('authorityImpact.requiresHumanApproval must be boolean')
-    if (!isString(authority.note ?? '', 0, 1000)) errors.push('authorityImpact.note must be <=1000 characters')
+    if (!Object.hasOwn(authority, 'note') || !isString(authority.note, 0, 1000)) errors.push('authorityImpact.note is required and must be <=1000 characters')
     if (!Array.isArray(authority.domains) || new Set(authority.domains).size !== authority.domains.length ||
         authority.domains.some((x) => !AUTHORITY_DOMAINS.has(x))) {
       errors.push('authorityImpact.domains contains invalid or duplicate values')
