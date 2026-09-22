@@ -101,6 +101,10 @@ export const diag = {
   rescued: 0,
   voice: '',
   lastText: '',
+  /** Last neural/cloud synthesis request latency. */
+  synthesisMs: 0,
+  /** Delay from deciding to speak a sentence until audio actually starts. */
+  startDelayMs: 0,
 }
 
 if (typeof window !== 'undefined') {
@@ -740,6 +744,9 @@ export function createSpeaker(): Speaker {
         markOutputAudible(true)
         diag.started++
         diag.lastError = ''
+        diag.startDelayMs = speakingAt
+          ? Math.max(0, Date.now() - speakingAt)
+          : 0
       }
       audio.onended = finish
       audio.onerror = () => {
@@ -845,6 +852,7 @@ async function fetchLocalAudio(
   speaker: string,
 ): Promise<string | null> {
   if (BACKEND !== 'bridge') return null
+  const startedAt = performance.now()
   try {
     const res = await fetch(`${BRIDGE_HTTP_URL}/tts/local`, {
       method: 'POST',
@@ -852,8 +860,10 @@ async function fetchLocalAudio(
       body: JSON.stringify({ text, speaker }),
     })
     if (!res.ok) return null
+    diag.synthesisMs = Math.round(performance.now() - startedAt)
     return URL.createObjectURL(await res.blob())
   } catch {
+    diag.synthesisMs = Math.round(performance.now() - startedAt)
     return null
   }
 }
@@ -861,6 +871,7 @@ async function fetchLocalAudio(
 /** Only used when USE_ELEVENLABS is on. Bridge proxy first (it already holds
  *  the key), then a direct key, then null to fall back to the native voice. */
 async function fetchCloudAudio(text: string): Promise<string | null> {
+  const startedAt = performance.now()
   if (BACKEND === 'bridge') {
     try {
       const res = await fetch(`${BRIDGE_HTTP_URL}/tts`, {
@@ -868,7 +879,10 @@ async function fetchCloudAudio(text: string): Promise<string | null> {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      if (res.ok) return URL.createObjectURL(await res.blob())
+      if (res.ok) {
+        diag.synthesisMs = Math.round(performance.now() - startedAt)
+        return URL.createObjectURL(await res.blob())
+      }
     } catch {
       /* fall through */
     }
@@ -896,11 +910,15 @@ async function fetchCloudAudio(text: string): Promise<string | null> {
           }),
         },
       )
-      if (res.ok) return URL.createObjectURL(await res.blob())
+      if (res.ok) {
+        diag.synthesisMs = Math.round(performance.now() - startedAt)
+        return URL.createObjectURL(await res.blob())
+      }
     } catch {
       /* fall through */
     }
   }
 
+  diag.synthesisMs = Math.round(performance.now() - startedAt)
   return null
 }
