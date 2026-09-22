@@ -1,4 +1,5 @@
 import { getMic } from './audio'
+import { AdaptiveAcousticFrontEnd, type AcousticSnapshot } from './acoustic-front-end'
 
 /**
  * Voice-activity detection and segment capture.
@@ -47,22 +48,13 @@ export type Vad = {
    *  past echo cancellation does not register as the user talking. */
   setGuard: (on: boolean) => void
   live: () => boolean
-  /** Live internals, for the diagnostics panel. */
-  meter: () => { energy: number; floor: number; threshold: number; speaking: boolean }
+  /** Live internals, for the diagnostics panel and Voice Gate telemetry. */
+  meter: () => AcousticSnapshot & { speaking: boolean }
 }
 
 // ---------------------------------------------------------------------------
 // Tuning
 // ---------------------------------------------------------------------------
-
-/** How far above the noise floor the signal must rise to count as speech.
- *  The floor tracks the room, so this is a ratio, not an absolute level. */
-const TRIGGER_OVER_FLOOR = 2.6
-/** While he is speaking, demand this much more, so residual echo is ignored. */
-const GUARD_BOOST = 2.4
-/** Falling back below trigger×this ends the segment. Hysteresis stops a single
- *  dip mid-word from cutting a sentence in half. */
-const RELEASE_RATIO = 0.6
 
 /** Sustained energy for this long confirms speech rather than a knock or click. */
 const START_MS = 110
@@ -81,11 +73,6 @@ const START_MS = 110
 const SILENCE_MS = 650
 /** Nobody speaks one segment for this long; cut it and transcribe what we have. */
 const MAX_MS = 20000
-
-/** The floor adapts slowly upward (a fan spinning up) and quickly downward (a
- *  door closing), so it settles to genuine ambient noise without chasing speech. */
-const FLOOR_UP = 0.0008
-const FLOOR_DOWN = 0.02
 
 function pickMime(): string {
   const candidates = [
@@ -112,12 +99,36 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
         ? 'Microphone access denied — voice input is unavailable.'
         : 'No microphone available.',
     )
-    return { stop: () => {}, setGuard: () => {}, live: () => false, meter: () => ({ energy: 0, floor: 0, threshold: 0, speaking: false }) }
+    return { stop: () => {}, setGuard: () => {}, live: () => false, meter: () => ({
+      energy: 0,
+      floor: 0,
+      threshold: 0,
+      release: 0,
+      echoBaseline: 0,
+      floorRatio: 0,
+      echoRatio: 0,
+      calibrated: false,
+      suppressed: false,
+      guard: false,
+      speaking: false,
+    }) }
   }
 
   if (typeof MediaRecorder === 'undefined') {
     h.onError('This browser cannot record audio — voice input is unavailable.')
-    return { stop: () => {}, setGuard: () => {}, live: () => false, meter: () => ({ energy: 0, floor: 0, threshold: 0, speaking: false }) }
+    return { stop: () => {}, setGuard: () => {}, live: () => false, meter: () => ({
+      energy: 0,
+      floor: 0,
+      threshold: 0,
+      release: 0,
+      echoBaseline: 0,
+      floorRatio: 0,
+      echoRatio: 0,
+      calibrated: false,
+      suppressed: false,
+      guard: false,
+      speaking: false,
+    }) }
   }
 
   const mime = pickMime()
@@ -134,9 +145,8 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
 
   let stopped = false
   let guard = false
-  let floor = 0.01
-  let smoothEnergy = 0
-  let threshold = 0
+  const acoustic = new AdaptiveAcousticFrontEnd()
+  let acousticState = acoustic.snapshot(false)
 
   // Segment state.
   let recorder: MediaRecorder | null = null
@@ -217,24 +227,30 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
       speaking = false
       speechStartedAt = 0
       lastLoud = 0
-      smoothEnergy = 0
+
+      // Speaker Shield still measures the microphone so VG-03 can learn the
+      // room-specific return level of L.U.M.I.A.'s own speakers. No recording
+      // is created and nothing reaches Whisper while suppression is active.
+      acousticState = acoustic.observe(rms(), {
+        guard: true,
+        speaking: false,
+        armed: false,
+        suppressed: true,
+      })
       h.onLevel(0)
       return
     }
 
-    const energy = rms()
-    smoothEnergy += (energy - smoothEnergy) * 0.5
+    acousticState = acoustic.observe(rms(), {
+      guard,
+      speaking,
+      armed: armedAt !== 0,
+      suppressed: false,
+    })
+    const smoothEnergy = acousticState.energy
+    const threshold = acousticState.threshold
+    const release = acousticState.release
     h.onLevel(Math.min(1, smoothEnergy * 12))
-
-    // Adapt the floor only when we are confident this is not speech.
-    if (!speaking && armedAt === 0) {
-      const rate = smoothEnergy > floor ? FLOOR_UP : FLOOR_DOWN
-      floor += (smoothEnergy - floor) * rate
-      floor = Math.max(floor, 0.0015)
-    }
-
-    threshold = floor * TRIGGER_OVER_FLOOR * (guard ? GUARD_BOOST : 1)
-    const release = threshold * RELEASE_RATIO
     const now = performance.now()
 
     if (!speaking) {
@@ -286,6 +302,6 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
       guard = on
     },
     live: () => !stopped,
-    meter: () => ({ energy: smoothEnergy, floor, threshold, speaking }),
+    meter: () => ({ ...acousticState, speaking }),
   }
 }
