@@ -18,7 +18,8 @@ const runtimeDir = resolve(root, '.local-runtime')
 const pidFile = resolve(runtimeDir, 'lumia-desktop.pid.json')
 const launcherLog = resolve(runtimeDir, 'lumia-launcher.log')
 const runtimeLog = resolve(runtimeDir, 'lumia-desktop-runtime.log')
-const branch = 'feature/lumia-vg03-acoustic-intelligence'
+const branch = 'feature/lumia-meeting-intelligence-v1'
+const meetingMode = process.argv.includes('--meeting')
 
 mkdirSync(runtimeDir, { recursive: true })
 
@@ -295,8 +296,11 @@ async function main() {
   }
 
   if (!update.updated && wasRunning && beforeFace) {
-    openBrowser(beforeFace)
-    log(`existing runtime opened at ${beforeFace}`)
+    const target = meetingMode
+      ? 'http://127.0.0.1:8787/meeting'
+      : beforeFace
+    openBrowser(target)
+    log(`existing runtime opened at ${target}`)
     return
   }
 
@@ -318,10 +322,14 @@ async function main() {
   })()
 
   if (face) {
-    openBrowser(face)
+    const target =
+      meetingMode && bridge
+        ? 'http://127.0.0.1:8787/meeting'
+        : face
+    openBrowser(target)
     log(
       bridge
-        ? `L.U.M.I.A. opened at ${face}`
+        ? `L.U.M.I.A. opened at ${target}`
         : `L.U.M.I.A. interface opened at ${face}, but bridge is not ready; see ${runtimeLog}`,
     )
     return
