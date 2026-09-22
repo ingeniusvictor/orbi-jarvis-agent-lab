@@ -77,6 +77,12 @@ export function renderMeetingPage() {
       <div class="buttons">
         <button id="analyze" disabled>Generar resumen local</button>
       </div>
+      <label>Preguntar sobre esta reunión</label>
+      <textarea id="question" rows="3" placeholder="Ej.: ¿Qué dijo Raúl sobre los trackers?" disabled></textarea>
+      <div class="buttons">
+        <button id="ask" disabled>Preguntar a Lumi</button>
+      </div>
+      <div id="answer" style="margin-top:10px;line-height:1.45;color:#c8e5ea"></div>
       <div id="log">Preparado.</div>
     </section>
     <section class="card">
@@ -121,6 +127,8 @@ export function renderMeetingPage() {
     $('end').disabled = !on
     $('vtt').disabled = !meetingId
     $('analyze').disabled = !meetingId
+    $('question').disabled = !meetingId
+    $('ask').disabled = !meetingId
   }
 
   function render() {
@@ -345,6 +353,25 @@ export function renderMeetingPage() {
       await refresh()
       log('Teams importado: ' + data.importedTurns + ' intervenciones; nombres reconciliados.')
     } catch(e){log('Teams VTT: ' + e.message)}
+  }
+
+  $('ask').onclick = async () => {
+    if (!meetingId) return
+    const question = $('question').value.trim()
+    if (!question) return
+    try {
+      $('ask').disabled = true
+      $('answer').textContent = 'Consultando la transcripción local...'
+      const data = await json('/meeting/' + encodeURIComponent(meetingId) + '/query',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({question})
+      })
+      $('answer').textContent = data.answer || 'No encontré una respuesta respaldada.'
+    } catch(e) {
+      $('answer').textContent = 'Consulta: ' + e.message
+    } finally {
+      $('ask').disabled = false
+    }
   }
 
   $('analyze').onclick = async () => {
