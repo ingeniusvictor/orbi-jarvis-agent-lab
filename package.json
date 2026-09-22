@@ -53,7 +53,10 @@
     "certify:mic-arbitration": "node scripts/certify-mic-arbitration.mjs",
     "certify:tool-domain-router": "node scripts/certify-tool-domain-router.mjs",
     "certify:capability-policy": "node scripts/certify-capability-policy.mjs",
-    "certify:lumia-architecture": "npm run certify:voice-gate && npm run certify:acoustic-front-end && npm run certify:mic-arbitration && npm run certify:tool-domain-router && npm run certify:capability-policy"
+    "certify:lumia-architecture": "npm run certify:voice-gate && npm run certify:acoustic-front-end && npm run certify:mic-arbitration && npm run certify:tool-domain-router && npm run certify:capability-policy && npm run certify:privacy-redaction && npm run certify:wake-engine",
+    "certify:privacy-redaction": "node scripts/certify-privacy-redaction.mjs",
+    "wake:doctor": "node scripts/wake-engine-doctor.mjs",
+    "certify:wake-engine": "node scripts/certify-wake-engine.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
