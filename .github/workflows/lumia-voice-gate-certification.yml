@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/lumia-voice-gate-v1
+      - feature/lumia-vg03-acoustic-intelligence
   pull_request:
     branches:
       - feature/lumia-brain-provider-abstraction
@@ -30,6 +31,9 @@ jobs:
 
       - name: Speaker verification contracts
         run: npm run certify:speaker-verification
+
+      - name: Architecture certifications
+        run: npm run certify:lumia-architecture
 
       - name: Build
         run: npm run build
