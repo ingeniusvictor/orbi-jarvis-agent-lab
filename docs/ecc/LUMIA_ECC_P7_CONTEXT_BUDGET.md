@@ -68,3 +68,29 @@ No runtime permission changes.
 ## Rollback
 
 Remove the P7 skill/auditor/certification, revert its CI step and profile registration.
+
+## First measured result
+
+ECC PR gate run `35678740081` executed the P7 auditor successfully on the P7 branch state.
+
+Observed:
+
+- always-instructions: 1;
+- discoverable skills: 4;
+- config references: 2;
+- estimated persistent instruction overhead: ~1,339 tokens;
+- discoverable skills if all four were fully read: ~3,865 tokens;
+- config references if fully read: ~1,139 tokens.
+
+Flags:
+
+- `AGENTS.md`: `large-always-instruction` (>150 lines).
+
+Interpretation:
+
+- the 3,865-token skill total is **not** persistent context;
+- the only persistent repository-instruction estimate is ~1,339 tokens;
+- the `AGENTS.md` size flag is a review trigger, not a failure;
+- no safety/authority boundary should be removed merely to clear the flag.
+
+The same gate run passed brain contracts, Voice Gate contracts, P6 agent-harness certification, P7 context-budget certification, production build and lint.
