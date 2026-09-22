@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "profile": "orbi-ecc-lumia-v0.5",
-  "status": "security-project-skill-materialized",
+  "profile": "orbi-ecc-lumia-v0.6",
+  "status": "agent-harness-project-skill-materialized",
   "adoptionMode": "curated",
   "scope": "orbi-jarvis-agent-lab/lumia-voice-gate",
   "activeDevelopmentBase": "feature/lumia-voice-gate-v1",
@@ -91,6 +91,18 @@
       "upstreamInspiration": "ECC security-review 2.2.2",
       "authoritative": false,
       "runtimeDependency": false
+    },
+    {
+      "name": "orbi-lumia-agent-harness",
+      "path": ".agents/skills/orbi-lumia-agent-harness/SKILL.md",
+      "version": "0.1.0",
+      "origin": "ORBI",
+      "upstreamInspiration": "ECC agent-harness-construction 2.2.2",
+      "authoritative": false,
+      "runtimeDependency": false,
+      "observationSchema": ".orbi/lumia-agent-observation-v1.schema.json",
+      "validator": "scripts/validate-lumia-agent-observation.mjs",
+      "certification": "scripts/certify-lumia-agent-harness.mjs"
     }
   ],
   "authority": {
@@ -186,6 +198,7 @@
       "npm ci",
       "npm run certify:brain",
       "npm run certify:voice-gate",
+      "node scripts/certify-lumia-agent-harness.mjs",
       "npm run build",
       "npm run lint"
     ],
@@ -246,7 +259,7 @@
     "orbi-lumia-security-review",
     "context-budget",
     "error-handling",
-    "agent-harness-construction"
+    "orbi-lumia-agent-harness"
   ],
   "librarySkills": [
     "agent-sort",
@@ -273,7 +286,14 @@
     "mcp-memory-tooling"
   ],
   "nextProjectSkills": [
-    "orbi-lumia-agent-harness",
     "orbi-lumia-context-budget"
-  ]
+  ],
+  "agentHarness": {
+    "schemaVersion": 1,
+    "schema": ".orbi/lumia-agent-observation-v1.schema.json",
+    "validator": "scripts/validate-lumia-agent-observation.mjs",
+    "certification": "scripts/certify-lumia-agent-harness.mjs",
+    "runtimeDependency": false,
+    "authoritative": false
+  }
 }
