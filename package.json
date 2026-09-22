@@ -56,7 +56,16 @@
     "certify:lumia-architecture": "npm run certify:voice-gate && npm run certify:acoustic-front-end && npm run certify:mic-arbitration && npm run certify:tool-domain-router && npm run certify:capability-policy && npm run certify:privacy-redaction && npm run certify:wake-engine",
     "certify:privacy-redaction": "node scripts/certify-privacy-redaction.mjs",
     "wake:doctor": "node scripts/wake-engine-doctor.mjs",
-    "certify:wake-engine": "node scripts/certify-wake-engine.mjs"
+    "certify:wake-engine": "node scripts/certify-wake-engine.mjs",
+    "meeting:doctor": "node scripts/meeting-doctor.mjs",
+    "certify:meeting-store": "node scripts/certify-meeting-store.mjs",
+    "certify:meeting-teams": "node scripts/certify-teams-transcript.mjs",
+    "certify:meeting-reconcile": "node scripts/certify-meeting-reconcile.mjs",
+    "certify:meeting-intelligence": "node scripts/certify-meeting-intelligence.mjs",
+    "certify:meeting-service": "node scripts/certify-meeting-service.mjs",
+    "certify:meeting-query": "node scripts/certify-meeting-query.mjs",
+    "certify:meeting-platform": "node scripts/certify-meeting-platform-adapters.mjs",
+    "certify:meeting": "npm run certify:meeting-store && npm run certify:meeting-teams && npm run certify:meeting-reconcile && npm run certify:meeting-intelligence && npm run certify:meeting-service && npm run certify:meeting-query && npm run certify:meeting-platform"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
