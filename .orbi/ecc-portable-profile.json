@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "profile": "orbi-ecc-lumia-portable-v0.1",
+  "status": "selective-reuse-ready",
+  "sourcePilot": {
+    "repository": "ingeniusvictor/orbi-jarvis-agent-lab",
+    "canonicalBranch": "feature/lumia-voice-gate-v1",
+    "certifiedThroughPhase": "P7",
+    "certifiedBaseline": "9a79bf97f6c45c56f3521424a0bab517356c6c6a"
+  },
+  "upstream": {
+    "ecc": {
+      "repository": "affaan-m/ECC",
+      "version": "2.2.2",
+      "commit": "91ba9b4cf6c47c8130829004f8bb64762a76ccbb"
+    },
+    "agentShield": {
+      "repository": "affaan-m/agentshield",
+      "package": "ecc-agentshield",
+      "version": "1.6.0",
+      "commit": "b0891303bdcd6037376a94263d45cfd2ff3dfb98"
+    }
+  },
+  "adoptionPolicy": {
+    "fullInstall": false,
+    "copyAllAgents": false,
+    "copyAllSkills": false,
+    "oneVariableAtATime": true,
+    "gitCertificationAndGovernedDocsRemainCanonical": true,
+    "agentOutputDoesNotGrantToolAuthority": true,
+    "ciDoesNotProveWorkstationHardwareReady": true
+  },
+  "portableComponents": [
+    {
+      "name": "ci-vs-local-evidence-model",
+      "source": ".agents/skills/orbi-lumia-verification-loop/SKILL.md",
+      "reuse": "portable-with-domain-review",
+      "reason": "Separation of deterministic CI evidence from local/runtime evidence generalizes to edge/local-AI projects."
+    },
+    {
+      "name": "security-authority-review-model",
+      "source": ".agents/skills/orbi-lumia-security-review/SKILL.md",
+      "reuse": "portable-with-authority-review",
+      "reason": "Explicit secret/tool/network/identity boundaries are reusable but target domains differ."
+    },
+    {
+      "name": "structured-agent-observation-contract",
+      "source": ".orbi/lumia-agent-observation-v1.schema.json",
+      "reuse": "portable-with-authority-review",
+      "reason": "Observation/recovery shape is reusable; authority domains must be adapted."
+    },
+    {
+      "name": "agent-harness-pattern",
+      "source": ".agents/skills/orbi-lumia-agent-harness/SKILL.md",
+      "reuse": "portable-with-action-space-review",
+      "reason": "Narrow action spaces, evidence and stop conditions are reusable."
+    },
+    {
+      "name": "context-budget-model",
+      "source": ".agents/skills/orbi-lumia-context-budget/SKILL.md",
+      "reuse": "portable-with-surface-review",
+      "reason": "Always-instructions vs discoverable-skills vs config-reference loading is broadly reusable."
+    },
+    {
+      "name": "agentshield-report-only-pattern",
+      "source": ".github/workflows/lumia-ecc-agentshield-report.yml",
+      "reuse": "adapt-required",
+      "reason": "Pinning/report-only design is portable; paths and accepted findings are repository-specific."
+    }
+  ],
+  "lumiaSpecificComponents": [
+    "speaker verification and enrollment boundaries",
+    "anti-replay/liveness separation",
+    "camera/microphone privacy lifecycle",
+    "provider fallback vs persisted preference",
+    "local Whisper/Kokoro runtime evidence",
+    "explicit tool/write authority",
+    "L.U.M.I.A. AgentShield npm-integrity false-positive baseline"
+  ],
+  "projectSkills": [
+    {
+      "name": "orbi-lumia-verification-loop",
+      "reuse": "adaptable-pattern"
+    },
+    {
+      "name": "orbi-lumia-security-review",
+      "reuse": "adaptable-pattern"
+    },
+    {
+      "name": "orbi-lumia-agent-harness",
+      "reuse": "adaptable-pattern"
+    },
+    {
+      "name": "orbi-lumia-context-budget",
+      "reuse": "portable-with-review"
+    }
+  ],
+  "validationEvidence": {
+    "finalPreCertificationGateRun": 35678816953,
+    "brainContracts": "pass",
+    "voiceGateContracts": "pass",
+    "agentHarnessContract": "pass",
+    "contextBudgetContract": "pass",
+    "build": "pass",
+    "lint": "pass",
+    "finalPreCertificationAgentShieldRun": 35678817032,
+    "agentShieldFindings": 358,
+    "agentShieldUniqueFindingClasses": 1,
+    "agentShieldAcceptedFinding": "npm integrity sha512 false-positive class",
+    "newNonLockfileFindingClasses": 0,
+    "supplyChain": "clean"
+  },
+  "authority": {
+    "mayEnableWrites": false,
+    "mayBroadenToolPermissions": false,
+    "mayHandleProviderSecrets": false,
+    "mayTreatVoiceSimilarityAsIdentityProof": false,
+    "mayTreatSpeakerMatchAsSensitiveActionAuthorization": false,
+    "maySkipAntiReplay": false,
+    "mayEnrollWithoutExplicitConsent": false,
+    "mayPersistRawBiometricMaterial": false,
+    "mayClaimHardwareReadyFromCi": false,
+    "mayPersistFallbackAsPreference": false,
+    "mayTreatAgentMemoryAsCanonical": false
+  },
+  "deferred": {
+    "hooks": false,
+    "mcp": false,
+    "continuousLearningV2": false,
+    "unifiedMemory": false,
+    "autonomousLoops": false,
+    "multiAgentRoles": false
+  }
+}
