@@ -60,6 +60,7 @@ import {
   markMeetingImportant,
   meetingSnapshot,
   pauseMeeting as pauseMeetingSession,
+  queryMeeting,
   refreshMeetingTranscriptArtifacts,
   resumeMeeting as resumeMeetingSession,
   setMeetingParticipants,
@@ -1001,6 +1002,30 @@ const handleRequest = async (req, res) => {
           'cache-control': 'no-store',
         })
         return res.end(JSON.stringify({ ok: true, ...intelligence }))
+      }
+
+      if (req.method === 'POST' && action === 'query') {
+        const payload = await readJsonBody(req)
+        const question = String(payload?.question ?? '').trim()
+        if (!question) {
+          res.writeHead(400, {
+            ...cors,
+            'content-type': 'application/json',
+          })
+          return res.end(
+            JSON.stringify({
+              ok: false,
+              errorCode: 'MEETING_QUERY_REQUIRED',
+            }),
+          )
+        }
+        const answer = await queryMeeting(meetingId, question)
+        res.writeHead(200, {
+          ...cors,
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+        })
+        return res.end(JSON.stringify({ ok: true, ...answer }))
       }
 
       if (req.method === 'GET' && action === 'artifact') {
