@@ -42,6 +42,9 @@ jobs:
       - name: ECC agent harness contract
         run: node scripts/certify-lumia-agent-harness.mjs
 
+      - name: ECC context budget contract
+        run: node scripts/certify-lumia-context-budget.mjs
+
       - name: Production build
         run: npm run build
 
