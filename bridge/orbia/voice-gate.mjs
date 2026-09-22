@@ -149,11 +149,15 @@ export function buildVoiceGateStatus({ env = process.env } = {}) {
     diarization: diarization.available,
     speakerVerificationEngine: speaker.engineReady,
     speakerVerification: speaker.available,
+    acousticFrontEnd: true,
+    multiMicArbitration: true,
+    toolDomainRouter: true,
+    capabilityPolicy: true,
     antiReplay: false,
   })
 
   return Object.freeze({
-    phase: 'VG-02',
+    phase: 'VG-03A',
     status:
       !diarization.available
         ? 'FOUNDATION'
@@ -191,8 +195,10 @@ export function buildVoiceGateStatus({ env = process.env } = {}) {
         : ['speaker-diarization-runtime']),
       ...(speaker.available ? [] : ['speaker-verification-enrollment']),
       'anti-replay-liveness-provider',
-      'calibration-and-threshold-benchmark',
-      'hot-path-enforcement',
+      'acoustic-room-calibration-benchmark',
+      'speaker-threshold-benchmark',
+      'wake-engine-dedicated',
+      'voice-gate-hot-path-enforcement',
     ]),
   })
 }
