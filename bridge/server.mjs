@@ -957,6 +957,8 @@ const handleRequest = async (req, res) => {
             localSpeakerName:
               meetingUrl.searchParams.get('localName') ?? 'LOCAL USER',
             localSpeakerAuthorized,
+            expectedParticipants:
+              meetingUrl.searchParams.get('expectedParticipants') ?? null,
             platform: meetingUrl.searchParams.get('platform') ?? null,
           },
         )
