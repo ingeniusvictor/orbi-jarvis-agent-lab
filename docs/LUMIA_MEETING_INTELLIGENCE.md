@@ -1,4 +1,4 @@
-# L.U.M.I.A. Meeting Intelligence — MI-02
+# L.U.M.I.A. Meeting Intelligence — MI-03
 
 ## Goal
 
@@ -189,3 +189,34 @@ Desktop Meeting Console now uses the available viewport rather than a fixed
 transcript receives the remaining horizontal and vertical space. The header
 shows MI-02 tracking state and anonymous speaker count when room tracking is
 active.
+
+
+## MI-03 — adaptive speaker consolidation
+
+MI-03 addresses over-segmentation observed in real room tests where three human
+participants could temporarily appear as five or more anonymous speakers.
+
+Changes:
+
+- default cross-chunk strong-match threshold lowered from 0.68 to 0.58;
+- meeting-only short-utterance embedding policy accepts useful speech down to
+  about 0.85 seconds without weakening Voice Gate enrollment rules;
+- optional expected participant count prevents unbounded anonymous speaker
+  creation when the user already knows the room size;
+- when that optional cap is reached, a softer similarity threshold can reuse an
+  existing cluster instead of creating another identity;
+- duplicate anonymous clusters can be merged later as their centroids become
+  better defined;
+- historical transcript turns are projected through the alias map so a merged
+  SPEAKER id is shown consistently;
+- Unknown speaker is no longer counted as a participant in the console;
+- room-mode audio chunks use a slightly longer window to improve diarization
+  evidence while remaining near-live.
+
+Privacy is unchanged: anonymous speaker embeddings remain process-memory only.
+The durable transcript can persist non-biometric speaker aliases, but never the
+embedding vectors themselves.
+
+The optional expected participant count is a clustering hint, not a claim of
+identity. When evidence is too weak after the cap is reached, MI-03 returns
+Unknown speaker rather than inventing another person.
