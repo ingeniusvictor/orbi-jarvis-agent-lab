@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "profile": "orbi-ecc-lumia-v0.1",
+  "status": "inventory-and-instruction-baseline",
+  "adoptionMode": "curated",
+  "scope": "orbi-jarvis-agent-lab/lumia-voice-gate",
+  "activeDevelopmentBase": "feature/lumia-voice-gate-v1",
+  "repositoryBaseline": "3aab2ed1f1663bf0ee9da27736fd231f42068818",
+  "sourcePilot": {
+    "repository": "ingeniusvictor/orbi-creative-studio",
+    "portableProfile": "orbi-ecc-portable-core-v0.1",
+    "adoptionPattern": "ECC reference -> ORBI adaptation -> repository evidence -> selective skill -> CI/security validation -> canonical merge"
+  },
+  "upstream": {
+    "ecc": {
+      "repository": "affaan-m/ECC",
+      "version": "2.2.2",
+      "commit": "91ba9b4cf6c47c8130829004f8bb64762a76ccbb"
+    },
+    "agentShield": {
+      "repository": "affaan-m/agentshield",
+      "package": "ecc-agentshield",
+      "version": "1.6.0",
+      "commit": "b0891303bdcd6037376a94263d45cfd2ff3dfb98"
+    }
+  },
+  "stack": {
+    "node": ">=20",
+    "ciNodeMajor": 22,
+    "language": [
+      "TypeScript",
+      "TSX",
+      "JavaScript ESM"
+    ],
+    "ui": [
+      "React 19",
+      "Vite 8"
+    ],
+    "packageManager": "npm",
+    "lint": "oxlint",
+    "localRuntimeAdapters": [
+      "Whisper.cpp",
+      "Kokoro",
+      "speaker diarization",
+      "speaker verification"
+    ]
+  },
+  "candidateDailyAgents": [
+    "planner",
+    "architect",
+    "code-reviewer",
+    "security-reviewer",
+    "tdd-guide",
+    "doc-updater",
+    "typescript-reviewer"
+  ],
+  "candidateDailySkills": [
+    "architecture-decision-records",
+    "coding-standards",
+    "contract-first",
+    "tdd-workflow",
+    "verification-loop",
+    "security-review",
+    "context-budget"
+  ],
+  "candidateLibrarySkills": [
+    "agent-sort",
+    "codebase-onboarding",
+    "agent-harness-construction",
+    "ai-regression-testing",
+    "eval-harness",
+    "benchmark",
+    "benchmark-methodology",
+    "cost-aware-llm-pipeline"
+  ],
+  "projectSkills": [],
+  "authority": {
+    "mayEnableWrites": false,
+    "mayBroadenToolPermissions": false,
+    "mayHandleProviderSecrets": false,
+    "mayTreatVoiceSimilarityAsIdentityProof": false,
+    "mayEnrollSpeakerWithoutExplicitConsent": false,
+    "mayPersistRawVoiceOrBiometricMaterial": false,
+    "mayClaimLocalRuntimeCertifiedFromCiOnly": false,
+    "mayPermanentlyChangeProviderPreferenceFromFallback": false,
+    "mayChangeIdentityMemoryKnowledgeOrPermissionsFromVoiceProfile": false,
+    "mayTreatAgentMemoryAsCanonical": false
+  },
+  "evidenceBoundaries": [
+    "ENGINE_READY != USER_ENROLLED != ANTI_REPLAY_READY != VOICE_GATE_FULLY_READY",
+    "DIARIZATION != SPEAKER_AUTHENTICATION",
+    "SPEAKER_SIMILARITY != IDENTITY_PROOF",
+    "CONTRACT_PASS != REAL_AUDIO_QUALITY_LATENCY_CERTIFIED",
+    "MODEL_RESPONSE != TOOL_WRITE_AUTHORITY"
+  ],
+  "hooks": {
+    "enabled": false
+  },
+  "mcp": {
+    "enabled": false
+  },
+  "continuousLearning": {
+    "enabled": false
+  },
+  "unifiedMemory": {
+    "enabled": false,
+    "authoritative": false
+  },
+  "autonomousLoops": {
+    "enabled": false
+  },
+  "agentShield": {
+    "mode": "not-enabled-yet",
+    "phase": "LUM-ECC-P2",
+    "baselineMustBeRepositorySpecific": true
+  },
+  "ci": {
+    "workflow": ".github/workflows/lumia-ecc-pr-gate.yml",
+    "requiredCommands": [
+      "npm ci",
+      "npm run certify:brain",
+      "npm run certify:voice-gate",
+      "npm run build",
+      "npm run lint"
+    ],
+    "localOnlyEvidence": [
+      "npm run voice:gate:doctor",
+      "npm run voice:doctor"
+    ]
+  }
+}
