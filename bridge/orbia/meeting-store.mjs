@@ -277,6 +277,17 @@ export async function appendMeetingAnnotation(
     JSON.stringify(annotation) + '\n',
     'utf8',
   )
+
+  if (annotation.type === 'important') {
+    const status = await meetingStatus(meetingId, { env })
+    const nextState = {
+      ...status.state,
+      importantCount: Number(status.state.importantCount || 0) + 1,
+      lastCheckpointAt: nowIso(),
+    }
+    await writeJsonAtomic(join(dir, 'state.json'), nextState)
+  }
+
   return annotation
 }
 
