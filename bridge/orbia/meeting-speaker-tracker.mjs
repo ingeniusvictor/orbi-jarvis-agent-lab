@@ -1,10 +1,9 @@
 /**
- * MI-02 Persistent Speaker Tracking for room meetings.
+ * MI-03 Persistent Speaker Tracking for room meetings.
  *
  * Anonymous participant embeddings exist only in process memory for the active
- * meeting. They are never written to the durable meeting store. This gives
- * stable SPEAKER identities across audio chunks without creating persistent
- * biometric profiles for other participants.
+ * meeting. MI-03 adds adaptive matching, duplicate-cluster consolidation and
+ * an optional expected-participant guard to reduce speaker over-segmentation.
  */
 
 import {
@@ -24,10 +23,19 @@ import {
 } from './multivoice-stt.mjs'
 import { transcribeLocalWav } from './local-stt.mjs'
 
-const DEFAULT_TRACK_THRESHOLD = 0.68
+const DEFAULT_TRACK_THRESHOLD = 0.58
+const DEFAULT_SOFT_THRESHOLD = 0.42
+const DEFAULT_MERGE_THRESHOLD = 0.64
 const DEFAULT_PRIMARY_THRESHOLD = 0.60
 const MAX_EMBED_SECONDS = 9.5
-const MIN_EMBED_SECONDS = 2.0
+const MIN_EMBED_SECONDS = 0.85
+
+const MEETING_SAMPLE_POLICY = Object.freeze({
+  minSeconds: MIN_EMBED_SECONDS,
+  maxSeconds: 10,
+  minRms: 0.004,
+  minPeak: 0.015,
+})
 
 const clampThreshold = (value, fallback) => {
   const n = Number(value)
@@ -35,10 +43,31 @@ const clampThreshold = (value, fallback) => {
   return Math.max(-1, Math.min(1, n))
 }
 
+const normalizeExpectedParticipants = (value) => {
+  if (value == null || value === '') return null
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n)) return null
+  return Math.max(1, Math.min(20, n))
+}
+
 function trackerThreshold(env = process.env) {
   return clampThreshold(
     env.ORBIA_MEETING_SPEAKER_TRACK_THRESHOLD,
     DEFAULT_TRACK_THRESHOLD,
+  )
+}
+
+function trackerSoftThreshold(env = process.env) {
+  return clampThreshold(
+    env.ORBIA_MEETING_SPEAKER_SOFT_THRESHOLD,
+    DEFAULT_SOFT_THRESHOLD,
+  )
+}
+
+function trackerMergeThreshold(env = process.env) {
+  return clampThreshold(
+    env.ORBIA_MEETING_SPEAKER_MERGE_THRESHOLD,
+    DEFAULT_MERGE_THRESHOLD,
   )
 }
 
@@ -58,14 +87,36 @@ function weightedCentroid(current, currentCount, next) {
   return averageSpeakerEmbeddings(repeated)
 }
 
+function mergedCentroid(a, aCount, b, bCount) {
+  const vectors = []
+  const aCopies = Math.max(1, Math.min(8, Number(aCount) || 1))
+  const bCopies = Math.max(1, Math.min(8, Number(bCount) || 1))
+  for (let i = 0; i < aCopies; i++) vectors.push(a)
+  for (let i = 0; i < bCopies; i++) vectors.push(b)
+  return averageSpeakerEmbeddings(vectors)
+}
+
 export class PersistentMeetingSpeakerTracker {
   constructor({
     threshold = DEFAULT_TRACK_THRESHOLD,
+    softThreshold = DEFAULT_SOFT_THRESHOLD,
+    mergeThreshold = DEFAULT_MERGE_THRESHOLD,
+    expectedParticipants = null,
     primaryProfile = null,
     primaryName = 'LOCAL USER',
     primaryMatchThreshold = DEFAULT_PRIMARY_THRESHOLD,
   } = {}) {
     this.threshold = clampThreshold(threshold, DEFAULT_TRACK_THRESHOLD)
+    this.softThreshold = clampThreshold(
+      softThreshold,
+      DEFAULT_SOFT_THRESHOLD,
+    )
+    this.mergeThreshold = clampThreshold(
+      mergeThreshold,
+      DEFAULT_MERGE_THRESHOLD,
+    )
+    this.expectedParticipants =
+      normalizeExpectedParticipants(expectedParticipants)
     this.primaryProfile = primaryProfile
     this.primaryName = String(primaryName || 'LOCAL USER').trim() || 'LOCAL USER'
     this.primaryMatchThreshold = clampThreshold(
@@ -73,7 +124,148 @@ export class PersistentMeetingSpeakerTracker {
       DEFAULT_PRIMARY_THRESHOLD,
     )
     this.speakers = []
+    this.aliases = new Map()
+    this.merges = []
     this.nextSpeaker = 1
+    this.lastDecision = null
+  }
+
+  setExpectedParticipants(value) {
+    const normalized = normalizeExpectedParticipants(value)
+    if (normalized != null) this.expectedParticipants = normalized
+    return this.expectedParticipants
+  }
+
+  anonymousLimit() {
+    if (!this.expectedParticipants) return null
+    return Math.max(
+      0,
+      this.expectedParticipants -
+        (this.primaryProfile?.embedding?.length ? 1 : 0),
+    )
+  }
+
+  resolveSpeakerId(id) {
+    let current = id
+    const seen = new Set()
+    while (current && this.aliases.has(current) && !seen.has(current)) {
+      seen.add(current)
+      current = this.aliases.get(current)
+    }
+    return current
+  }
+
+  speakerById(id) {
+    const canonical = this.resolveSpeakerId(id)
+    return this.speakers.find((speaker) => speaker.id === canonical) ?? null
+  }
+
+  identityFor(id) {
+    if (id === 'local-primary') {
+      return Object.freeze({
+        id,
+        name: this.primaryName,
+        source: 'local-speaker-profile',
+      })
+    }
+    const speaker = this.speakerById(id)
+    if (!speaker) return null
+    return Object.freeze({
+      id: speaker.id,
+      name: speaker.name,
+      source: 'diarization',
+    })
+  }
+
+  updateSpeaker(speaker, vector, atMs, score, reason) {
+    speaker.centroid = weightedCentroid(
+      speaker.centroid,
+      speaker.sampleCount,
+      vector,
+    )
+    speaker.sampleCount += 1
+    speaker.lastSeenAtMs = Math.max(
+      speaker.lastSeenAtMs,
+      Number(atMs) || 0,
+    )
+    this.lastDecision = {
+      action: reason,
+      speakerId: speaker.id,
+      score: Number.isFinite(score) ? score : null,
+      atMs: Math.max(0, Number(atMs) || 0),
+    }
+    this.consolidateDuplicates()
+    const canonical = this.speakerById(speaker.id) ?? speaker
+    return Object.freeze({
+      id: canonical.id,
+      name: canonical.name,
+      source: 'diarization',
+      confidence: score,
+      newSpeaker: false,
+      reason,
+    })
+  }
+
+  consolidateDuplicates() {
+    let changed = true
+    while (changed) {
+      changed = false
+      let best = null
+
+      for (let i = 0; i < this.speakers.length; i++) {
+        for (let j = i + 1; j < this.speakers.length; j++) {
+          const left = this.speakers[i]
+          const right = this.speakers[j]
+          if (left.sampleCount + right.sampleCount < 3) continue
+
+          const score = cosineSimilarity(left.centroid, right.centroid)
+          if (score < this.mergeThreshold) continue
+          if (!best || score > best.score) {
+            best = { left, right, score }
+          }
+        }
+      }
+
+      if (!best) break
+
+      const keep =
+        best.left.firstSeenAtMs <= best.right.firstSeenAtMs
+          ? best.left
+          : best.right
+      const drop = keep === best.left ? best.right : best.left
+
+      keep.centroid = mergedCentroid(
+        keep.centroid,
+        keep.sampleCount,
+        drop.centroid,
+        drop.sampleCount,
+      )
+      keep.sampleCount += drop.sampleCount
+      keep.firstSeenAtMs = Math.min(
+        keep.firstSeenAtMs,
+        drop.firstSeenAtMs,
+      )
+      keep.lastSeenAtMs = Math.max(
+        keep.lastSeenAtMs,
+        drop.lastSeenAtMs,
+      )
+
+      this.aliases.set(drop.id, keep.id)
+      for (const [from, to] of this.aliases) {
+        if (to === drop.id) this.aliases.set(from, keep.id)
+      }
+      this.merges.push(
+        Object.freeze({
+          from: drop.id,
+          to: keep.id,
+          score: best.score,
+        }),
+      )
+      this.speakers = this.speakers.filter(
+        (speaker) => speaker.id !== drop.id,
+      )
+      changed = true
+    }
   }
 
   assignEmbedding(embedding, { atMs = 0 } = {}) {
@@ -85,18 +277,26 @@ export class PersistentMeetingSpeakerTracker {
         source: 'anonymous',
         confidence: null,
         newSpeaker: false,
+        reason: 'embedding-missing',
       })
     }
 
     if (this.primaryProfile?.embedding?.length) {
       const score = cosineSimilarity(this.primaryProfile.embedding, vector)
       if (score >= this.primaryMatchThreshold) {
+        this.lastDecision = {
+          action: 'primary-match',
+          speakerId: 'local-primary',
+          score,
+          atMs: Math.max(0, Number(atMs) || 0),
+        }
         return Object.freeze({
           id: 'local-primary',
           name: this.primaryName,
           source: 'local-speaker-profile',
           confidence: score,
           newSpeaker: false,
+          reason: 'primary-match',
         })
       }
     }
@@ -108,22 +308,43 @@ export class PersistentMeetingSpeakerTracker {
     }
 
     if (best && best.score >= this.threshold) {
-      best.speaker.centroid = weightedCentroid(
-        best.speaker.centroid,
-        best.speaker.sampleCount,
+      return this.updateSpeaker(
+        best.speaker,
         vector,
+        atMs,
+        best.score,
+        'strong-match',
       )
-      best.speaker.sampleCount += 1
-      best.speaker.lastSeenAtMs = Math.max(
-        best.speaker.lastSeenAtMs,
-        Number(atMs) || 0,
-      )
+    }
+
+    const limit = this.anonymousLimit()
+    if (
+      limit != null &&
+      this.speakers.length >= limit
+    ) {
+      if (best && best.score >= this.softThreshold) {
+        return this.updateSpeaker(
+          best.speaker,
+          vector,
+          atMs,
+          best.score,
+          'expected-count-soft-match',
+        )
+      }
+
+      this.lastDecision = {
+        action: 'expected-count-guard',
+        speakerId: null,
+        score: best?.score ?? null,
+        atMs: Math.max(0, Number(atMs) || 0),
+      }
       return Object.freeze({
-        id: best.speaker.id,
-        name: best.speaker.name,
-        source: 'diarization',
-        confidence: best.score,
+        id: null,
+        name: 'Unknown speaker',
+        source: 'anonymous',
+        confidence: best?.score ?? null,
         newSpeaker: false,
+        reason: 'expected-count-guard',
       })
     }
 
@@ -137,21 +358,42 @@ export class PersistentMeetingSpeakerTracker {
       lastSeenAtMs: Math.max(0, Number(atMs) || 0),
     }
     this.speakers.push(speaker)
+    this.lastDecision = {
+      action: 'new-speaker',
+      speakerId: speaker.id,
+      score: best?.score ?? null,
+      atMs: Math.max(0, Number(atMs) || 0),
+    }
 
     return Object.freeze({
       id: speaker.id,
       name: speaker.name,
       source: 'diarization',
-      confidence: 1,
+      confidence: best?.score ?? 1,
       newSpeaker: true,
+      reason: 'new-speaker',
     })
   }
 
   status() {
     return Object.freeze({
+      phase: 'MI-03',
       threshold: this.threshold,
+      softThreshold: this.softThreshold,
+      mergeThreshold: this.mergeThreshold,
+      expectedParticipants: this.expectedParticipants,
+      anonymousSpeakerLimit: this.anonymousLimit(),
       anonymousSpeakerCount: this.speakers.length,
       primaryProfileAvailable: Boolean(this.primaryProfile?.embedding?.length),
+      lastDecision: this.lastDecision
+        ? Object.freeze({ ...this.lastDecision })
+        : null,
+      aliases: Object.freeze(
+        [...this.aliases.entries()].map(([from, to]) =>
+          Object.freeze({ from, to }),
+        ),
+      ),
+      merges: Object.freeze(this.merges.slice(-12)),
       speakers: Object.freeze(
         this.speakers.map((speaker) =>
           Object.freeze({
@@ -174,13 +416,17 @@ export function getMeetingSpeakerTracker(
   {
     env = process.env,
     primaryName = 'LOCAL USER',
+    expectedParticipants = null,
   } = {},
 ) {
   const id = String(meetingId ?? '').trim()
   if (!id) throw new Error('meetingId is required')
 
   let tracker = trackers.get(id)
-  if (tracker) return tracker
+  if (tracker) {
+    tracker.setExpectedParticipants(expectedParticipants)
+    return tracker
+  }
 
   let primaryProfile = null
   try {
@@ -191,6 +437,9 @@ export function getMeetingSpeakerTracker(
 
   tracker = new PersistentMeetingSpeakerTracker({
     threshold: trackerThreshold(env),
+    softThreshold: trackerSoftThreshold(env),
+    mergeThreshold: trackerMergeThreshold(env),
+    expectedParticipants,
     primaryProfile,
     primaryName,
     primaryMatchThreshold: primaryThreshold(env),
@@ -243,12 +492,20 @@ function concatenateClusterAudio(decoded, segments) {
   return encodeMonoPcm16Wav(samples, decoded.sampleRate)
 }
 
+function computeMeetingEmbedding(audio, env) {
+  return computeSpeakerEmbedding(audio, {
+    env,
+    samplePolicy: MEETING_SAMPLE_POLICY,
+  })
+}
+
 export async function transcribeTrackedRoomChunk(
   meetingId,
   audio,
   {
     offsetMs = 0,
     primaryName = 'LOCAL USER',
+    expectedParticipants = null,
     env = process.env,
   } = {},
 ) {
@@ -259,13 +516,14 @@ export async function transcribeTrackedRoomChunk(
   const tracker = getMeetingSpeakerTracker(meetingId, {
     env,
     primaryName,
+    expectedParticipants,
   })
 
   if (!merged.length) {
     const transcription = await transcribeLocalWav(audio, { env })
     let identity = null
     try {
-      const embedding = computeSpeakerEmbedding(audio, { env })
+      const embedding = computeMeetingEmbedding(audio, env)
       identity = tracker.assignEmbedding(embedding, { atMs: baseOffset })
     } catch {
       identity = Object.freeze({
@@ -274,6 +532,7 @@ export async function transcribeTrackedRoomChunk(
         source: 'anonymous',
         confidence: null,
         newSpeaker: false,
+        reason: 'embedding-unavailable',
       })
     }
 
@@ -313,13 +572,14 @@ export async function transcribeTrackedRoomChunk(
           source: 'anonymous',
           confidence: null,
           newSpeaker: false,
+          reason: 'cluster-too-short',
         }),
       )
       continue
     }
 
     try {
-      const embedding = computeSpeakerEmbedding(clusterWav, { env })
+      const embedding = computeMeetingEmbedding(clusterWav, env)
       identities.set(
         localSpeaker,
         tracker.assignEmbedding(embedding, {
@@ -337,6 +597,7 @@ export async function transcribeTrackedRoomChunk(
           source: 'anonymous',
           confidence: null,
           newSpeaker: false,
+          reason: 'embedding-unavailable',
         }),
       )
     }
