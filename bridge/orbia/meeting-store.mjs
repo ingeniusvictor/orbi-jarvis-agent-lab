@@ -111,6 +111,7 @@ export async function startMeetingSession(
     writeJsonAtomic(join(dir, 'participants.json'), normalizedParticipants),
     writeJsonAtomic(join(dir, 'state.json'), state),
     writeFile(join(dir, 'transcript.jsonl'), '', 'utf8'),
+    writeFile(join(dir, 'annotations.jsonl'), '', 'utf8'),
   ])
 
   return Object.freeze({ ...metadata, state })
@@ -237,6 +238,113 @@ export const resumeMeeting = (meetingId, options) =>
 
 export const endMeeting = (meetingId, options) =>
   transitionMeeting(meetingId, 'ended', options)
+
+
+export async function appendMeetingAnnotation(
+  meetingId,
+  {
+    type = 'important',
+    atMs = null,
+    utteranceId = null,
+    note = '',
+  } = {},
+  { env = process.env } = {},
+) {
+  const dir = meetingDir(meetingId, env)
+  await meetingStatus(meetingId, { env })
+
+  const annotation = Object.freeze({
+    id:
+      'ann-' +
+      Date.now().toString(36) +
+      '-' +
+      Math.random().toString(36).slice(2, 9),
+    type: String(type || 'important').trim().slice(0, 60),
+    atMs:
+      Number.isFinite(Number(atMs))
+        ? Math.max(0, Number(atMs))
+        : null,
+    utteranceId:
+      utteranceId == null
+        ? null
+        : String(utteranceId).trim().slice(0, 180),
+    note: String(note || '').replace(/\s+/g, ' ').trim().slice(0, 1000),
+    createdAt: nowIso(),
+  })
+
+  await appendFile(
+    join(dir, 'annotations.jsonl'),
+    JSON.stringify(annotation) + '\n',
+    'utf8',
+  )
+  return annotation
+}
+
+export async function readMeetingAnnotations(
+  meetingId,
+  { env = process.env } = {},
+) {
+  const path = join(meetingDir(meetingId, env), 'annotations.jsonl')
+  let raw = ''
+  try {
+    raw = await readFile(path, 'utf8')
+  } catch {
+    return Object.freeze([])
+  }
+
+  const annotations = []
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim()) continue
+    try {
+      annotations.push(JSON.parse(line))
+    } catch {
+      // Preserve all complete annotations if the final write was interrupted.
+    }
+  }
+  return Object.freeze(annotations)
+}
+
+const DERIVED_NAMES = new Set([
+  'canonical-transcript.json',
+  'transcript.md',
+  'transcript.vtt',
+  'intelligence.json',
+  'summary.md',
+  'action-items.json',
+])
+
+export async function writeMeetingDerivedArtifact(
+  meetingId,
+  name,
+  content,
+  { env = process.env } = {},
+) {
+  const safeName = String(name ?? '').trim()
+  if (!DERIVED_NAMES.has(safeName)) {
+    throw new Error('unsupported derived artifact')
+  }
+  const dir = join(meetingDir(meetingId, env), 'derived')
+  await mkdir(dir, { recursive: true })
+  const path = join(dir, safeName)
+  const body =
+    typeof content === 'string'
+      ? content
+      : JSON.stringify(content, null, 2) + '\n'
+  await writeFile(path, body, 'utf8')
+  return path
+}
+
+export async function readMeetingDerivedArtifact(
+  meetingId,
+  name,
+  { env = process.env } = {},
+) {
+  const safeName = String(name ?? '').trim()
+  if (!DERIVED_NAMES.has(safeName)) {
+    throw new Error('unsupported derived artifact')
+  }
+  return readFile(join(meetingDir(meetingId, env), 'derived', safeName), 'utf8')
+}
 
 export async function listMeetings({ env = process.env } = {}) {
   const root = rootFrom(env)
