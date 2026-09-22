@@ -135,6 +135,7 @@ export async function ingestMeetingAudioChunk(
     channel = 'microphone',
     offsetMs = 0,
     localSpeakerName = 'LOCAL USER',
+    localSpeakerAuthorized = null,
     platform = null,
   } = {},
   options = {},
@@ -157,8 +158,17 @@ export async function ingestMeetingAudioChunk(
           endedAtMs: baseOffset + chunkDurationMs,
           source: 'microphone',
           platform,
-          manualSpeakerName: cleanName(localSpeakerName) || 'LOCAL USER',
-          localSpeakerAuthorized: false,
+          ...(localSpeakerAuthorized === true
+            ? {
+                localSpeakerName:
+                  cleanName(localSpeakerName) || 'LOCAL USER',
+                localSpeakerAuthorized: true,
+              }
+            : {
+                manualSpeakerName:
+                  cleanName(localSpeakerName) || 'LOCAL USER',
+                localSpeakerAuthorized: false,
+              }),
           language: result.language,
         },
         options,
