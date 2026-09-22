@@ -16,6 +16,7 @@ import {
 } from '../orbia/conversation.mjs'
 import { buildKnowledgeContext } from '../orbia/knowledge.mjs'
 import { applyVoiceRuntimeControl } from '../orbia/voice-control.mjs'
+import { selectToolDomains } from '../orbia/tool-domain-router.mjs'
 import { parseVoiceRuntimeControl } from '../orbia/voice-runtime.mjs'
 import { readBrainSettings } from './brain-settings.mjs'
 import { streamOllama, getOllamaModel } from '../ollama.mjs'
@@ -238,6 +239,7 @@ export function attachHybridSession(socket) {
         }
 
         const route = chooseHybridRoute(originalPrompt)
+        const toolScope = selectToolDomains(originalPrompt)
         const history = getConversationHistory(conversationId)
         let actualProvider = route.provider
         let routeReason = route.reason
@@ -322,6 +324,7 @@ export function attachHybridSession(socket) {
           provider: actualProvider,
           route: actualProvider,
           routeReason,
+          toolScope,
           modelName:
             actualProvider === 'openai'
               ? OPENAI_MODEL
