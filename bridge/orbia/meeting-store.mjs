@@ -311,6 +311,9 @@ const DERIVED_NAMES = new Set([
   'intelligence.json',
   'summary.md',
   'action-items.json',
+  'teams-transcript.vtt',
+  'teams-transcript.json',
+  'query-history.jsonl',
 ])
 
 export async function writeMeetingDerivedArtifact(
