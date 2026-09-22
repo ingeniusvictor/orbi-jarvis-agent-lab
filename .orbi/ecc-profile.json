@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "profile": "orbi-ecc-lumia-v0.7",
-  "status": "context-budget-project-skill-materialized",
+  "profile": "orbi-ecc-lumia-v1.0",
+  "status": "selective-adoption-certified",
   "adoptionMode": "curated",
   "scope": "orbi-jarvis-agent-lab/lumia-voice-gate",
   "activeDevelopmentBase": "feature/lumia-voice-gate-v1",
@@ -323,5 +323,21 @@
       "enforcing": false
     },
     "runtimeTelemetry": false
+  },
+  "certification": {
+    "phase": "LUM-ECC-P8",
+    "certifiedThrough": "LUM-ECC-P7",
+    "preCertificationCanonical": "9a79bf97f6c45c56f3521424a0bab517356c6c6a",
+    "eccGateRun": 35678816953,
+    "brainContracts": "pass",
+    "voiceGateContracts": "pass",
+    "agentHarnessContract": "pass",
+    "contextBudgetContract": "pass",
+    "build": "pass",
+    "lint": "pass",
+    "agentShieldRun": 35678817032,
+    "agentShieldNewNonLockfileFindingClasses": 0,
+    "portableProfile": ".orbi/ecc-portable-profile.json",
+    "workstationEvidenceCertifiedByCi": false
   }
 }
