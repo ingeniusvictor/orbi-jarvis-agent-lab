@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "profile": "orbi-ecc-lumia-v0.2",
-  "status": "agentshield-report-baseline",
+  "status": "agentshield-baseline-classified",
   "adoptionMode": "curated",
   "scope": "orbi-jarvis-agent-lab/lumia-voice-gate",
   "activeDevelopmentBase": "feature/lumia-voice-gate-v1",
@@ -120,8 +120,46 @@
     "failOnFindings": false,
     "onlineSupplyChainLookup": false,
     "evidenceRetentionDays": 14,
-    "baselineClassification": "pending-first-run-review",
-    "inheritedAcceptedFindings": false
+    "baselineClassification": "classified",
+    "inheritedAcceptedFindings": false,
+    "acceptedFindingClasses": [
+      {
+        "detector": "Hardcoded Azure storage account key",
+        "category": "secrets",
+        "severity": "critical",
+        "path": "package-lock.json",
+        "count": 358,
+        "disposition": "accepted-false-positive-only-when-evidence-is-npm-integrity-sha512",
+        "remediation": "none-do-not-rewrite-lockfile-integrity"
+      }
+    ],
+    "validation": {
+      "runId": 35677759003,
+      "artifactId": 10672988591,
+      "artifactDigest": "sha256:bdaa7e8eaa687209618a01aa3a69897be7c3bd8f440925788d3645218a11f64e",
+      "evidencePackDigest": "sha256:a119dc7576917812f9ba4990981c55a8f33c2f85e3e2dd94a8f6038176129db8",
+      "score": 80,
+      "grade": "B",
+      "totalFindings": 358,
+      "criticalFindings": 358,
+      "newNonLockfileFindingClasses": 0,
+      "supplyChain": {
+        "status": "clean",
+        "totalPackages": 374,
+        "riskyPackages": 0,
+        "pinnedPackages": 374,
+        "unpinnedPackages": 0
+      },
+      "harness": {
+        "registered": 9,
+        "matched": 1,
+        "codexMatched": true,
+        "confidence": "strong",
+        "evidence": [
+          "AGENTS.md"
+        ]
+      }
+    }
   },
   "ci": {
     "workflow": ".github/workflows/lumia-ecc-pr-gate.yml",
@@ -135,6 +173,8 @@
     "localOnlyEvidence": [
       "npm run voice:gate:doctor",
       "npm run voice:doctor"
-    ]
+    ],
+    "p2GateRunId": 35677758971,
+    "p2GateConclusion": "success"
   }
 }
