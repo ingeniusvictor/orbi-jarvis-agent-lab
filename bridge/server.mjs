@@ -33,6 +33,7 @@ import { openRemote, proxyError, vetTarget, PROXY_UA } from './net.mjs'
 import { renderPage } from './page.mjs'
 import { buildVoiceRuntimeStatus } from './orbia/voice-status.mjs'
 import { buildVoiceGateStatus } from './orbia/voice-gate.mjs'
+import { classifyCapability } from './orbia/capability-policy.mjs'
 import { renderSpeakerEnrollmentPage } from './orbia/speaker-enrollment-page.mjs'
 import {
   enrollSpeakerFromWavs,
@@ -1760,8 +1761,11 @@ wss.on('connection', (socket) => {
       // something with a consequence, like a `touch`. So a deny here is
       // reliable; an absence of a call here is not proof nothing ran.
       canUseTool: async (toolName) => {
+        const policy = classifyCapability(toolName)
         const ok = decideTool(toolName)
-        console.log(`${CONSOLE_TAG} tool ${toolName} -> ${ok ? 'allow' : 'deny'}`)
+        console.log(
+          `${CONSOLE_TAG} tool ${toolName} [${policy.level}:${policy.reason}] -> ${ok ? 'allow' : 'deny'}`,
+        )
         return ok
           ? { behavior: 'allow' }
           : {
