@@ -1,0 +1,159 @@
+# L.U.M.I.A. Meeting Intelligence — MI-01
+
+## Goal
+
+Provide a local-first meeting transcription and intelligence layer for Microsoft
+Teams, Zoom, Google Meet and physical meetings without requiring a third-party
+meeting bot.
+
+## Canonical pipeline
+
+```
+microphone -----------------------------+
+                                        |
+shared/system audio -> local Whisper ---+--> durable JSONL transcript
+                                        |
+platform captions / transcript --------+--> identity evidence
+                                        |
+local diarization ----------------------+--> anonymous fallback
+                                             |
+                                             v
+                                      canonical transcript
+                                             |
+                                 +-----------+-----------+
+                                 |                       |
+                              Ollama                  exports
+                      summary / decisions /       Markdown / VTT
+                       tasks / questions
+```
+
+## Identity precedence
+
+1. Explicit platform identity (Teams/Zoom/Meet).
+2. Manual user correction.
+3. Enrolled local speaker profile when actually verified.
+4. Anonymous sherpa-onnx diarization.
+5. Unknown speaker.
+
+Never infer a person's identity from screen position, avatar colour, tile order,
+or an unverified voice guess.
+
+## Microsoft Teams
+
+### Live capture
+
+The Meeting Console can capture:
+
+- the local microphone through `getUserMedia`;
+- browser/system shared audio through `getDisplayMedia` when the browser and
+  operating system expose an audio track.
+
+Audio is converted locally to mono PCM16 WAV and sent to the local bridge in
+short chunks. The default implementation does not retain raw audio.
+
+Live explicit names can be ingested through the platform-caption contract when
+a trusted Teams integration provides them. MI-01 does not scrape unstable Teams
+DOM selectors and does not guess names.
+
+### Post-meeting reconciliation
+
+Microsoft Graph can expose Teams meeting transcripts. Speaker-attributed WebVTT
+uses `<v Speaker Name>` voice tags when the tenant permits attributed
+transcripts. Access is tenant-controlled and requires Microsoft Graph
+permissions.
+
+The raw local transcript is preserved. A Teams VTT import creates a separate
+platform evidence artifact and a canonical reconciled transcript.
+
+References checked September 2026:
+
+- https://learn.microsoft.com/en-us/graph/api/onlinemeeting-list-transcripts
+- https://learn.microsoft.com/en-us/graph/api/calltranscript-get
+- https://learn.microsoft.com/en-us/microsoftteams/meeting-transcript-api-access
+
+## Durability
+
+Each finalized utterance is appended immediately to:
+
+`.local-runtime/meetings/<meeting-id>/transcript.jsonl`
+
+State and participant metadata use atomic JSON writes. Derived files are
+regenerable and live under `derived/`.
+
+A crash can at worst leave one incomplete final JSONL line; prior complete
+utterances remain readable.
+
+## Local artifacts
+
+Typical meeting directory:
+
+```
+meeting-.../
+  metadata.json
+  state.json
+  participants.json
+  transcript.jsonl
+  annotations.jsonl
+  derived/
+    teams-transcript.vtt
+    teams-transcript.json
+    canonical-transcript.json
+    transcript.md
+    transcript.vtt
+    intelligence.json
+    summary.md
+    action-items.json
+```
+
+## Privacy defaults
+
+- Raw audio retention: OFF.
+- Transcript persistence: ON after the user starts Meeting Mode.
+- Other-person biometric enrollment: OFF.
+- Platform names are preferred over biometric identity.
+- Local speaker verification is used only when an enrolled profile exists and a
+  chunk is suitable for verification.
+- A visible red Meeting Mode indicator is mandatory while capture is active.
+- Users are responsible for informing participants and following workplace and
+  jurisdictional recording/transcription requirements.
+
+## Long meetings
+
+Transcription is incremental and not limited to one commercial one-hour window.
+Audio is processed in short chunks and transcript evidence is persisted as it
+arrives.
+
+Meeting intelligence uses bounded chunks. Long transcripts are analyzed in
+parts and consolidated so multi-hour meetings do not require one giant prompt.
+
+## Controls
+
+Meeting Console:
+
+`http://127.0.0.1:8787/meeting`
+
+Supported controls in MI-01:
+
+- start meeting;
+- microphone capture;
+- system/shared audio capture;
+- pause/resume;
+- mark important moment;
+- end meeting;
+- import Teams WebVTT;
+- generate local summary/tasks/decisions;
+- query the meeting.
+
+## Current boundary
+
+MI-01 provides the complete local core and platform-ingest contracts.
+
+Not yet claimed as certified:
+
+- automatic live Teams display-name acquisition from the desktop client;
+- Graph authentication on behalf of a Microsoft tenant;
+- stable cross-chunk diarization identity in all acoustic conditions;
+- automatic task creation in external work-management systems.
+
+Those capabilities must be added and certified independently rather than
+silently inferred.
