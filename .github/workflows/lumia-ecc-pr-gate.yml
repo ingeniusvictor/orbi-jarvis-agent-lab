@@ -39,6 +39,9 @@ jobs:
       - name: Voice Gate contracts
         run: npm run certify:voice-gate
 
+      - name: ECC agent harness contract
+        run: node scripts/certify-lumia-agent-harness.mjs
+
       - name: Production build
         run: npm run build
 
