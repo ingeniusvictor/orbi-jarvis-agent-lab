@@ -20,10 +20,7 @@ const valid = {
   localEvidenceRequired: true,
 }
 
-const invalidErrorWithoutRecovery = {
-  ...valid,
-  status: 'error',
-}
+const invalidErrorWithoutRecovery = { ...valid, status: 'error' }
 
 const invalidApprovalWithoutImpact = {
   ...valid,
@@ -32,6 +29,15 @@ const invalidApprovalWithoutImpact = {
     domains: [],
     requiresHumanApproval: true,
     note: 'Invalid contradictory authority state.',
+  },
+}
+
+const invalidAuthorityWithoutNote = {
+  ...valid,
+  authorityImpact: {
+    affected: true,
+    domains: ['tool-writes'],
+    requiresHumanApproval: true,
   },
 }
 
@@ -46,6 +52,11 @@ if (!missingRecoveryErrors.some((x) => x.includes('require recovery'))) {
 const contradictoryAuthorityErrors = validateObservation(invalidApprovalWithoutImpact)
 if (!contradictoryAuthorityErrors.some((x) => x.includes('requiresHumanApproval'))) {
   throw new Error('contradictory human-approval state was not rejected')
+}
+
+const missingNoteErrors = validateObservation(invalidAuthorityWithoutNote)
+if (!missingNoteErrors.some((x) => x.includes('note is required'))) {
+  throw new Error('authorityImpact without note was not rejected')
 }
 
 console.log('LUMIA_AGENT_HARNESS_CERTIFICATION_PASS')
