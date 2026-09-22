@@ -50,6 +50,25 @@ import {
 } from './orbia/local-tts.mjs'
 import { transcribeMultivoiceLocalWav } from './orbia/multivoice-stt.mjs'
 import { ensureWhisperServer } from './orbia/whisper-server-runtime.mjs'
+import { renderMeetingPage } from './orbia/meeting-page.mjs'
+import {
+  analyzeMeeting,
+  endMeeting as endMeetingSession,
+  importTeamsTranscript,
+  ingestMeetingAudioChunk,
+  ingestMeetingText,
+  markMeetingImportant,
+  meetingSnapshot,
+  pauseMeeting as pauseMeetingSession,
+  refreshMeetingTranscriptArtifacts,
+  resumeMeeting as resumeMeetingSession,
+  setMeetingParticipants,
+  startMeeting,
+} from './orbia/meeting-service.mjs'
+import {
+  listMeetings,
+  readMeetingDerivedArtifact,
+} from './orbia/meeting-store.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
 const speakerEnrollmentSamples = []
@@ -701,6 +720,32 @@ function corsFor(req) {
 // One HTTP server for both the speech proxy and the WebSocket upgrade.
 const http = await import('node:http')
 
+async function readBoundedBody(req, maxBytes = 512 * 1024) {
+  const chunks = []
+  let size = 0
+  for await (const chunk of req) {
+    size += chunk.length
+    if (size > maxBytes) {
+      const error = new Error('request body too large')
+      error.status = 413
+      throw error
+    }
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks)
+}
+
+async function readJsonBody(req, maxBytes = 512 * 1024) {
+  const body = await readBoundedBody(req, maxBytes)
+  try {
+    return JSON.parse(body.toString('utf8') || '{}')
+  } catch {
+    const error = new Error('invalid json')
+    error.status = 400
+    throw error
+  }
+}
+
 async function readSpeakerWav(req) {
   const type = String(req.headers['content-type'] || '').toLowerCase()
   if (
@@ -774,6 +819,225 @@ const handleRequest = async (req, res) => {
         },
       }),
     )
+  }
+
+  if (req.method === 'GET' && req.url === '/meeting') {
+    res.writeHead(200, {
+      ...cors,
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'content-security-policy':
+        "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; media-src 'self'",
+    })
+    return res.end(renderMeetingPage())
+  }
+
+  if (req.method === 'GET' && req.url === '/meeting/list') {
+    const meetings = await listMeetings()
+    res.writeHead(200, {
+      ...cors,
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+    })
+    return res.end(JSON.stringify({ ok: true, meetings }))
+  }
+
+  if (req.method === 'POST' && req.url === '/meeting/start') {
+    try {
+      const payload = await readJsonBody(req)
+      const created = await startMeeting(payload)
+      res.writeHead(201, {
+        ...cors,
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      })
+      return res.end(JSON.stringify({ ok: true, ...created }))
+    } catch (err) {
+      res.writeHead(Number(err?.status ?? 400), {
+        ...cors,
+        'content-type': 'application/json',
+      })
+      return res.end(
+        JSON.stringify({
+          ok: false,
+          errorCode: 'MEETING_START_FAILED',
+          message: String(err?.message ?? 'meeting start failed'),
+        }),
+      )
+    }
+  }
+
+  const meetingUrl = new URL(req.url ?? '/', 'http://localhost')
+  const meetingParts = meetingUrl.pathname.split('/').filter(Boolean)
+  if (meetingParts[0] === 'meeting' && meetingParts[1]) {
+    const meetingId = decodeURIComponent(meetingParts[1])
+    const action = meetingParts.slice(2).join('/')
+
+    try {
+      if (req.method === 'GET' && action === 'snapshot') {
+        const snapshot = await meetingSnapshot(meetingId)
+        res.writeHead(200, {
+          ...cors,
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+        })
+        return res.end(JSON.stringify({ ok: true, ...snapshot }))
+      }
+
+      if (req.method === 'POST' && action === 'pause') {
+        const state = await pauseMeetingSession(meetingId)
+        res.writeHead(200, { ...cors, 'content-type': 'application/json' })
+        return res.end(JSON.stringify({ ok: true, state }))
+      }
+
+      if (req.method === 'POST' && action === 'resume') {
+        const state = await resumeMeetingSession(meetingId)
+        res.writeHead(200, { ...cors, 'content-type': 'application/json' })
+        return res.end(JSON.stringify({ ok: true, state }))
+      }
+
+      if (req.method === 'POST' && action === 'end') {
+        const state = await endMeetingSession(meetingId)
+        await refreshMeetingTranscriptArtifacts(meetingId)
+        res.writeHead(200, { ...cors, 'content-type': 'application/json' })
+        return res.end(JSON.stringify({ ok: true, state }))
+      }
+
+      if (req.method === 'POST' && action === 'participants') {
+        const payload = await readJsonBody(req)
+        const participants = await setMeetingParticipants(
+          meetingId,
+          Array.isArray(payload) ? payload : payload.participants ?? [],
+        )
+        res.writeHead(200, { ...cors, 'content-type': 'application/json' })
+        return res.end(JSON.stringify({ ok: true, participants }))
+      }
+
+      if (req.method === 'POST' && action === 'utterance') {
+        const payload = await readJsonBody(req)
+        const utterance = await ingestMeetingText(meetingId, payload)
+        res.writeHead(201, { ...cors, 'content-type': 'application/json' })
+        return res.end(JSON.stringify({ ok: true, utterance }))
+      }
+
+      if (req.method === 'POST' && action === 'important') {
+        const payload = await readJsonBody(req)
+        const annotation = await markMeetingImportant(meetingId, payload)
+        res.writeHead(201, { ...cors, 'content-type': 'application/json' })
+        return res.end(JSON.stringify({ ok: true, annotation }))
+      }
+
+      if (req.method === 'POST' && action === 'audio') {
+        const wav = await readSpeakerWav(req)
+        const utterances = await ingestMeetingAudioChunk(
+          meetingId,
+          wav,
+          {
+            channel: meetingUrl.searchParams.get('channel') ?? 'microphone',
+            offsetMs: meetingUrl.searchParams.get('offsetMs') ?? 0,
+            localSpeakerName:
+              meetingUrl.searchParams.get('localName') ?? 'LOCAL USER',
+            platform: meetingUrl.searchParams.get('platform') ?? null,
+          },
+        )
+        res.writeHead(201, {
+          ...cors,
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+        })
+        return res.end(
+          JSON.stringify({
+            ok: true,
+            utteranceCount: utterances.length,
+            utterances,
+          }),
+        )
+      }
+
+      if (req.method === 'POST' && action === 'import/teams-vtt') {
+        const type = String(req.headers['content-type'] || '').toLowerCase()
+        if (
+          !type.includes('text/vtt') &&
+          !type.includes('text/plain') &&
+          !type.includes('application/octet-stream')
+        ) {
+          res.writeHead(415, {
+            ...cors,
+            'content-type': 'application/json',
+          })
+          return res.end(
+            JSON.stringify({
+              ok: false,
+              errorCode: 'MEETING_TEAMS_VTT_REQUIRED',
+            }),
+          )
+        }
+
+        const body = await readBoundedBody(req, 10 * 1024 * 1024)
+        const result = await importTeamsTranscript(
+          meetingId,
+          body.toString('utf8'),
+        )
+        res.writeHead(200, {
+          ...cors,
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+        })
+        return res.end(
+          JSON.stringify({
+            ok: true,
+            importedTurns: result.importedTurns,
+            localTurns: result.localTurns,
+            canonicalTurns: result.canonicalTurns,
+          }),
+        )
+      }
+
+      if (req.method === 'POST' && action === 'analyze') {
+        const intelligence = await analyzeMeeting(meetingId)
+        res.writeHead(200, {
+          ...cors,
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+        })
+        return res.end(JSON.stringify({ ok: true, ...intelligence }))
+      }
+
+      if (req.method === 'GET' && action === 'artifact') {
+        const name = meetingUrl.searchParams.get('name') ?? ''
+        const body = await readMeetingDerivedArtifact(meetingId, name)
+        const type =
+          name.endsWith('.json') || name.endsWith('.jsonl')
+            ? 'application/json; charset=utf-8'
+            : name.endsWith('.vtt')
+              ? 'text/vtt; charset=utf-8'
+              : 'text/markdown; charset=utf-8'
+        res.writeHead(200, {
+          ...cors,
+          'content-type': type,
+          'cache-control': 'no-store',
+          'content-disposition':
+            'attachment; filename="' +
+            name.replace(/[^a-zA-Z0-9._-]/g, '_') +
+            '"',
+        })
+        return res.end(body)
+      }
+    } catch (err) {
+      const status = Number(err?.status ?? 400)
+      res.writeHead(status, {
+        ...cors,
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      })
+      return res.end(
+        JSON.stringify({
+          ok: false,
+          errorCode: 'MEETING_REQUEST_FAILED',
+          message: String(err?.message ?? 'meeting request failed'),
+        }),
+      )
+    }
   }
 
   if (req.method === 'GET' && req.url === '/voice/speaker/enroll') {
