@@ -25,6 +25,7 @@ import {
 } from './meeting-speakers.mjs'
 import { transcribeLocalWav } from './local-stt.mjs'
 import { transcribeMultivoiceLocalWav } from './multivoice-stt.mjs'
+import { decodeMonoPcm16Wav } from './speaker-diarization.mjs'
 import { parseTeamsTranscriptVtt } from './teams-transcript.mjs'
 import { reconcileMeetingTurns } from './meeting-reconcile.mjs'
 import {
@@ -129,6 +130,11 @@ export async function ingestMeetingAudioChunk(
   options = {},
 ) {
   const baseOffset = Math.max(0, Number(offsetMs) || 0)
+  const decoded = decodeMonoPcm16Wav(audio)
+  const chunkDurationMs =
+    decoded.sampleRate > 0
+      ? Math.round((decoded.samples.length / decoded.sampleRate) * 1000)
+      : 0
 
   if (channel === 'microphone') {
     const result = await transcribeLocalWav(audio, options)
@@ -138,7 +144,7 @@ export async function ingestMeetingAudioChunk(
         {
           text: result.text,
           startedAtMs: baseOffset,
-          endedAtMs: baseOffset,
+          endedAtMs: baseOffset + chunkDurationMs,
           source: 'microphone',
           platform,
           localSpeakerName: cleanName(localSpeakerName) || 'LOCAL USER',
@@ -190,7 +196,7 @@ export async function ingestMeetingAudioChunk(
       {
         text: single.text,
         startedAtMs: baseOffset,
-        endedAtMs: baseOffset,
+        endedAtMs: baseOffset + chunkDurationMs,
         source: 'system-audio',
         platform,
         diarizationSpeakerIndex: 0,
