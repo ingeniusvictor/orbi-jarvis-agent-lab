@@ -14,27 +14,41 @@ export function renderMeetingPage() {
 <title>L.U.M.I.A. Meeting Intelligence</title>
 <style>
   :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
-  *{box-sizing:border-box} body{margin:0;background:#071014;color:#d8eef2}
-  main{max-width:1100px;margin:0 auto;padding:28px}
-  h1{font-size:24px;margin:0 0 4px} .sub{color:#7ba5ad;margin-bottom:22px}
-  .grid{display:grid;grid-template-columns:360px 1fr;gap:18px}
-  .card{background:#0b171c;border:1px solid #17323a;border-radius:14px;padding:16px}
-  label{display:block;color:#8eb5bd;font-size:12px;margin:12px 0 5px}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:#071014;color:#d8eef2}
+  body{height:100vh;overflow:hidden}
+  main{width:min(1720px,calc(100vw - 24px));height:100vh;margin:0 auto;padding:14px 0 16px;display:flex;flex-direction:column}
+  h1{font-size:22px;margin:0 0 2px}.sub{color:#7ba5ad;margin-bottom:10px;font-size:13px}
+  .grid{display:grid;grid-template-columns:minmax(286px,320px) minmax(0,1fr);gap:12px;flex:1;min-height:0}
+  .card{background:#0b171c;border:1px solid #17323a;border-radius:14px;padding:14px;min-height:0}
+  .control-card{overflow:auto;padding-right:10px}
+  .transcript-card{display:flex;flex-direction:column;padding:10px}
+  .transcript-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:3px 5px 10px;border-bottom:1px solid #17323a}
+  .transcript-title{font-weight:700;color:#cdebf0}.tracking{font-size:11px;color:#7ba5ad;text-align:right}
+  label{display:block;color:#8eb5bd;font-size:11px;margin:10px 0 4px}
   input,select,button,textarea{font:inherit}
-  input,select,textarea{width:100%;background:#071115;color:#d8eef2;border:1px solid #23434c;border-radius:9px;padding:9px}
-  button{background:#14343d;color:#dff7fb;border:1px solid #2b5b67;border-radius:9px;padding:9px 12px;cursor:pointer}
+  input,select,textarea{width:100%;background:#071115;color:#d8eef2;border:1px solid #23434c;border-radius:9px;padding:8px}
+  button{background:#14343d;color:#dff7fb;border:1px solid #2b5b67;border-radius:9px;padding:8px 10px;cursor:pointer}
   button:hover{background:#1a424d} button:disabled{opacity:.4;cursor:not-allowed}
-  .buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .buttons{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
   .danger{border-color:#8c3434;background:#3a1616}.good{border-color:#2c705b}
-  #recording{display:none;background:#3c1111;border:1px solid #8f3434;color:#ffbaba;border-radius:10px;padding:10px;margin-bottom:12px;font-weight:700}
+  #recording{display:none;background:#3c1111;border:1px solid #8f3434;color:#ffbaba;border-radius:10px;padding:8px 10px;margin-bottom:10px;font-weight:700;font-size:13px}
   #recording.on{display:block}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#ff4949;margin-right:8px}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
-  .stat{background:#081216;border-radius:9px;padding:9px}.stat b{display:block;font-size:18px}.stat span{font-size:11px;color:#769ca4}
-  #transcript{height:560px;overflow:auto;background:#071115;border-radius:10px;padding:12px}
-  .turn{padding:9px 0;border-bottom:1px solid #10272e}.speaker{font-weight:700;color:#91dae7}.time{font-size:11px;color:#688f97;margin-left:8px}
-  .text{margin-top:4px;line-height:1.45}.important{color:#ffd36b;margin-left:6px}
-  #log{font:12px ui-monospace,monospace;color:#81aab2;white-space:pre-wrap;margin-top:10px}
-  @media(max-width:800px){.grid{grid-template-columns:1fr}#transcript{height:420px}}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
+  .stat{background:#081216;border-radius:9px;padding:8px}.stat b{display:block;font-size:16px}.stat span{font-size:10px;color:#769ca4}
+  #transcript{flex:1;min-height:0;overflow:auto;background:#071115;border-radius:10px;padding:8px 14px;margin-top:8px}
+  .turn{padding:10px 2px;border-bottom:1px solid #10272e}.speaker{font-weight:700;color:#91dae7}.time{font-size:11px;color:#688f97;margin-left:8px}
+  .text{margin-top:4px;line-height:1.5;font-size:15px;max-width:1100px}.important{color:#ffd36b;margin-left:6px}
+  .empty{height:100%;display:grid;place-items:center;color:#496b72;text-align:center}
+  #answer{margin-top:8px;line-height:1.4;color:#c8e5ea;font-size:12px}
+  #log{font:11px ui-monospace,monospace;color:#81aab2;white-space:pre-wrap;margin-top:8px}
+  @media(max-width:900px){
+    body{height:auto;overflow:auto}
+    main{height:auto;min-height:100vh;width:min(100% - 16px,900px);padding:10px 0}
+    .grid{grid-template-columns:1fr}
+    .control-card{overflow:visible}
+    #transcript{height:60vh;min-height:420px}
+  }
 </style>
 </head>
 <body>
@@ -43,7 +57,7 @@ export function renderMeetingPage() {
   <div class="sub">Transcripción local · Whisper · diarización · Teams reconciliation</div>
   <div id="recording"><span class="dot"></span>TRANSCRIPCIÓN ACTIVA · informa a los participantes</div>
   <div class="grid">
-    <section class="card">
+    <section class="card control-card">
       <label>Título</label>
       <input id="title" value="Reunión">
       <label>Plataforma</label>
@@ -85,8 +99,12 @@ export function renderMeetingPage() {
       <div id="answer" style="margin-top:10px;line-height:1.45;color:#c8e5ea"></div>
       <div id="log">Preparado.</div>
     </section>
-    <section class="card">
-      <div id="transcript"></div>
+    <section class="card transcript-card">
+      <div class="transcript-head">
+        <div class="transcript-title">Transcripción en vivo</div>
+        <div id="trackingState" class="tracking">MI-02 · esperando reunión presencial</div>
+      </div>
+      <div id="transcript"><div class="empty">La transcripción aparecerá aquí.</div></div>
     </section>
   </div>
 </main>
@@ -100,6 +118,7 @@ export function renderMeetingPage() {
   let poll = null
   let timer = null
   let transcript = []
+  let speakerTracking = null
 
   const log = (msg) => { $('log').textContent = msg }
   const elapsed = () => startedAt ? Math.max(0, performance.now() - startedAt) : 0
@@ -132,17 +151,37 @@ export function renderMeetingPage() {
   }
 
   function render() {
-    const speakers = new Set(transcript.map(x => x.speakerName).filter(Boolean))
+    const speakers = new Set(
+      transcript
+        .map(x => x.speakerId || x.speakerName)
+        .filter(Boolean),
+    )
     $('turnCount').textContent = String(transcript.length)
     $('speakerCount').textContent = String(speakers.size)
-    $('transcript').innerHTML = transcript.map(turn => {
-      const safe = (s) => String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
-      return '<div class="turn"><div><span class="speaker">' +
-        safe(turn.speakerName || 'Unknown speaker') + '</span><span class="time">' +
-        time(turn.startedAtMs || 0) + '</span>' +
-        (turn.markedImportant ? '<span class="important">★</span>' : '') +
-        '</div><div class="text">' + safe(turn.text) + '</div></div>'
-    }).join('')
+    $('transcript').innerHTML = transcript.length
+      ? transcript.map(turn => {
+          const safe = (s) => String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+          return '<div class="turn"><div><span class="speaker">' +
+            safe(turn.speakerName || 'Unknown speaker') + '</span><span class="time">' +
+            time(turn.startedAtMs || 0) + '</span>' +
+            (turn.markedImportant ? '<span class="important">★</span>' : '') +
+            '</div><div class="text">' + safe(turn.text) + '</div></div>'
+        }).join('')
+      : '<div class="empty">La transcripción aparecerá aquí.</div>'
+
+    if (speakerTracking) {
+      $('trackingState').textContent =
+        'MI-02 activo · ' +
+        speakerTracking.anonymousSpeakerCount +
+        ' voz(es) anónima(s)' +
+        (speakerTracking.primaryProfileAvailable ? ' · perfil local disponible' : '')
+    } else {
+      $('trackingState').textContent =
+        $('platform').value === 'room'
+          ? 'MI-02 · esperando audio para identificar voces'
+          : 'Identidad por plataforma / diarización de respaldo'
+    }
+
     $('transcript').scrollTop = $('transcript').scrollHeight
   }
 
@@ -151,6 +190,7 @@ export function renderMeetingPage() {
     try {
       const data = await json('/meeting/' + encodeURIComponent(meetingId) + '/snapshot')
       transcript = data.transcript || []
+      speakerTracking = data.speakerTracking || null
       render()
     } catch (e) {
       log('Estado: ' + e.message)
