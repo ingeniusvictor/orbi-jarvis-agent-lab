@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process'
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
 const startVbs = resolve(root, 'scripts', 'lumia-launcher.vbs')
+const meetingVbs = resolve(root, 'scripts', 'lumia-meeting-launcher.vbs')
 const stopVbs = resolve(root, 'scripts', 'lumia-stop.vbs')
 
 function psLiteral(value) {
@@ -32,6 +33,12 @@ const script = [
   `$s.WorkingDirectory=${psLiteral(root)}`,
   "$s.Description='Abrir L.U.M.I.A. y actualizar a la última versión disponible'",
   "$s.Save()",
+  `$m=$ws.CreateShortcut((Join-Path $desktop 'L.U.M.I.A. Meeting.lnk'))`,
+  `$m.TargetPath=(Join-Path $env:WINDIR 'System32\\wscript.exe')`,
+  `$m.Arguments=${psLiteral(`"${meetingVbs}"`)}`,
+  `$m.WorkingDirectory=${psLiteral(root)}`,
+  "$m.Description='Abrir L.U.M.I.A. directamente en Meeting Intelligence'",
+  "$m.Save()",
   `$q=$ws.CreateShortcut((Join-Path $desktop 'Cerrar L.U.M.I.A..lnk'))`,
   `$q.TargetPath=(Join-Path $env:WINDIR 'System32\\wscript.exe')`,
   `$q.Arguments=${psLiteral(`"${stopVbs}"`)}`,
@@ -66,8 +73,9 @@ const desktop = String(result.stdout ?? '').trim()
 
 console.log('')
 console.log('Accesos directos creados:')
-console.log('  L.U.M.I.A.         -> actualiza, inicia y abre la interfaz')
-console.log('  Cerrar L.U.M.I.A.  -> detiene el runtime iniciado por el acceso')
+console.log('  L.U.M.I.A.          -> actualiza, inicia y abre la interfaz')
+console.log('  L.U.M.I.A. Meeting  -> abre Meeting Intelligence')
+console.log('  Cerrar L.U.M.I.A.   -> detiene el runtime iniciado por el acceso')
 if (desktop) console.log(`  Carpeta: ${desktop}`)
 console.log('')
 console.log('El acceso de cierre se crea junto al acceso de inicio existente cuando Windows usa un Escritorio redirigido.')
