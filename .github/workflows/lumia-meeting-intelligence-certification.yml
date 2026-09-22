@@ -5,6 +5,7 @@ on:
     branches:
       - feature/lumia-meeting-intelligence-v1
       - feature/lumia-mi02-speaker-tracking-ui
+      - feature/lumia-mi03-speaker-consolidation
   pull_request:
     branches:
       - feature/lumia-vg03-acoustic-intelligence
