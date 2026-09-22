@@ -1,0 +1,46 @@
+name: LUMIA ECC Pull Request Gate
+
+on:
+  pull_request:
+    branches:
+      - feature/lumia-voice-gate-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumia-ecc-pr-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pinned v4 release-line commit
+        with:
+          persist-credentials: false
+
+      - name: Setup Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # pinned v4 release-line commit
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install exact dependency graph
+        run: npm ci
+
+      - name: Brain provider contracts
+        run: npm run certify:brain
+
+      - name: Voice Gate contracts
+        run: npm run certify:voice-gate
+
+      - name: Production build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
