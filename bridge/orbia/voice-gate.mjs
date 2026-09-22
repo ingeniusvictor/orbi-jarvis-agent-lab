@@ -14,6 +14,7 @@
 
 import { probeSpeakerDiarization } from './speaker-diarization-probe.mjs'
 import { speakerVerificationStatus } from './speaker-verification.mjs'
+import { probeWakeEngine } from './wake-engine-probe.mjs'
 
 export const VOICE_GATE_STATES = Object.freeze([
   'live',
@@ -142,9 +143,11 @@ export function buildVoiceGateStatus({ env = process.env } = {}) {
   const config = voiceGateConfig(env)
   const diarization = probeSpeakerDiarization({ env })
   const speaker = speakerVerificationStatus({ env })
+  const wake = probeWakeEngine({ env })
 
   const capabilities = Object.freeze({
     wakeWordGate: true,
+    dedicatedWakeEngine: wake.dedicatedReady,
     householdFocus: true,
     diarization: diarization.available,
     speakerVerificationEngine: speaker.engineReady,
@@ -180,6 +183,14 @@ export function buildVoiceGateStatus({ env = process.env } = {}) {
       segmentationReady: diarization.segmentationReady,
       embeddingReady: diarization.embeddingReady,
     }),
+    wake: Object.freeze({
+      canonical: wake.canonical,
+      selected: wake.selected,
+      dedicatedReady: wake.dedicatedReady,
+      transcriptFallback: wake.transcriptFallback,
+      openWakeWord: wake.openWakeWord,
+      porcupine: wake.porcupine,
+    }),
     speaker: Object.freeze({
       provider: speaker.provider,
       engineReady: speaker.engineReady,
@@ -197,7 +208,7 @@ export function buildVoiceGateStatus({ env = process.env } = {}) {
       'anti-replay-liveness-provider',
       'acoustic-room-calibration-benchmark',
       'speaker-threshold-benchmark',
-      'wake-engine-dedicated',
+      ...(wake.dedicatedReady ? [] : ['wake-engine-dedicated']),
       'voice-gate-hot-path-enforcement',
     ]),
   })
