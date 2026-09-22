@@ -375,6 +375,38 @@ export async function queryMeeting(
   return answerMeetingQuestion(question, turns, options)
 }
 
+export function applyMeetingAnnotations(turns = [], annotations = []) {
+  const important = annotations.filter((x) => x?.type === 'important')
+  if (!important.length) return Object.freeze(turns.map((turn) => ({ ...turn })))
+
+  return Object.freeze(
+    turns.map((turn, index) => {
+      const matches = important.filter((annotation) => {
+        if (annotation.utteranceId) return annotation.utteranceId === turn.id
+        if (!Number.isFinite(Number(annotation.atMs))) return false
+
+        const at = Number(annotation.atMs)
+        const start = Number(turn.startedAtMs) || 0
+        const nextStart =
+          index + 1 < turns.length
+            ? Number(turns[index + 1]?.startedAtMs) || Number.POSITIVE_INFINITY
+            : Number.POSITIVE_INFINITY
+
+        return at >= start && at < nextStart
+      })
+
+      if (!matches.length) return { ...turn }
+      return {
+        ...turn,
+        markedImportant: true,
+        importantNotes: matches
+          .map((x) => String(x.note || '').trim())
+          .filter(Boolean),
+      }
+    }),
+  )
+}
+
 export async function meetingSnapshot(meetingId, options = {}) {
   const [status, transcript, annotations] = await Promise.all([
     meetingStatus(meetingId, options),
@@ -384,7 +416,7 @@ export async function meetingSnapshot(meetingId, options = {}) {
 
   return Object.freeze({
     ...status,
-    transcript,
+    transcript: applyMeetingAnnotations(transcript, annotations),
     annotations,
   })
 }
