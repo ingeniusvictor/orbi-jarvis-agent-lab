@@ -65,7 +65,9 @@
     "certify:meeting-service": "node scripts/certify-meeting-service.mjs",
     "certify:meeting-query": "node scripts/certify-meeting-query.mjs",
     "certify:meeting-platform": "node scripts/certify-meeting-platform-adapters.mjs",
-    "certify:meeting": "npm run certify:meeting-store && npm run certify:meeting-teams && npm run certify:meeting-reconcile && npm run certify:meeting-intelligence && npm run certify:meeting-service && npm run certify:meeting-query && npm run certify:meeting-platform"
+    "certify:meeting": "npm run certify:meeting-store && npm run certify:meeting-teams && npm run certify:meeting-reconcile && npm run certify:meeting-intelligence && npm run certify:meeting-service && npm run certify:meeting-query && npm run certify:meeting-platform && npm run certify:meeting-speaker-tracker && npm run certify:meeting-ui",
+    "certify:meeting-speaker-tracker": "node scripts/certify-meeting-speaker-tracker.mjs",
+    "certify:meeting-ui": "node scripts/certify-meeting-ui.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
