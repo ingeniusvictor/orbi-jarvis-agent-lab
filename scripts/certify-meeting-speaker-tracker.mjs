@@ -69,9 +69,72 @@ assert.equal(merged.anonymousSpeakerCount, 1)
 assert.ok(merged.aliases.length >= 1)
 assert.ok(merged.merges.length >= 1)
 
-console.log('MI-03 persistent speaker tracker: PASS')
+const shortGuarded = new PersistentMeetingSpeakerTracker({
+  threshold: 0.58,
+  softThreshold: 0.42,
+  shortMatchThreshold: 0.32,
+  mergeThreshold: 0.8,
+  expectedParticipants: 3,
+})
+
+shortGuarded.assignEmbedding(
+  [1, 0, 0, 0, 0, 0, 0, 0, 0],
+  { atMs: 1000 },
+)
+shortGuarded.assignEmbedding(
+  [0, 1, 0, 0, 0, 0, 0, 0, 0],
+  { atMs: 2000 },
+)
+shortGuarded.assignEmbedding(
+  [0, 0, 1, 0, 0, 0, 0, 0, 0],
+  { atMs: 3000 },
+)
+
+const beforeSamples = shortGuarded.status().speakers.map(
+  (speaker) => speaker.sampleCount,
+)
+
+const recoveredShort = shortGuarded.assignEmbedding(
+  [0, 0, 0.35, 0.93675, 0, 0, 0, 0, 0],
+  {
+    atMs: 4000,
+    evidenceQuality: 'short',
+  },
+)
+
+assert.equal(recoveredShort.name, 'SPEAKER 3')
+assert.equal(recoveredShort.reason, 'expected-count-short-recovery')
+assert.equal(shortGuarded.status().shortRecoveryCount, 1)
+assert.deepEqual(
+  shortGuarded.status().speakers.map((speaker) => speaker.sampleCount),
+  beforeSamples,
+)
+
+const shortCannotCreate = new PersistentMeetingSpeakerTracker({
+  threshold: 0.58,
+  softThreshold: 0.42,
+  shortMatchThreshold: 0.32,
+})
+
+const orphanShort = shortCannotCreate.assignEmbedding(
+  [1, 0, 0],
+  {
+    atMs: 1000,
+    evidenceQuality: 'short',
+  },
+)
+
+assert.equal(orphanShort.name, 'Unknown speaker')
+assert.equal(orphanShort.reason, 'short-evidence-no-new-speaker')
+assert.equal(shortCannotCreate.status().anonymousSpeakerCount, 0)
+
+console.log('MI-04 persistent speaker tracker: PASS')
 console.log('Primary enrolled speaker precedence: PASS')
 console.log('Cross-chunk anonymous speaker continuity: PASS')
 console.log('Expected participant guard prevents speaker explosion: PASS')
 console.log('Duplicate speaker clusters consolidate automatically: PASS')
 console.log('Other-person embeddings remain process-memory only: PASS')
+
+console.log('Short turns can recover an established speaker safely: PASS')
+console.log('Short evidence cannot create a new speaker by itself: PASS')
+console.log('Short-turn recovery does not contaminate speaker centroids: PASS')
