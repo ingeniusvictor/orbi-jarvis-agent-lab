@@ -1,9 +1,9 @@
 /**
- * MI-03 Persistent Speaker Tracking for room meetings.
+ * MI-04 Persistent Speaker Tracking for room meetings.
  *
  * Anonymous participant embeddings exist only in process memory for the active
- * meeting. MI-03 adds adaptive matching, duplicate-cluster consolidation and
- * an optional expected-participant guard to reduce speaker over-segmentation.
+ * meeting. MI-04 extends adaptive matching with conservative short-turn
+ * recovery while keeping anonymous embeddings process-memory only.
  */
 
 import {
@@ -25,13 +25,22 @@ import { transcribeLocalWav } from './local-stt.mjs'
 
 const DEFAULT_TRACK_THRESHOLD = 0.58
 const DEFAULT_SOFT_THRESHOLD = 0.42
+const DEFAULT_SHORT_MATCH_THRESHOLD = 0.32
 const DEFAULT_MERGE_THRESHOLD = 0.64
 const DEFAULT_PRIMARY_THRESHOLD = 0.60
 const MAX_EMBED_SECONDS = 9.5
 const MIN_EMBED_SECONDS = 0.85
+const MIN_SHORT_EMBED_SECONDS = 0.45
 
 const MEETING_SAMPLE_POLICY = Object.freeze({
   minSeconds: MIN_EMBED_SECONDS,
+  maxSeconds: 10,
+  minRms: 0.004,
+  minPeak: 0.015,
+})
+
+const MEETING_SHORT_SAMPLE_POLICY = Object.freeze({
+  minSeconds: MIN_SHORT_EMBED_SECONDS,
   maxSeconds: 10,
   minRms: 0.004,
   minPeak: 0.015,
@@ -61,6 +70,13 @@ function trackerSoftThreshold(env = process.env) {
   return clampThreshold(
     env.ORBIA_MEETING_SPEAKER_SOFT_THRESHOLD,
     DEFAULT_SOFT_THRESHOLD,
+  )
+}
+
+function trackerShortMatchThreshold(env = process.env) {
+  return clampThreshold(
+    env.ORBIA_MEETING_SPEAKER_SHORT_MATCH_THRESHOLD,
+    DEFAULT_SHORT_MATCH_THRESHOLD,
   )
 }
 
@@ -100,6 +116,7 @@ export class PersistentMeetingSpeakerTracker {
   constructor({
     threshold = DEFAULT_TRACK_THRESHOLD,
     softThreshold = DEFAULT_SOFT_THRESHOLD,
+    shortMatchThreshold = DEFAULT_SHORT_MATCH_THRESHOLD,
     mergeThreshold = DEFAULT_MERGE_THRESHOLD,
     expectedParticipants = null,
     primaryProfile = null,
@@ -110,6 +127,10 @@ export class PersistentMeetingSpeakerTracker {
     this.softThreshold = clampThreshold(
       softThreshold,
       DEFAULT_SOFT_THRESHOLD,
+    )
+    this.shortMatchThreshold = clampThreshold(
+      shortMatchThreshold,
+      DEFAULT_SHORT_MATCH_THRESHOLD,
     )
     this.mergeThreshold = clampThreshold(
       mergeThreshold,
@@ -128,6 +149,7 @@ export class PersistentMeetingSpeakerTracker {
     this.merges = []
     this.nextSpeaker = 1
     this.lastDecision = null
+    this.shortRecoveryCount = 0
   }
 
   setExpectedParticipants(value) {
@@ -206,6 +228,33 @@ export class PersistentMeetingSpeakerTracker {
     })
   }
 
+  reuseSpeakerWithoutCentroidUpdate(
+    speaker,
+    atMs,
+    score,
+    reason = 'short-turn-recovery',
+  ) {
+    speaker.lastSeenAtMs = Math.max(
+      speaker.lastSeenAtMs,
+      Number(atMs) || 0,
+    )
+    this.shortRecoveryCount += 1
+    this.lastDecision = {
+      action: reason,
+      speakerId: speaker.id,
+      score: Number.isFinite(score) ? score : null,
+      atMs: Math.max(0, Number(atMs) || 0),
+    }
+    return Object.freeze({
+      id: speaker.id,
+      name: speaker.name,
+      source: 'diarization-short-recovery',
+      confidence: score,
+      newSpeaker: false,
+      reason,
+    })
+  }
+
   consolidateDuplicates() {
     let changed = true
     while (changed) {
@@ -268,7 +317,13 @@ export class PersistentMeetingSpeakerTracker {
     }
   }
 
-  assignEmbedding(embedding, { atMs = 0 } = {}) {
+  assignEmbedding(
+    embedding,
+    {
+      atMs = 0,
+      evidenceQuality = 'normal',
+    } = {},
+  ) {
     const vector = Array.from(embedding ?? [], Number)
     if (!vector.length) {
       return Object.freeze({
@@ -308,13 +363,20 @@ export class PersistentMeetingSpeakerTracker {
     }
 
     if (best && best.score >= this.threshold) {
-      return this.updateSpeaker(
-        best.speaker,
-        vector,
-        atMs,
-        best.score,
-        'strong-match',
-      )
+      return evidenceQuality === 'short'
+        ? this.reuseSpeakerWithoutCentroidUpdate(
+            best.speaker,
+            atMs,
+            best.score,
+            'short-strong-match',
+          )
+        : this.updateSpeaker(
+            best.speaker,
+            vector,
+            atMs,
+            best.score,
+            'strong-match',
+          )
     }
 
     const limit = this.anonymousLimit()
@@ -323,12 +385,32 @@ export class PersistentMeetingSpeakerTracker {
       this.speakers.length >= limit
     ) {
       if (best && best.score >= this.softThreshold) {
-        return this.updateSpeaker(
+        return evidenceQuality === 'short'
+          ? this.reuseSpeakerWithoutCentroidUpdate(
+              best.speaker,
+              atMs,
+              best.score,
+              'expected-count-short-soft-match',
+            )
+          : this.updateSpeaker(
+              best.speaker,
+              vector,
+              atMs,
+              best.score,
+              'expected-count-soft-match',
+            )
+      }
+
+      if (
+        evidenceQuality === 'short' &&
+        best &&
+        best.score >= this.shortMatchThreshold
+      ) {
+        return this.reuseSpeakerWithoutCentroidUpdate(
           best.speaker,
-          vector,
           atMs,
           best.score,
-          'expected-count-soft-match',
+          'expected-count-short-recovery',
         )
       }
 
@@ -345,6 +427,23 @@ export class PersistentMeetingSpeakerTracker {
         confidence: best?.score ?? null,
         newSpeaker: false,
         reason: 'expected-count-guard',
+      })
+    }
+
+    if (evidenceQuality === 'short') {
+      this.lastDecision = {
+        action: 'short-evidence-no-new-speaker',
+        speakerId: null,
+        score: best?.score ?? null,
+        atMs: Math.max(0, Number(atMs) || 0),
+      }
+      return Object.freeze({
+        id: null,
+        name: 'Unknown speaker',
+        source: 'anonymous',
+        confidence: best?.score ?? null,
+        newSpeaker: false,
+        reason: 'short-evidence-no-new-speaker',
       })
     }
 
@@ -377,14 +476,16 @@ export class PersistentMeetingSpeakerTracker {
 
   status() {
     return Object.freeze({
-      phase: 'MI-03',
+      phase: 'MI-04',
       threshold: this.threshold,
       softThreshold: this.softThreshold,
+      shortMatchThreshold: this.shortMatchThreshold,
       mergeThreshold: this.mergeThreshold,
       expectedParticipants: this.expectedParticipants,
       anonymousSpeakerLimit: this.anonymousLimit(),
       anonymousSpeakerCount: this.speakers.length,
       primaryProfileAvailable: Boolean(this.primaryProfile?.embedding?.length),
+      shortRecoveryCount: this.shortRecoveryCount,
       lastDecision: this.lastDecision
         ? Object.freeze({ ...this.lastDecision })
         : null,
@@ -438,6 +539,7 @@ export function getMeetingSpeakerTracker(
   tracker = new PersistentMeetingSpeakerTracker({
     threshold: trackerThreshold(env),
     softThreshold: trackerSoftThreshold(env),
+    shortMatchThreshold: trackerShortMatchThreshold(env),
     mergeThreshold: trackerMergeThreshold(env),
     expectedParticipants,
     primaryProfile,
@@ -481,7 +583,7 @@ function concatenateClusterAudio(decoded, segments) {
   }
 
   const durationSeconds = total / decoded.sampleRate
-  if (durationSeconds < MIN_EMBED_SECONDS) return null
+  if (durationSeconds < MIN_SHORT_EMBED_SECONDS) return null
 
   const samples = new Float32Array(total)
   let offset = 0
@@ -489,13 +591,22 @@ function concatenateClusterAudio(decoded, segments) {
     samples.set(chunk, offset)
     offset += chunk.length
   }
-  return encodeMonoPcm16Wav(samples, decoded.sampleRate)
+
+  return Object.freeze({
+    wav: encodeMonoPcm16Wav(samples, decoded.sampleRate),
+    durationSeconds,
+    quality:
+      durationSeconds < MIN_EMBED_SECONDS ? 'short' : 'normal',
+  })
 }
 
-function computeMeetingEmbedding(audio, env) {
+function computeMeetingEmbedding(audio, env, quality = 'normal') {
   return computeSpeakerEmbedding(audio, {
     env,
-    samplePolicy: MEETING_SAMPLE_POLICY,
+    samplePolicy:
+      quality === 'short'
+        ? MEETING_SHORT_SAMPLE_POLICY
+        : MEETING_SAMPLE_POLICY,
   })
 }
 
@@ -562,8 +673,8 @@ export async function transcribeTrackedRoomChunk(
 
   const identities = new Map()
   for (const [localSpeaker, segments] of clusters) {
-    const clusterWav = concatenateClusterAudio(decoded, segments)
-    if (!clusterWav) {
+    const clusterAudio = concatenateClusterAudio(decoded, segments)
+    if (!clusterAudio) {
       identities.set(
         localSpeaker,
         Object.freeze({
@@ -579,13 +690,18 @@ export async function transcribeTrackedRoomChunk(
     }
 
     try {
-      const embedding = computeMeetingEmbedding(clusterWav, env)
+      const embedding = computeMeetingEmbedding(
+        clusterAudio.wav,
+        env,
+        clusterAudio.quality,
+      )
       identities.set(
         localSpeaker,
         tracker.assignEmbedding(embedding, {
           atMs:
             baseOffset +
             Math.max(0, Number(segments[0]?.start) || 0) * 1000,
+          evidenceQuality: clusterAudio.quality,
         }),
       )
     } catch {
