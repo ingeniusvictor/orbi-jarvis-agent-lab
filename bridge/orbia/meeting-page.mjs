@@ -178,7 +178,7 @@ export function renderMeetingPage() {
 
     if (speakerTracking) {
       $('trackingState').textContent =
-        'MI-03 activo · ' +
+        'MI-04 activo · ' +
         speakerTracking.anonymousSpeakerCount +
         ' voz(es) anónima(s)' +
         (speakerTracking.expectedParticipants
@@ -187,11 +187,14 @@ export function renderMeetingPage() {
         (speakerTracking.merges?.length
           ? ' · ' + speakerTracking.merges.length + ' fusión(es)'
           : '') +
+        (speakerTracking.shortRecoveryCount
+          ? ' · ' + speakerTracking.shortRecoveryCount + ' turno(s) corto(s) recuperado(s)'
+          : '') +
         (speakerTracking.primaryProfileAvailable ? ' · perfil local disponible' : '')
     } else {
       $('trackingState').textContent =
         $('platform').value === 'room'
-          ? 'MI-03 · esperando audio para identificar voces'
+          ? 'MI-04 · esperando audio para identificar voces'
           : 'Identidad por plataforma / diarización de respaldo'
     }
 
