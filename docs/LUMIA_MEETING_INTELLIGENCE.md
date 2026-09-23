@@ -1,4 +1,4 @@
-# L.U.M.I.A. Meeting Intelligence — MI-03
+# L.U.M.I.A. Meeting Intelligence — MI-04
 
 ## Goal
 
@@ -220,3 +220,30 @@ embedding vectors themselves.
 The optional expected participant count is a clustering hint, not a claim of
 identity. When evidence is too weak after the cap is reached, MI-03 returns
 Unknown speaker rather than inventing another person.
+
+
+## MI-04 — short-turn speaker recovery
+
+MI-04 targets a narrower failure observed after MI-03 fixed speaker explosion:
+very short utterances can still fall back to `Unknown speaker`, especially for
+higher-pitched or child voices whose useful voiced segment is brief.
+
+Changes:
+
+- meeting-only embedding accepts short evidence down to about 0.45 seconds;
+- short evidence can match an already-established speaker;
+- short evidence cannot create a new speaker by itself;
+- when the expected participant count is already reached, a separate
+  conservative short-turn threshold may recover the closest established
+  speaker;
+- recovered short turns do not update the speaker centroid, preventing weak
+  evidence from contaminating the stable meeting-local voice representation;
+- the console surfaces the number of short turns recovered during the active
+  meeting.
+
+Privacy remains unchanged: anonymous embeddings are process-memory only and raw
+audio is not retained by default.
+
+MI-04 deliberately preserves `Unknown speaker` when short evidence is too weak
+or ambiguous. The goal is to reduce avoidable unknown turns without forcing a
+speaker identity when confidence is insufficient.
