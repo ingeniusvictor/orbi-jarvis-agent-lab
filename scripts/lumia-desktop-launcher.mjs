@@ -18,7 +18,7 @@ const runtimeDir = resolve(root, '.local-runtime')
 const pidFile = resolve(runtimeDir, 'lumia-desktop.pid.json')
 const launcherLog = resolve(runtimeDir, 'lumia-launcher.log')
 const runtimeLog = resolve(runtimeDir, 'lumia-desktop-runtime.log')
-const branch = 'feature/lumia-mi04-short-turn-recovery'
+const branch = process.env.ORBIA_LUMIA_BRANCH ?? 'feature/lumia-mi04-short-turn-recovery'
 const meetingMode = process.argv.includes('--meeting')
 
 mkdirSync(runtimeDir, { recursive: true })
@@ -194,6 +194,14 @@ function ensureLatestCode() {
   return { updated: true, dependencyChange }
 }
 
+function dependenciesMissing() {
+  return (
+    !existsSync(resolve(root, 'node_modules')) ||
+    !existsSync(resolve(root, 'node_modules', 'vite')) ||
+    !existsSync(resolve(root, 'node_modules', '@vitejs', 'plugin-react'))
+  )
+}
+
 function ensureDependencies() {
   const result = run(
     'npm.cmd',
@@ -202,7 +210,7 @@ function ensureDependencies() {
   )
   log(
     result.ok
-      ? 'dependencies synchronized after update'
+      ? 'dependencies synchronized'
       : `dependency sync failed: ${result.stderr || result.stdout}`,
   )
   return result.ok
@@ -291,8 +299,10 @@ async function main() {
     await waitFor(async () => !(await bridgeReady()), 5000, 250)
   }
 
-  if (update.updated && update.dependencyChange) {
-    ensureDependencies()
+  if (update.dependencyChange || dependenciesMissing()) {
+    if (!ensureDependencies()) {
+      throw new Error('npm install failed; see lumia-launcher.log for details')
+    }
   }
 
   if (!update.updated && wasRunning && beforeFace) {
@@ -304,7 +314,10 @@ async function main() {
     return
   }
 
-  await ensureOllama()
+  const ollama = await ensureOllama()
+  if (!ollama) {
+    log('Ollama is not ready; continuing so the interface can report model availability')
+  }
 
   if (!(await bridgeReady())) {
     startLumia()
@@ -338,8 +351,10 @@ async function main() {
   log(
     `startup incomplete: bridge=${bridge ? 'ready' : 'missing'} face=missing; see ${runtimeLog}`,
   )
+  process.exitCode = 1
 }
 
 main().catch((error) => {
   log(`launcher fatal: ${error?.stack ?? error}`)
+  process.exitCode = 1
 })
