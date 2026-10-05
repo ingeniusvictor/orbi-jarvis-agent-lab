@@ -2,8 +2,9 @@
  * VF-02 local multivoice bootstrap (Windows).
  *
  * Installs an experimental sherpa-onnx-node runtime without changing the app
- * package manifest, plus the two official models used by the upstream Node
- * diarization example. Assets remain machine-local.
+ * package manifest, plus the native Windows x64 addon and the two official
+ * models used by the upstream Node diarization example. Assets remain
+ * machine-local.
  */
 
 import { createWriteStream, existsSync } from 'node:fs'
@@ -28,8 +29,11 @@ const embeddingRoot = join(runtimeRoot, 'embedding')
 const nodeRuntimeRoot = join(runtimeRoot, 'node-runtime')
 const nodeRuntimePackage = join(nodeRuntimeRoot, 'package.json')
 
+// Keep the JS wrapper and native platform addon on the exact same release.
+// sherpa-onnx-node does not declare the platform addon as an npm dependency,
+// so Windows installs must request sherpa-onnx-win-x64 explicitly.
 const SHERPA_VERSION =
-  process.env.ORBIA_SHERPA_ONNX_VERSION?.trim() || '^1.13.8'
+  process.env.ORBIA_SHERPA_ONNX_VERSION?.trim() || '1.13.8'
 
 const SEGMENTATION_URL =
   process.env.ORBIA_DIARIZATION_SEGMENTATION_URL?.trim() ||
@@ -118,15 +122,32 @@ function hasCommand(command, args = ['--version']) {
 }
 
 async function installPackage() {
-  const isolatedPackage = join(
+  const isolatedWrapperPackage = join(
     nodeRuntimeRoot,
     'node_modules',
     'sherpa-onnx-node',
     'package.json',
   )
+  const isolatedNativePackage = join(
+    nodeRuntimeRoot,
+    'node_modules',
+    'sherpa-onnx-win-x64',
+    'package.json',
+  )
+  const isolatedNativeBinary = join(
+    nodeRuntimeRoot,
+    'node_modules',
+    'sherpa-onnx-win-x64',
+    'sherpa-onnx.node',
+  )
 
-  if (!force && existsSync(isolatedPackage)) {
-    info('sherpa-onnx-node isolated runtime already present')
+  if (
+    !force &&
+    existsSync(isolatedWrapperPackage) &&
+    existsSync(isolatedNativePackage) &&
+    existsSync(isolatedNativeBinary)
+  ) {
+    info('sherpa-onnx-node + Windows x64 native addon already present')
     return
   }
 
@@ -147,7 +168,9 @@ async function installPackage() {
     )
   }
 
-  info(`installing sherpa-onnx-node ${SHERPA_VERSION} in isolated runtime...`)
+  info(
+    `installing sherpa-onnx-node ${SHERPA_VERSION} + sherpa-onnx-win-x64 ${SHERPA_VERSION} in isolated runtime...`,
+  )
 
   // Spawning npm.cmd directly can fail with EINVAL on newer Windows/Node
   // combinations. npm exposes the actual JS entry point in npm_execpath when
@@ -177,9 +200,16 @@ async function installPackage() {
       '--package-lock=false',
       '--legacy-peer-deps',
       `sherpa-onnx-node@${SHERPA_VERSION}`,
+      `sherpa-onnx-win-x64@${SHERPA_VERSION}`,
     ],
     { cwd: root },
   )
+
+  if (!existsSync(isolatedNativeBinary)) {
+    throw new Error(
+      'sherpa-onnx-win-x64 installed without sherpa-onnx.node; native runtime is incomplete.',
+    )
+  }
 }
 
 async function installSegmentationModel() {

@@ -169,43 +169,77 @@ export async function ingestMeetingAudioChunk(
       : 0
 
   if (channel === 'microphone' && platform === 'room') {
-    const tracked = await transcribeTrackedRoomChunk(
-      meetingId,
-      audio,
-      {
-        offsetMs: baseOffset,
-        primaryName: cleanName(localSpeakerName) || 'LOCAL USER',
-        expectedParticipants,
-        env: options.env ?? process.env,
-      },
-    )
-
-    const out = []
-    for (const turn of tracked.turns) {
-      out.push(
-        await ingestMeetingText(
-          meetingId,
-          {
-            text: turn.text,
-            startedAtMs:
-              baseOffset + Math.max(0, Number(turn.start) || 0) * 1000,
-            endedAtMs:
-              baseOffset + Math.max(0, Number(turn.end) || 0) * 1000,
-            source: 'diarization',
-            platform,
-            resolvedSpeakerId: turn.speakerId,
-            resolvedSpeakerName: turn.speakerName,
-            resolvedSpeakerIdentitySource:
-              turn.speakerIdentitySource,
-            resolvedSpeakerConfidence:
-              turn.speakerConfidence,
-            language: turn.language || 'es',
-          },
-          options,
-        ),
+    let tracked = null
+    try {
+      tracked = await transcribeTrackedRoomChunk(
+        meetingId,
+        audio,
+        {
+          offsetMs: baseOffset,
+          primaryName: cleanName(localSpeakerName) || 'LOCAL USER',
+          expectedParticipants,
+          env: options.env ?? process.env,
+        },
       )
+    } catch {
+      tracked = null
     }
-    return Object.freeze(out)
+
+    if (tracked?.turns?.length) {
+      const out = []
+      for (const turn of tracked.turns) {
+        out.push(
+          await ingestMeetingText(
+            meetingId,
+            {
+              text: turn.text,
+              startedAtMs:
+                baseOffset + Math.max(0, Number(turn.start) || 0) * 1000,
+              endedAtMs:
+                baseOffset + Math.max(0, Number(turn.end) || 0) * 1000,
+              source: 'diarization',
+              platform,
+              resolvedSpeakerId: turn.speakerId,
+              resolvedSpeakerName: turn.speakerName,
+              resolvedSpeakerIdentitySource:
+                turn.speakerIdentitySource,
+              resolvedSpeakerConfidence:
+                turn.speakerConfidence,
+              language: turn.language || 'es',
+            },
+            options,
+          ),
+        )
+      }
+      return Object.freeze(out)
+    }
+
+    // Room capture must never lose an otherwise transcribable microphone chunk
+    // just because native diarization is unavailable, blocked by OS policy, or
+    // produced unusable speaker segments. Preserve the transcript, but keep the
+    // identity explicitly unknown rather than falsely attributing the room to
+    // the local user.
+    const fallback = await transcribeLocalWav(audio, options)
+    const fallbackText = String(fallback.text ?? '').trim()
+    if (!fallbackText) return Object.freeze([])
+
+    return Object.freeze([
+      await ingestMeetingText(
+        meetingId,
+        {
+          text: fallbackText,
+          startedAtMs: baseOffset,
+          endedAtMs: baseOffset + chunkDurationMs,
+          source: 'microphone',
+          platform,
+          resolvedSpeakerName: 'Unknown speaker',
+          resolvedSpeakerIdentitySource: 'room-fallback',
+          resolvedSpeakerConfidence: null,
+          language: fallback.language || 'es',
+        },
+        options,
+      ),
+    ])
   }
 
   if (channel === 'microphone') {

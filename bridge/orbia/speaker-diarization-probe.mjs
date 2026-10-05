@@ -1,9 +1,9 @@
 /**
  * Speaker diarization capability probe.
  *
- * This does not identify people and does not perform diarization. It only
- * reports whether the planned local sherpa-onnx runtime and model assets are
- * installed so the multivoice UI can remain truthful.
+ * This does not identify people and does not perform diarization. It reports
+ * whether the local sherpa-onnx runtime can actually be loaded and whether the
+ * required model assets are installed, so the multivoice UI remains truthful.
  */
 
 import { existsSync } from 'node:fs'
@@ -65,6 +65,31 @@ export function sherpaRuntimeRequire(env = process.env) {
   }
 }
 
+function probeRuntimeLoad(runtimeRequire) {
+  if (!runtimeRequire) {
+    return Object.freeze({
+      ready: false,
+      error: 'sherpa-onnx-node package is not installed.',
+    })
+  }
+
+  try {
+    const sherpa = runtimeRequire('sherpa-onnx-node')
+    if (typeof sherpa?.OfflineSpeakerDiarization !== 'function') {
+      return Object.freeze({
+        ready: false,
+        error: 'sherpa-onnx-node loaded without OfflineSpeakerDiarization.',
+      })
+    }
+    return Object.freeze({ ready: true, error: null })
+  } catch (error) {
+    return Object.freeze({
+      ready: false,
+      error: String(error?.message ?? error).split('\n')[0].slice(0, 240),
+    })
+  }
+}
+
 export function probeSpeakerDiarization({
   env = process.env,
   exists = existsSync,
@@ -73,14 +98,21 @@ export function probeSpeakerDiarization({
 
   const runtimeRequire = sherpaRuntimeRequire(env)
   const packageReady = Boolean(runtimeRequire)
+  const runtimeLoad = probeRuntimeLoad(runtimeRequire)
 
   const segmentationReady = exists(paths.segmentationModel)
   const embeddingReady = exists(paths.embeddingModel)
 
   return Object.freeze({
     provider: 'sherpa-onnx-local',
-    available: packageReady && segmentationReady && embeddingReady,
+    available:
+      packageReady &&
+      runtimeLoad.ready &&
+      segmentationReady &&
+      embeddingReady,
     packageReady,
+    runtimeLoadReady: runtimeLoad.ready,
+    runtimeLoadError: runtimeLoad.error,
     packageLocation:
       runtimeRequire && exists(paths.runtimePackageJson)
         ? 'isolated-runtime'
