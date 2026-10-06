@@ -1,12 +1,13 @@
 /**
  * VF-02 local speaker diarization adapter.
  *
- * This adapter is intentionally not in the hot path yet. It can be installed
- * and benchmarked independently before multivoice routing is enabled.
- *
  * Provider: sherpa-onnx-node OfflineSpeakerDiarization
  * Input: mono PCM16 WAV (the same 16 kHz format already produced for Whisper)
  * Output: anonymous per-clip speaker segments.
+ *
+ * MI-05 adds a process-local circuit breaker. A native addon rejected by
+ * Windows Application Control will not be loaded again for every room chunk.
+ * A process restart (or a new runtime after repair) resets the breaker.
  */
 
 import {
@@ -14,6 +15,7 @@ import {
   sherpaRuntimeRequire,
   speakerDiarizationPaths,
 } from './speaker-diarization-probe.mjs'
+import { markMeetingRuntimeDegraded } from './meeting-runtime.mjs'
 
 export class SpeakerDiarizationError extends Error {
   constructor(code, message) {
@@ -110,14 +112,21 @@ export function decodeMonoPcm16Wav(audio) {
 
 let cached = null
 let cachedKey = ''
+let nativeLoadBlocked = null
 
 function createRuntime(env = process.env) {
+  if (nativeLoadBlocked) {
+    fail('DIARIZATION_UNAVAILABLE', nativeLoadBlocked)
+  }
+
   const readiness = probeSpeakerDiarization({ env })
   if (!readiness.available) {
-    fail(
-      'DIARIZATION_UNAVAILABLE',
-      'Local speaker diarization package or model assets are unavailable.',
-    )
+    const reason =
+      readiness.runtimeLoadError ||
+      'Local speaker diarization package or model assets are unavailable.'
+    nativeLoadBlocked = String(reason).split('\n')[0].slice(0, 240)
+    markMeetingRuntimeDegraded(nativeLoadBlocked)
+    fail('DIARIZATION_UNAVAILABLE', nativeLoadBlocked)
   }
 
   const paths = speakerDiarizationPaths(env)
@@ -129,11 +138,13 @@ function createRuntime(env = process.env) {
     const runtimeRequire = sherpaRuntimeRequire(env)
     if (!runtimeRequire) throw new Error('runtime missing')
     sherpa = runtimeRequire('sherpa-onnx-node')
-  } catch {
-    fail(
-      'DIARIZATION_UNAVAILABLE',
-      'sherpa-onnx-node could not be loaded.',
-    )
+  } catch (error) {
+    nativeLoadBlocked =
+      String(error?.message ?? 'sherpa-onnx-node could not be loaded.')
+        .split('\n')[0]
+        .slice(0, 240)
+    markMeetingRuntimeDegraded(nativeLoadBlocked)
+    fail('DIARIZATION_UNAVAILABLE', nativeLoadBlocked)
   }
 
   const runtime = new sherpa.OfflineSpeakerDiarization({
@@ -156,6 +167,7 @@ function createRuntime(env = process.env) {
 
   cached = runtime
   cachedKey = key
+  nativeLoadBlocked = null
   return runtime
 }
 
