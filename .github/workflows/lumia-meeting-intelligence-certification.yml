@@ -7,9 +7,12 @@ on:
       - feature/lumia-mi02-speaker-tracking-ui
       - feature/lumia-mi03-speaker-consolidation
       - feature/lumia-mi04-short-turn-recovery
+      - feature/mi05-meeting-reliability
   pull_request:
     branches:
       - feature/lumia-vg03-acoustic-intelligence
+      - feature/lumia-mi04-short-turn-recovery
+      - fix/mi04-room-sac-fallback
 
 jobs:
   certify:
