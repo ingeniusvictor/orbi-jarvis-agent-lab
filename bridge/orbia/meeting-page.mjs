@@ -24,7 +24,7 @@ export function renderMeetingPage() {
   .control-card{overflow:auto;padding-right:10px}
   .transcript-card{display:flex;flex-direction:column;padding:10px}
   .transcript-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:3px 5px 10px;border-bottom:1px solid #17323a}
-  .transcript-title{font-weight:700;color:#cdebf0}.tracking{font-size:11px;color:#7ba5ad;text-align:right}
+  .transcript-title{font-weight:700;color:#cdebf0}.tracking{font-size:11px;color:#7ba5ad;text-align:right;max-width:70%}
   label{display:block;color:#8eb5bd;font-size:11px;margin:10px 0 4px}
   input,select,button,textarea{font:inherit}
   input,select,textarea{width:100%;background:#071115;color:#d8eef2;border:1px solid #23434c;border-radius:9px;padding:8px}
@@ -36,6 +36,8 @@ export function renderMeetingPage() {
   #recording.on{display:block}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#ff4949;margin-right:8px}
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
   .stat{background:#081216;border-radius:9px;padding:8px}.stat b{display:block;font-size:16px}.stat span{font-size:10px;color:#769ca4}
+  .pipeline{border:1px solid #183943;background:#081419;border-radius:10px;padding:9px 10px;margin:8px 0;font:11px ui-monospace,monospace;color:#90b9c0;line-height:1.45}
+  .pipeline.full{border-color:#245f51;color:#9edac9}.pipeline.degraded{border-color:#805d2b;color:#f1c982}.pipeline.probing{border-color:#315a73;color:#a7d5e8}
   #transcript{flex:1;min-height:0;overflow:auto;background:#071115;border-radius:10px;padding:8px 14px;margin-top:8px}
   .turn{padding:10px 2px;border-bottom:1px solid #10272e}.speaker{font-weight:700;color:#91dae7}.time{font-size:11px;color:#688f97;margin-left:8px}
   .text{margin-top:4px;line-height:1.5;font-size:15px;max-width:1100px}.important{color:#ffd36b;margin-left:6px}
@@ -48,6 +50,7 @@ export function renderMeetingPage() {
     .grid{grid-template-columns:1fr}
     .control-card{overflow:visible}
     #transcript{height:60vh;min-height:420px}
+    .tracking{max-width:55%}
   }
 </style>
 </head>
@@ -88,6 +91,7 @@ export function renderMeetingPage() {
         <div class="stat"><b id="turnCount">0</b><span>intervenciones</span></div>
         <div class="stat"><b id="speakerCount">0</b><span>speakers</span></div>
       </div>
+      <div id="pipeline" class="pipeline probing">MI-05 · preparado</div>
       <label>Importar transcript Teams (.vtt)</label>
       <input id="vtt" type="file" accept=".vtt,text/vtt" disabled>
       <div class="buttons">
@@ -104,7 +108,7 @@ export function renderMeetingPage() {
     <section class="card transcript-card">
       <div class="transcript-head">
         <div class="transcript-title">Transcripción en vivo</div>
-        <div id="trackingState" class="tracking">MI-02 · esperando reunión presencial</div>
+        <div id="trackingState" class="tracking">MI-05 · preparado</div>
       </div>
       <div id="transcript"><div class="empty">La transcripción aparecerá aquí.</div></div>
     </section>
@@ -121,6 +125,9 @@ export function renderMeetingPage() {
   let timer = null
   let transcript = []
   let speakerTracking = null
+  let runtimeMode = 'probing'
+  let refreshFailures = 0
+  const ingestMetrics = { chunks:0, pending:0, failed:0, lastMs:null, totalMs:0 }
 
   const log = (msg) => { $('log').textContent = msg }
   const elapsed = () => startedAt ? Math.max(0, performance.now() - startedAt) : 0
@@ -129,12 +136,36 @@ export function renderMeetingPage() {
     return [Math.floor(s/3600), Math.floor((s%3600)/60), s%60]
       .map(x => String(x).padStart(2,'0')).join(':')
   }
+  const roomChunkSeconds = () => runtimeMode === 'full' ? 10 : 3
 
   async function json(url, options={}) {
     const res = await fetch(url, options)
     const body = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(body.message || body.errorCode || ('HTTP ' + res.status))
     return body
+  }
+
+  function renderPipeline() {
+    const box = $('pipeline')
+    const avg = ingestMetrics.chunks
+      ? Math.round(ingestMetrics.totalMs / ingestMetrics.chunks)
+      : null
+    const last = ingestMetrics.lastMs == null ? '—' : Math.round(ingestMetrics.lastMs) + ' ms'
+    const avgText = avg == null ? '—' : avg + ' ms'
+    const modeText =
+      runtimeMode === 'full'
+        ? 'FULL · Whisper + diarización'
+        : runtimeMode === 'degraded'
+          ? 'DEGRADED · Whisper activo · diarización no disponible'
+          : 'PREPARANDO · comprobando diarización con audio real'
+    box.className = 'pipeline ' + runtimeMode
+    box.textContent =
+      'MI-05 ' + modeText +
+      ' · bloque ' + (($('platform').value === 'room') ? roomChunkSeconds() : 8) + ' s' +
+      ' · último bloque ' + last +
+      ' · promedio ' + avgText +
+      ' · cola ' + ingestMetrics.pending +
+      (ingestMetrics.failed ? ' · fallos ' + ingestMetrics.failed : '')
   }
 
   function setActive(on) {
@@ -176,40 +207,49 @@ export function renderMeetingPage() {
         }).join('')
       : '<div class="empty">La transcripción aparecerá aquí.</div>'
 
-    if (speakerTracking) {
-      $('trackingState').textContent =
-        'MI-04 activo · ' +
-        speakerTracking.anonymousSpeakerCount +
-        ' voz(es) anónima(s)' +
-        (speakerTracking.expectedParticipants
-          ? ' · objetivo ' + speakerTracking.expectedParticipants
-          : '') +
-        (speakerTracking.merges?.length
-          ? ' · ' + speakerTracking.merges.length + ' fusión(es)'
-          : '') +
-        (speakerTracking.shortRecoveryCount
-          ? ' · ' + speakerTracking.shortRecoveryCount + ' turno(s) corto(s) recuperado(s)'
-          : '') +
-        (speakerTracking.primaryProfileAvailable ? ' · perfil local disponible' : '')
+    if ($('platform').value === 'room') {
+      if (runtimeMode === 'degraded') {
+        $('trackingState').textContent =
+          'MI-05 DEGRADED · Whisper activo · identificación de voces temporalmente no disponible'
+      } else if (speakerTracking) {
+        $('trackingState').textContent =
+          'MI-05 FULL · ' +
+          speakerTracking.anonymousSpeakerCount +
+          ' voz(es) anónima(s)' +
+          (speakerTracking.expectedParticipants
+            ? ' · objetivo ' + speakerTracking.expectedParticipants
+            : '') +
+          (speakerTracking.merges?.length
+            ? ' · ' + speakerTracking.merges.length + ' fusión(es)'
+            : '') +
+          (speakerTracking.shortRecoveryCount
+            ? ' · ' + speakerTracking.shortRecoveryCount + ' turno(s) corto(s) recuperado(s)'
+            : '') +
+          (speakerTracking.primaryProfileAvailable ? ' · perfil local disponible' : '')
+      } else {
+        $('trackingState').textContent =
+          'MI-05 PREPARANDO · primer bloque rápido para comprobar identificación de voces'
+      }
     } else {
-      $('trackingState').textContent =
-        $('platform').value === 'room'
-          ? 'MI-04 · esperando audio para identificar voces'
-          : 'Identidad por plataforma / diarización de respaldo'
+      $('trackingState').textContent = 'Identidad por plataforma / diarización de respaldo'
     }
 
+    renderPipeline()
     $('transcript').scrollTop = $('transcript').scrollHeight
   }
 
-  async function refresh() {
+  async function refresh({quiet=false}={}) {
     if (!meetingId) return
     try {
       const data = await json('/meeting/' + encodeURIComponent(meetingId) + '/snapshot')
       transcript = data.transcript || []
       speakerTracking = data.speakerTracking || null
+      if ($('platform').value === 'room' && speakerTracking) runtimeMode = 'full'
+      refreshFailures = 0
       render()
     } catch (e) {
-      log('Estado: ' + e.message)
+      refreshFailures += 1
+      if (!quiet || refreshFailures >= 3) log('Estado: ' + e.message)
     }
   }
 
@@ -261,8 +301,10 @@ export function renderMeetingPage() {
     src.connect(node); node.connect(silent); silent.connect(ctx.destination)
 
     let parts = [], total = 0, chunkStart = elapsed(), chain = Promise.resolve()
-    const chunkSeconds = $('platform').value === 'room' ? 10 : 8
-    const threshold = ctx.sampleRate * chunkSeconds
+    const currentChunkSeconds = () =>
+      $('platform').value === 'room' && channel === 'microphone'
+        ? roomChunkSeconds()
+        : 8
 
     const send = (samples, offset) => {
       if (!samples.length || !meetingId) return
@@ -275,16 +317,39 @@ export function renderMeetingPage() {
         expectedParticipants: $('expectedParticipants').value.trim(),
         platform: $('platform').value,
       })
+      ingestMetrics.pending += 1
+      renderPipeline()
       chain = chain.then(async () => {
-        const res = await fetch('/meeting/' + encodeURIComponent(meetingId) + '/audio?' + q, {
-          method:'POST', headers:{'content-type':'audio/wav'}, body:blob
-        })
-        if (!res.ok) {
+        const started = performance.now()
+        try {
+          const res = await fetch('/meeting/' + encodeURIComponent(meetingId) + '/audio?' + q, {
+            method:'POST', headers:{'content-type':'audio/wav'}, body:blob
+          })
           const body = await res.json().catch(()=>({}))
-          throw new Error(body.message || body.errorCode || 'audio ingest failed')
+          if (!res.ok) {
+            throw new Error(body.message || body.errorCode || 'audio ingest failed')
+          }
+          const latency = performance.now() - started
+          ingestMetrics.chunks += 1
+          ingestMetrics.lastMs = latency
+          ingestMetrics.totalMs += latency
+          await refresh({quiet:true})
+
+          if ($('platform').value === 'room' && channel === 'microphone') {
+            const turns = Array.isArray(body.utterances) ? body.utterances : []
+            const hasTracked = Boolean(speakerTracking) || turns.some(x => x?.source === 'diarization')
+            const hasFallback = turns.some(x => x?.speakerIdentitySource === 'room-fallback')
+            if (hasTracked) runtimeMode = 'full'
+            else if (hasFallback) runtimeMode = 'degraded'
+          }
+        } catch (e) {
+          ingestMetrics.failed += 1
+          log(channel + ': ' + e.message)
+        } finally {
+          ingestMetrics.pending = Math.max(0, ingestMetrics.pending - 1)
+          render()
         }
-        await refresh()
-      }).catch(e => log(channel + ': ' + e.message))
+      })
     }
 
     const flush = () => {
@@ -300,6 +365,7 @@ export function renderMeetingPage() {
       if (!total) chunkStart = elapsed()
       const data = new Float32Array(event.inputBuffer.getChannelData(0))
       parts.push(data); total += data.length
+      const threshold = ctx.sampleRate * currentChunkSeconds()
       if (total >= threshold) flush()
     }
 
@@ -318,8 +384,14 @@ export function renderMeetingPage() {
     return handle
   }
 
+  $('platform').onchange = () => {
+    runtimeMode = 'probing'
+    render()
+  }
+
   $('start').onclick = async () => {
     try {
+      runtimeMode = $('platform').value === 'room' ? 'probing' : 'full'
       const data = await json('/meeting/start', {
         method:'POST', headers:{'content-type':'application/json'},
         body:JSON.stringify({
@@ -333,9 +405,9 @@ export function renderMeetingPage() {
       paused = false
       setActive(true)
       timer = setInterval(() => $('clock').textContent = time(elapsed()), 500)
-      poll = setInterval(refresh, 2000)
+      poll = setInterval(() => refresh({quiet:true}), 2000)
       log('Reunión iniciada: ' + meetingId)
-      await refresh()
+      await refresh({quiet:true})
     } catch(e){ log('No se pudo iniciar: ' + e.message) }
   }
 
@@ -346,7 +418,9 @@ export function renderMeetingPage() {
       })
       await attachAudio(stream,'microphone')
       $('mic').disabled = true
-      log('Micrófono activo.')
+      const first = $('platform').value === 'room' ? roomChunkSeconds() : 8
+      log('Micrófono activo · primer bloque ~' + first + ' s.')
+      render()
     } catch(e){ log('Micrófono: ' + e.message) }
   }
 
@@ -393,7 +467,7 @@ export function renderMeetingPage() {
       clearInterval(poll); clearInterval(timer)
       setActive(false)
       $('vtt').disabled = false; $('analyze').disabled = false
-      await refresh()
+      await refresh({quiet:true})
       log('Reunión terminada. Transcript guardado localmente.')
     } catch(e){log('Fin: ' + e.message)}
   }
@@ -408,7 +482,7 @@ export function renderMeetingPage() {
       })
       const data = await res.json().catch(()=>({}))
       if(!res.ok) throw new Error(data.message || 'import failed')
-      await refresh()
+      await refresh({quiet:true})
       log('Teams importado: ' + data.importedTurns + ' intervenciones; nombres reconciliados.')
     } catch(e){log('Teams VTT: ' + e.message)}
   }
@@ -443,6 +517,7 @@ export function renderMeetingPage() {
   }
 
   setActive(false)
+  render()
 })()
 </script>
 </body>
