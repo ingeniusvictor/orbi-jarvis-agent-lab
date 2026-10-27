@@ -26,6 +26,7 @@ if not exist "node_modules\vite\bin\vite.js" (
 rem Temporary, process-only overrides. Never edit .env.local, change Git
 rem branches, persist secrets, enable write permissions or request API access.
 rem The local Ollama/Kokoro/Whisper runtime may still need to be installed.
+set "VITE_BACKEND=bridge"
 set "ORBIA_BRAIN_PROVIDER=ollama"
 set "JARVIS_PROVIDER=ollama"
 set "ORBIA_BRAIN_DEFAULT=ollama"
