@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { inspectVoicePreflight } from './lumia-voice-preflight.mjs'
+import { createRealtimeGrantService } from '../bridge/orbia/realtime-grants.mjs'
 
 const safeEnv = {
   JARVIS_BRIDGE_PORT: '8787',
@@ -40,6 +41,56 @@ assert.equal(online.bridge.stt, 'local')
 assert.equal(online.bridge.tts, 'local')
 assert.equal(calls.length, 3)
 assert.equal(calls.filter(v => v.method === 'POST').length, 2)
+
+assert.deepEqual(calls.filter(v => v.method === 'POST').map(v => v.headers.Origin ?? null),
+  [null, 'http://realtime-preflight.invalid'],
+  'Preflight must NEVER send a wrong PIN from an allowed local origin.')
+
+// Regression: a technician can run the local preflight repeatedly without
+// consuming five failed-PIN attempts and accidentally locking out the owner.
+// The broker is REAL; only its upstream paid provider is simulated.
+let providerCalls = 0
+const PIN = 'long-local-pin-for-regression-only'
+const realBroker = createRealtimeGrantService({
+  env: {
+    ORBIA_REALTIME_EXPERIMENT: '1',
+    OPENAI_API_KEY: 'dummy-do-not-bill-test-key',
+    ORBIA_REALTIME_OWNER_PIN: PIN,
+  },
+  now: () => 45000,
+  fetchFn: async () => {
+    providerCalls++
+    return new Response(JSON.stringify({ value: 'ek_ci-fake', expires_at: 999999 }),
+      { status: 200, headers: { 'content-type': 'application/json' } })
+  },
+})
+const brokerBridge = async (url, opts) => {
+  if (url.endsWith('/health')) {
+    return new Response(JSON.stringify({
+      ok: true,
+      voice: { effective: { effectiveStt: 'local', effectiveTts: 'local' } },
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  const result = await realBroker.grant({
+    origin: opts.headers.Origin,
+    pin: opts.headers['x-orbia-realtime-pin'],
+    bridgePort: 8787,
+  })
+  return new Response(JSON.stringify(result.body), { status: result.status })
+}
+for (let i = 0; i < 8; i++) {
+  const check = await inspectVoicePreflight({
+    env: safeEnv, platform: 'win32', nodeVersion: '22.9.0',
+    live: true, fetchFn: brokerBridge,
+  })
+  assert.equal(check.pass, true, 'Repeated safe preflight must remain valid.')
+}
+assert.equal(providerCalls, 0, 'Preflight must not mint any billable secret.')
+assert.equal(realBroker.remaining(), 2, 'Preflight must not use a pilot credential.')
+const ownerTrial = await realBroker.grant({ origin: 'http://localhost:5173', pin: PIN })
+assert.equal(ownerTrial.status, 200, 'Owner must not be locked out by repeated preflight.')
+assert.equal(providerCalls, 1)
+
 
 const oldNode = await inspectVoicePreflight({
   env: safeEnv, platform: 'win32', nodeVersion: '18.0.0', live: false,
