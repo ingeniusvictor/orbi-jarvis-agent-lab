@@ -59,7 +59,41 @@ llaman a ningún proveedor de pago. No afirman medir el micrófono.
 
 Si falta el bridge o no protege los POST sin autorización: FAIL.
 
-## 3. Prueba de voz habitual (sin API de pago)
+## 3. Laboratorio acústico local en el navegador (SIN API)
+
+VL-06 ahora incluye un panel manual opcional para comprobar la señal del
+micrófono y la salida de sonido con Chrome/Edge y Windows.
+
+En el .env.local PRIVADO del frontend, añade:
+
+    VITE_LUMIA_ACOUSTIC_LAB=1
+
+Reinicia el frontend mediante el procedimiento normal. Esta variable NO
+habilita la API Realtime ni ElevenLabs, y no requiere claves de pago.
+
+Tras iniciar LUMIA, aparece a la izquierda el botón
+"LUMIA · LAB ACÚSTICO". Pulsa el botón, luego "Iniciar micrófono".
+El sistema suspende el reconocimiento habitual mientras dura la prueba
+para evitar que LUMIA responda al tono.
+
+Habla durante 5 a 10 segundos y observa nivel actual y pico dBFS.
+Pulsando "Reproducir tono 0,5 s" se envía un sonido de 440 Hz al dispositivo
+predeterminado de salida; confirma manualmente si realmente lo oíste.
+El micrófono NO se conecta a los altavoces, no hay monitorización de tu propia
+voz, no se guardan grabaciones y no se transmiten audios.
+
+Pulsa "Terminar" o espera el límite de seguridad de 45 segundos. LUMIA
+debe volver a su reconocimiento local. El botón "Copiar resultado sin audio"
+exporta solo un resumen numérico; el indicador de pico NO prueba por sí solo
+que el reconocimiento lingüístico funcione. Deshabilita la bandera después
+de terminar las pruebas.
+
+**Exclusión:** el Laboratorio y la sesión Realtime usan propiedad exclusiva
+del micrófono; no pueden ejecutarse ambos simultáneamente. Durante cualquiera
+de las pruebas se descartan transcripciones tardías y teclas de inicio del
+asistente normal. No se fusionan a producción sin una prueba Windows real.
+
+## 4. Prueba de voz habitual (sin API de pago)
 
 Dejar sin activar estas banderas experimentales:
 VITE_LUMIA_REALTIME_EXPERIMENT,
@@ -86,7 +120,7 @@ Los tiempos de "primer texto"/"primera voz" de la respuesta normal
 se miden desde la aceptación del comando, NO desde el fin físico de
 la voz. No confundir con la nueva métrica WebRTC.
 
-## 4. Opcional: piloto Realtime de pago, SOLO con autorización
+## 5. Opcional: piloto Realtime de pago, SOLO con autorización
 
 No habilitar por defecto. ChatGPT Plus no incluye créditos de API.
 
@@ -129,7 +163,7 @@ Recopilar 10+ muestras por configuración antes de comparar medianas
 y P95. Las métricas no se guardan automáticamente ni se transmiten
 a GitHub.
 
-## 5. Condiciones para aceptar o revertir
+## 6. Condiciones para aceptar o revertir
 
 Aprobación de audio físico requiere todas estas verificaciones:
 - sin audio de LUMIA tras cancelar/ocultar la pestaña;
@@ -143,7 +177,7 @@ Aprobación de audio físico requiere todas estas verificaciones:
 Cualquier error debe documentarse con pasos reproducibles, sin datos
 privados. El fallo de la prueba física bloquea la integración.
 
-## 6. Orden de PR
+## 7. Orden de PR
 
 VL-01 #13 -> VL-02 #14 -> VL-03 #15 -> VL-04 #16 ->
 VL-05 #17 -> VL-05B #18 -> VL-06.
