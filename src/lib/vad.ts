@@ -268,11 +268,13 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
       const runFor = now - speechStartedAt
       // Speech duration is the last *voiced* point, not total wall time.
       // Otherwise a very short word could switch policy during its silence.
-      const endpointMs = chooseAcousticSilenceMs({
-        voicedDurationMs: Math.max(0, lastLoud - speechStartedAt),
-        adaptive: Boolean(h.adaptiveEndpointing?.()),
-        guarded: guard,
-      })
+      const endpointMs = h.adaptiveEndpointing?.()
+        ? chooseAcousticSilenceMs({
+            voicedDurationMs: Math.max(0, lastLoud - speechStartedAt),
+            adaptive: true,
+            guarded: guard,
+          })
+        : SILENCE_MS
       if (quietFor >= endpointMs || runFor >= MAX_MS) {
         h.onEndpointWindow?.(endpointMs)
         armedAt = 0
