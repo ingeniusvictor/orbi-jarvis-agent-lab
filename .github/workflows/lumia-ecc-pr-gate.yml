@@ -51,6 +51,9 @@ jobs:
       - name: VL-02 Voice latency policy certification
         run: npx tsx scripts/certify-lumia-voice-latency-vl02.ts
 
+      - name: VL-03 Adaptive turn-taking certification
+        run: npx tsx scripts/certify-lumia-adaptive-turns-vl03.ts
+
       - name: Production build
         run: npm run build
 
