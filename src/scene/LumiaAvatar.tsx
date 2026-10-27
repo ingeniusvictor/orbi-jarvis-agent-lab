@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useStore } from '../store'
+import { isFaceOnlyAvatar } from './avatar-profile'
 import type { Drive } from './Scene'
 
 const MODEL_URL = '/models/lumia/lumia.glb'
@@ -36,21 +37,6 @@ const OPTICAL_LIFT = 0.095
  * to the right of the reactor centre, so correct that in screen space.
  */
 const OPTICAL_SHIFT_PX = -28
-const FACE_MODEL_PROFILE = 'face-v1'
-
-/**
- * The Windows installer preserves the original path and adds a metadata marker
- * to its replacement GLB. Only marked face-only models get a new optical fit;
- * the existing full-body mascot is unaffected, and the owner can restore the
- * original GLB without modifying code.
- */
-function isFaceOnlyAvatar(scene: THREE.Object3D): boolean {
-  let isFace = false
-  scene.traverse((node) => {
-    if (node.userData?.lumiaAvatarProfile === FACE_MODEL_PROFILE) isFace = true
-  })
-  return isFace
-}
 
 function cloneMaterial(
   material: THREE.Material,
