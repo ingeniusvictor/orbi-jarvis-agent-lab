@@ -131,6 +131,9 @@ export async function startRealtimeVoiceTrial({
   channel.onopen = () => {
     if (!stopped) onState('listening')
   }
+  channel.onclose = () => {
+    if (!stopped) fail('Se cerró el canal Realtime. Regresé a la voz habitual.')
+  }
   channel.onmessage = (event) => {
     if (stopped) return
     let data: { type?: string }
@@ -161,6 +164,13 @@ export async function startRealtimeVoiceTrial({
     const track = mic.getAudioTracks()[0]
     if (!track) throw new Error('No hay una pista de micrófono disponible.')
     clone = track.clone()
+    // Stopping a shared device is not the same as intentionally ending this
+    // session. When Windows removes a headset or microphone, the cloned track
+    // may end even though WebRTC still reports "connected". Stop promptly
+    // rather than leaving a billable call silently active.
+    clone.addEventListener('ended', () => {
+      fail('El micrófono se desconectó. Cerré la llamada Realtime.')
+    }, { once: true })
     pc.addTrack(clone)
     const auth = await fetch(BRIDGE_HTTP_URL + '/voice/realtime/client-secret', {
       method: 'POST',
