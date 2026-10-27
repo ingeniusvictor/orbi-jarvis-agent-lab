@@ -575,8 +575,11 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
       if (cancelled) return
       // A failed generation is not a failed turn — drop to the system voice.
       if (source) {
-        await playUrl(source, item.text)
-        return
+        const played = await playUrl(source, item.text)
+        // If an opted-in MSE stream failed before producing *any* sound, use
+        // the existing system-voice recovery. Never repeat words that already
+        // became audible, even if the network fails mid-sentence.
+        if (played || cancelled || typeof source === 'string') return
       }
 
       const spoke = await speakNative(item.text)
@@ -733,7 +736,7 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
     })
 
   const playUrl = (source: AudioSource, text: string) =>
-    new Promise<void>((resolve) => {
+    new Promise<boolean>((resolve) => {
       const url = typeof source === 'string' ? source : source.url
       const audio = new Audio(url)
       diag.transport = typeof source === 'string' ? 'buffered' : 'mse-stream'
@@ -796,7 +799,7 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
         if (beganPlaying) markOutputAudible(false)
         releaseSource(source)
         if (currentAudio === audio) currentAudio = null
-        resolve()
+        resolve(beganPlaying)
       }
       // Sound is genuinely coming out. This is the cloud/neural counterpart of
       // SpeechSynthesisUtterance.onstart, and it is what makes the diagnostics
