@@ -65,7 +65,7 @@ Si falta el bridge o no protege los POST sin autorización: FAIL.
 
 ## Opción rápida para Windows: un solo archivo y sin cambiar .env.local
 
-Con la rama VL-06 actualizada y \`npm ci\` ejecutado, haz doble clic en:
+Con la rama VL-06 actualizada y `npm ci` ejecutado, haz doble clic en:
 
     PROBAR_VOZ_LOCAL_LUMIA_WINDOWS.cmd
 
@@ -108,8 +108,12 @@ predeterminado de salida; confirma manualmente si realmente lo oíste.
 El micrófono NO se conecta a los altavoces, no hay monitorización de tu propia
 voz, no se guardan grabaciones y no se transmiten audios.
 
-Pulsa "Terminar" o espera el límite de seguridad de 45 segundos. LUMIA
-debe volver a su reconocimiento local. El botón "Copiar resultado sin audio"
+Pulsa "Terminar" o espera el límite de seguridad de 45 segundos, que
+empieza **antes de solicitar permisos de micrófono**. Si Windows desconecta
+el dispositivo o la pestaña pasa a segundo plano, el laboratorio termina
+la captura y devuelve el control a LUMIA. La respuesta tardía del diálogo
+de permisos no debe volver a activar la medición. LUMIA debe recuperar su
+reconocimiento local. El botón "Copiar resultado sin audio"
 exporta solo un resumen numérico; el indicador de pico NO prueba por sí solo
 que el reconocimiento lingüístico funcione. Deshabilita la bandera después
 de terminar las pruebas.
@@ -161,8 +165,10 @@ Antes de ello, establecer límites de gasto apropiados en el proveedor.
 No grabar ni subir claves, PINs o muestras de voz a GitHub.
 
 Hacer la primera prueba con auriculares, y comprobar que la llamada
-se corta voluntariamente, al ocultar la pestaña, por red fallida y
-por límite de 90s. Se permite un máximo de dos concesiones por
+se corta voluntariamente, al ocultar la pestaña, por red fallida,
+al desconectar el micrófono USB/Bluetooth, si se cierra inesperadamente
+el canal de eventos WebRTC, y por límite de 90s. Al cerrar la pestaña
+no se debe arrancar un nuevo reconocimiento de voz desde callbacks tardíos. Se permite un máximo de dos concesiones por
 arranque del bridge. Reiniciar el proceso reinicia ese contador.
 
 ### Nuevo medidor VL-06
