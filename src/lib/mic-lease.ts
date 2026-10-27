@@ -23,7 +23,7 @@ export function createSharedMic(open: () => Promise<MediaStream>): () => Promise
       current = null
     }
 
-    const attempt = Promise.resolve()
+    const attempt: Promise<MediaStream> = Promise.resolve()
       .then(open)
       .then((fresh) => {
         if (!fresh.getAudioTracks().some((track) => track.readyState === 'live')) {
