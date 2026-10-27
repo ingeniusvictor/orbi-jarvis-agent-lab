@@ -60,6 +60,10 @@ type TtsDiag = {
   lastText: string
   firstTextMs: number | null
   firstAudioMs: number | null
+  streamOptIn: boolean
+  transport: string
+  streamChunks: number
+  streamFailures: number
 }
 
 const ago = (t: number) => (t ? `${((Date.now() - t) / 1000).toFixed(1)}s ago` : '—')
@@ -165,6 +169,10 @@ export function Diagnostics() {
       <Row k="voice" v={String(t.voice || '—')} />
       <Row k="first model text" v={t.firstTextMs == null ? '—' : `${t.firstTextMs} ms`} />
       <Row k="first audible word" v={t.firstAudioMs == null ? '—' : `${t.firstAudioMs} ms`} />
+      <Row k="cloud audio streaming" v={t.streamOptIn ? 'ON · experimental' : 'OFF · legacy'} />
+      <Row k="audio transport" v={String(t.transport ?? 'buffered')} />
+      <Row k="MP3 stream chunks" v={String(t.streamChunks ?? 0)} />
+      <Row k="MP3 stream failures" v={String(t.streamFailures ?? 0)} bad={(t.streamFailures ?? 0) > 0} />
       <Row k="handed to OS" v={String(t.spoken ?? 0)} />
       <Row k="actually spoke" v={String(t.started ?? 0)} bad={(t.started ?? 0) === 0} />
       <Row k="failures" v={String(t.failures ?? 0)} bad={(t.failures ?? 0) > 0} />
