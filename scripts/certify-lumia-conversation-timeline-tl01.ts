@@ -38,6 +38,7 @@ const heard: HeardLine[] = [{
 }]
 const result = exportConversationTimeline({
   heard, turns: [user, speaking, failed], at: base + 43000,
+  error: 'Bridge caído durante segunda pregunta', errorAt: after,
 })
 assert.match(result, /STT 4200 ms/)
 assert.match(result, /39\.00 s/)
