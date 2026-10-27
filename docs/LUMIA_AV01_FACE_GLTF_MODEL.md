@@ -61,6 +61,28 @@ Para revertir: restaurar el GLB respaldado en su ruta original
 y recargar la pestaña. El componente AV-01 detectará la ausencia del
 marcador y volverá a usar el perfil óptico clásico.
 
+## AV-01B — Encaje del rostro en el reactor (captura de Windows)
+
+En la captura del 27 de octubre, el cabello quedaba demasiado cerca del
+borde superior del círculo y el avatar estaba algo desplazado a la izquierda.
+
+Ajuste exclusivo del perfil GLB `face-v1`:
+
+- Altura de referencia: `0.52 → 0.47` del lado menor del viewport
+  (aproximadamente un 9,6 % menos que el encuadre AV-01).
+- Desplazamiento horizontal: `0 → +25 px CSS` hacia la derecha.
+- Sin cambios de escala/posición para el personaje clásico: conserva la
+  escala de `0.45`, corrección `-28 px` y elevación óptica original.
+- Sin volver a exportar, reemplazar ni modificar el GLB instalado: son
+  parámetros de la escena React Three Fiber.
+
+Para ver el cambio sobre el rostro ya instalado en Windows, actualizar
+**la rama de código** `feature/lumia-avatar-face-av01` mediante Git
+sin forzar un reset ni perder modificaciones locales, reiniciar el servidor
+de desarrollo si procede y recargar Chrome con `Ctrl + Shift + R`.
+**La instalación del ZIP anterior por sí sola no aplica este nuevo ajuste
+de código.** El archivo GLB y el respaldo local se conservan.
+
 ## Verificación pendiente
 
 La compilación y las pruebas automáticas NO significan que la nueva
