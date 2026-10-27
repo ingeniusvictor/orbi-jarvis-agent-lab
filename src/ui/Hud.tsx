@@ -254,7 +254,7 @@ export function Hud() {
           <button type="button" className="conversation-copy"
             title="Copiar las transcripciones y los tiempos de esta sesión; no envía datos automáticamente"
             onClick={() => {
-              const text = exportConversationTimeline({ heard: heardLines, turns, at: now })
+              const text = exportConversationTimeline({ heard: heardLines, turns, at: now, error, errorAt })
               void navigator.clipboard.writeText(text)
                 .then(() => setCopyState('copied'))
                 .catch(() => setCopyState('error'))
