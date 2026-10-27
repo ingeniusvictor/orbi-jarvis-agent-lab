@@ -9,7 +9,7 @@ const DATE = new Intl.DateTimeFormat('es-CL', {
   weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
 })
 
-export function timeLabel(ms: number | undefined): string {
+export function timeLabel(ms: number | null | undefined): string {
   if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) return '—'
   const t = new Date(ms)
   return `${CLOCK.format(t)}.${String(t.getMilliseconds()).padStart(3, '0')}`
