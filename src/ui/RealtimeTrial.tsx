@@ -30,8 +30,10 @@ export function RealtimeTrial({
   const aborting = useRef<AbortController | null>(null)
   const suspended = useRef(false)
   const stopping = useRef(false)
+  const disposed = useRef(false)
 
   const stop = useCallback(() => {
+    if (disposed.current) return
     // Aborting a handshake synchronously invokes its "closed" callback.
     // Mark recovery before aborting so nested callbacks cannot start two
     // microphone/Whisper loops or restore an already-ended conversation.
@@ -53,9 +55,21 @@ export function RealtimeTrial({
     }
   }, [onResumeNormal])
 
-  useEffect(() => () => {
-    aborting.current?.abort()
-    active.current?.stop()
+  useEffect(() => {
+    disposed.current = false
+    return () => {
+      // A "closed" callback is invoked during abort. On unmount the entire
+      // assistant may be shutting down; never resume a recognizer or set state
+      // into the component that no longer exists.
+      disposed.current = true
+      suspended.current = false
+      const controller = aborting.current
+      aborting.current = null
+      const call = active.current
+      active.current = null
+      controller?.abort()
+      call?.stop()
+    }
   }, [])
 
   const start = async () => {
@@ -78,6 +92,7 @@ export function RealtimeTrial({
         signal: controller.signal,
         onMetrics: setMetrics,
         onState: (next, note) => {
+          if (disposed.current || controller.signal.aborted) return
           if (note) setMessage(note)
           if (next === 'closed') stop()
           else setState(next)
@@ -86,7 +101,7 @@ export function RealtimeTrial({
       if (controller.signal.aborted) result.stop()
       else active.current = result
     } catch (error) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && !disposed.current) {
         setMessage(error instanceof Error ? error.message : 'No se pudo conectar.')
       }
       stop()
