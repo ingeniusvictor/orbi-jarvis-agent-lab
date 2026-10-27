@@ -48,13 +48,26 @@ export async function startRealtimeVoiceTrial({
   let clone: MediaStreamTrack | null = null
   let stopped = false
   let closed = false
-  let timer: ReturnType<typeof setTimeout> | null = null
+  // Bound total trial life from the first click, not from the *end* of the
+  // handshake. This prevents an indefinite chargeable connection when SDP or
+  // device setup stalls. The pilot does NOT guarantee provider-side billing
+  // termination; the owner's API project limit remains essential.
+  const sessionAbort = new AbortController()
+  let trialTimer: ReturnType<typeof setTimeout> | null = null
+  let handshakeTimer: ReturnType<typeof setTimeout> | null = null
+  let disconnectedTimer: ReturnType<typeof setTimeout> | null = null
 
   const stop = () => {
     if (stopped) return
     stopped = true
-    if (timer) clearTimeout(timer)
-    channel.close()
+    sessionAbort.abort()
+    signal?.removeEventListener('abort', stop)
+    if (trialTimer) clearTimeout(trialTimer)
+    if (handshakeTimer) clearTimeout(handshakeTimer)
+    if (disconnectedTimer) clearTimeout(disconnectedTimer)
+    document.removeEventListener('visibilitychange', onVisibility)
+    window.removeEventListener('pagehide', stop)
+    try { channel.close() } catch { /* already closed */ }
     clone?.stop()
     playback.pause()
     playback.srcObject = null
@@ -64,7 +77,21 @@ export async function startRealtimeVoiceTrial({
       onState('closed')
     }
   }
+  const fail = (message: string) => {
+    if (stopped) return
+    onState('error', message)
+    stop()
+  }
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden') stop()
+  }
   signal?.addEventListener('abort', stop, { once: true })
+  document.addEventListener('visibilitychange', onVisibility)
+  window.addEventListener('pagehide', stop, { once: true })
+  trialTimer = setTimeout(stop, REALTIME_TRIAL_MAX_MS)
+  handshakeTimer = setTimeout(() => {
+    fail('La conexión tardó demasiado. Cerré el micrófono y volví a LUMIA local.')
+  }, 20_000)
   const ensureActive = () => {
     if (stopped || signal?.aborted) throw new Error('Conexión cancelada.')
   }
@@ -75,15 +102,26 @@ export async function startRealtimeVoiceTrial({
     if (remote) {
       playback.srcObject = remote
       void playback.play().catch(() => {
-        if (!stopped) onState('error', 'Tu navegador bloqueó la reproducción. Permite el audio y vuelve a intentarlo.')
+        fail('Tu navegador bloqueó la reproducción. Permite el audio y vuelve a intentarlo.')
       })
     }
   }
   pc.onconnectionstatechange = () => {
     if (stopped) return
-    if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-      onState('error', 'Se perdió la conexión de voz en tiempo real.')
-      stop()
+    const state = pc.connectionState
+    if (state === 'failed' || state === 'closed') {
+      fail('Se perdió la conexión de voz en tiempo real.')
+    } else if (state === 'disconnected' && !disconnectedTimer) {
+      // Wi-Fi handover can briefly disconnect without an actual failure.
+      disconnectedTimer = setTimeout(() => {
+        disconnectedTimer = null
+        if (!stopped && pc.connectionState === 'disconnected') {
+          fail('La conexión no se recuperó. Regresé a la voz local.')
+        }
+      }, 5000)
+    } else if (state === 'connected' && disconnectedTimer) {
+      clearTimeout(disconnectedTimer)
+      disconnectedTimer = null
     }
   }
   channel.onopen = () => {
@@ -123,7 +161,7 @@ export async function startRealtimeVoiceTrial({
       headers: { 'x-orbia-realtime-pin': pin, 'content-type': 'application/json' },
       body: '{}',
       cache: 'no-store',
-      signal,
+      signal: sessionAbort.signal,
     })
     ensureActive()
     if (!auth.ok) {
@@ -152,7 +190,7 @@ export async function startRealtimeVoiceTrial({
         'Content-Type': 'application/sdp',
       },
       body: pc.localDescription?.sdp ?? offer.sdp,
-      signal,
+      signal: sessionAbort.signal,
     })
     ensureActive()
     if (!answer.ok) throw new Error('No se pudo establecer la llamada WebRTC.')
@@ -160,13 +198,12 @@ export async function startRealtimeVoiceTrial({
     ensureActive()
     await pc.setRemoteDescription({ type: 'answer', sdp })
     ensureActive()
-
-    const limit = Math.min(
-      REALTIME_TRIAL_MAX_MS,
-      Math.max(0, Math.round(Number(grant.maxTrialSeconds) * 1000) ||
-        REALTIME_TRIAL_MAX_MS),
-    )
-    timer = setTimeout(stop, limit)
+    // The 90s lifetime has already been ticking since before requesting mic
+    // access, secrets and SDP. Never reset it when connection succeeds.
+    if (handshakeTimer) {
+      clearTimeout(handshakeTimer)
+      handshakeTimer = null
+    }
     return { stop }
   } catch (err) {
     stop()
