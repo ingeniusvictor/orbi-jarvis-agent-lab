@@ -20,8 +20,14 @@ markedNode.userData.lumiaAvatarProfile = 'face-v1'
 const component = readFileSync(new URL('../src/scene/LumiaAvatar.tsx', import.meta.url), 'utf8')
 assert.match(component, /const MODEL_URL = '\/models\/lumia\/lumia\.glb'/)
 assert.match(component, /const faceOnly = isFaceOnlyAvatar\(object\)/)
-assert.match(component, /prepared\.faceOnly \? 0\.52 : 0\.45/)
-assert.match(component, /prepared\.faceOnly \? 0 : OPTICAL_SHIFT_PX/)
+// Screenshot-driven AV-01B: head slightly smaller and 25 CSS pixels right.
+// Ensure profile only changes when the installed GLB is marked "face-v1".
+assert.match(component, /const FACE_HEIGHT_FRACTION = 0\.47/)
+assert.match(component, /const FACE_SHIFT_PX = 25/)
+assert.match(component, /prepared\.faceOnly \? FACE_HEIGHT_FRACTION : 0\.45/)
+assert.match(component, /prepared\.faceOnly \? FACE_SHIFT_PX : OPTICAL_SHIFT_PX/)
+assert.match(component, /const OPTICAL_SHIFT_PX = -28/)
+assert.match(component, /const OPTICAL_LIFT = 0\.095/)
 assert.match(component, /prepared\.faceOnly \? 0 : OPTICAL_LIFT/)
 assert.match(component, /cloneMaterial\(child\.material, reactive, faceOnly\)/)
 assert.match(component, /clone\.emissiveIntensity = faceOnly \? 0\.12 : 0\.34/)
