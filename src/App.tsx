@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Scene } from './scene/Scene'
 import { Hud } from './ui/Hud'
 import { Boot } from './ui/Boot'
 import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
 import { RealtimeTrial } from './ui/RealtimeTrial'
+import { AcousticLab } from './ui/AcousticLab'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
 import {
@@ -116,6 +117,10 @@ export default function App() {
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const voicePoll = useRef<ReturnType<typeof setInterval> | null>(null)
   const voiceRestart = useRef(0)
+  // Exclusive voice-device test ownership: the paid WebRTC trial and the
+  // local hardware test must NEVER share the normal assistant mic loop.
+  const experimentOwner = useRef<'realtime' | 'acoustic' | null>(null)
+  const [activeExperiment, setActiveExperiment] = useState<'realtime' | 'acoustic' | null>(null)
 
   // -- helpers --------------------------------------------------------------
 
@@ -270,9 +275,10 @@ export default function App() {
 
   /** What the voice loop should do with what it hears, derived from phase. */
   const mode = (): VoiceMode =>
-    voiceModeForPhase(store.getState().phase)
+    experimentOwner.current ? 'deaf' : voiceModeForPhase(store.getState().phase)
 
   const onWake = (trailing: string) => {
+    if (experimentOwner.current) return
     const phase = store.getState().phase
     if (phase === 'offline' || phase === 'boot') return
 
@@ -315,6 +321,7 @@ export default function App() {
    * immediately, whatever he was doing.
    */
   const onSpeechStart = () => {
+    if (experimentOwner.current) return
     clearIdle()
     const phase = store.getState().phase
     if (phase === 'offline' || phase === 'boot' || phase === 'dormant') return
@@ -342,6 +349,7 @@ export default function App() {
   }
 
   const onUtterance = (text: string) => {
+    if (experimentOwner.current) return
     const phase = store.getState().phase
     if (phase === 'offline' || phase === 'boot' || phase === 'dormant') return
 
@@ -361,10 +369,12 @@ export default function App() {
   }
 
   const onPartial = (text: string) => {
+    if (experimentOwner.current) return
     store.getState().setCaption(text)
   }
 
   const onTranscript = (event: VoiceTranscriptEvent) => {
+    if (experimentOwner.current) return
     store.getState().pushHeardLine({
       id: event.id,
       text: event.text,
@@ -387,6 +397,8 @@ export default function App() {
   const restartVoice = async () => {
     const generation = ++voiceRestart.current
     voice.current?.stop()
+    voice.current = null
+    if (experimentOwner.current) return
 
     const next = await startVoice({
       mode,
@@ -398,7 +410,7 @@ export default function App() {
       onError: onVoiceError,
     })
 
-    if (generation !== voiceRestart.current) {
+    if (generation !== voiceRestart.current || experimentOwner.current) {
       next.stop()
       return
     }
@@ -695,6 +707,12 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      // Global shortcuts remain installed while a voice lab owns the mic.
+      // They must never start turns or speak over the test's acoustic output.
+      if (experimentOwner.current) {
+        if (e.key === 'Escape' || e.code === 'Space') e.preventDefault()
+        return
+      }
 
       // V auditions the next British voice installed on this machine. Which
       // ones exist varies per Mac, so hearing them beats trusting a ranking.
@@ -812,39 +830,58 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const suspendForExperiment = (owner: 'realtime' | 'acoustic'): boolean => {
+    if (experimentOwner.current) return false
+    experimentOwner.current = owner
+    setActiveExperiment(owner)
+    clearIdle()
+    invalidateVoiceRestart()
+    voice.current?.stop()
+    voice.current = null
+    silence()
+    turn.current++
+    interrupt()
+    music.working(false)
+    music.duck(false)
+    sfx.duck(false)
+    store.getState().setPhase('thinking')
+    return true
+  }
+
+  const resumeFromExperiment = (owner: 'realtime' | 'acoustic'): void => {
+    if (experimentOwner.current !== owner) return
+    // Release ownership before restarting; generation mismatches will reject
+    // any recognizer packets emitted from an older suspended voice instance.
+    experimentOwner.current = null
+    setActiveExperiment(null)
+    goDormant()
+    void restartVoice().catch((err: unknown) => {
+      store.getState().setError(
+        err instanceof Error ? err.message : 'No se pudo recuperar el reconocimiento local.',
+      )
+    })
+  }
+
   return (
     <>
       <Scene />
       <Hud />
       <Boot />
       <Diagnostics />
+      {import.meta.env.VITE_LUMIA_ACOUSTIC_LAB === '1' && (
+        <AcousticLab
+          available={phase !== 'offline' && phase !== 'boot' &&
+            (activeExperiment === null || activeExperiment === 'acoustic')}
+          onSuspendNormal={() => suspendForExperiment('acoustic')}
+          onResumeNormal={() => resumeFromExperiment('acoustic')}
+        />
+      )}
       {isRealtimePilotUiEnabled() && (
         <RealtimeTrial
-          available={phase !== 'offline' && phase !== 'boot'}
-          onSuspendNormal={() => {
-            // Never run the established Whisper/browser/agent voice loop at
-            // the same time as the owner-authorized realtime experiment.
-            clearIdle()
-            invalidateVoiceRestart()
-            voice.current?.stop()
-            silence()
-            turn.current++
-            interrupt()
-            music.working(false)
-            music.duck(false)
-            sfx.duck(false)
-            store.getState().setPhase('thinking')
-          }}
-          onResumeNormal={() => {
-            void restartVoice()
-              .then(() => goDormant())
-              .catch((err: unknown) => {
-                store.getState().setError(
-                  err instanceof Error ? err.message : 'No se pudo reanudar el reconocimiento local.',
-                )
-                goDormant()
-              })
-          }}
+          available={phase !== 'offline' && phase !== 'boot' &&
+            (activeExperiment === null || activeExperiment === 'realtime')}
+          onSuspendNormal={() => suspendForExperiment('realtime')}
+          onResumeNormal={() => resumeFromExperiment('realtime')}
         />
       )}
       <Ignition onStart={() => void powerOn()} />
