@@ -249,6 +249,7 @@ type State = {
   turns: Turn[]
   activeTool: string | null
   error: string | null
+  errorAt: number | null
   connected: string[]
   /** Name of the speech-synthesis voice in use, shown in the HUD. */
   voice: string
@@ -313,6 +314,7 @@ export const useStore = create<State>((set) => ({
   turns: [],
   activeTool: null,
   error: null,
+  errorAt: null,
   connected: [],
   voice: '',
   gestures: false,
@@ -392,7 +394,7 @@ export const useStore = create<State>((set) => ({
       multiSpeakerLines: [...s.multiSpeakerLines.slice(-59), line],
     })),
   setActiveTool: (activeTool) => set({ activeTool }),
-  setError: (error) => set({ error }),
+  setError: (error) => set({ error, errorAt: error ? Date.now() : null }),
   setConnected: (connected) => set({ connected }),
   pushTurn: (turn) => set((s) => ({ turns: [...s.turns.slice(-40), turn] })),
   appendToLastTurn: (text) =>
