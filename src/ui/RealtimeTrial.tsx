@@ -16,7 +16,7 @@ export function RealtimeTrial({
   onResumeNormal,
 }: {
   available: boolean
-  onSuspendNormal: () => void
+  onSuspendNormal: () => boolean
   onResumeNormal: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -64,10 +64,13 @@ export function RealtimeTrial({
     setMetrics({ count: 0, lastMs: null, medianMs: null, p95Ms: null, interrupted: 0 })
     setPin('') // Never retain the owner PIN in component state after submission.
     const submittedPin = pin.trim()
+    if (!onSuspendNormal()) {
+      setMessage('Hay otra prueba de voz usando el micrófono. Ciérrala primero.')
+      return
+    }
     const controller = new AbortController()
     aborting.current = controller
     suspended.current = true
-    onSuspendNormal()
     setState('connecting')
     try {
       const result = await startRealtimeVoiceTrial({
