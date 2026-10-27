@@ -12,6 +12,8 @@ export const REALTIME_MODEL = 'gpt-realtime'
 export const REALTIME_VOICE = 'marin'
 export const REALTIME_MAX_SESSIONS_PER_BOOT = 2
 export const REALTIME_TRIAL_SECONDS = 90
+export const REALTIME_INVALID_PIN_LIMIT = 5
+export const REALTIME_LOCKOUT_MS = 5 * 60 * 1000
 
 const approvedHostname = new Set(['localhost', '127.0.0.1', '[::1]'])
 
@@ -87,31 +89,53 @@ export function createRealtimeGrantService({
 } = {}) {
   let granted = 0
   let busy = false
-  let lastAttempt = 0
+  let lastAttempt = null
+  let failedPinAttempts = 0
+  let lockedUntil = 0
 
   return {
     remaining: () => Math.max(0, REALTIME_MAX_SESSIONS_PER_BOOT - granted),
     async grant({ origin, pin, bridgePort = 8787 } = {}) {
-      // Generic errors prevent exposing whether the owner PIN was correct.
-      if (!validRealtimeOrigin(origin, bridgePort) || !realtimeReady(env) ||
-          !samePin(pin, env.ORBIA_REALTIME_OWNER_PIN)) {
-        return { status: 403, body: { ok: false, errorCode: 'REALTIME_NOT_AUTHORIZED' } }
+      // Strict, local-origin admission BEFORE attempting any credentials.
+      // Invalid PINs share one generic response and use a bounded lockout;
+      // an attacker must not be able to brute-force the owner's local PIN.
+      const denied = () => ({
+        status: 403, body: { ok: false, errorCode: 'REALTIME_NOT_AUTHORIZED' },
+      })
+      if (!validRealtimeOrigin(origin, bridgePort) || !realtimeReady(env)) {
+        return denied()
       }
+      const current = now()
+      if (current < lockedUntil) return denied()
+      if (!samePin(pin, env.ORBIA_REALTIME_OWNER_PIN)) {
+        failedPinAttempts++
+        if (failedPinAttempts >= REALTIME_INVALID_PIN_LIMIT) {
+          lockedUntil = current + REALTIME_LOCKOUT_MS
+          failedPinAttempts = 0
+        }
+        return denied()
+      }
+      failedPinAttempts = 0
       if (busy || granted >= REALTIME_MAX_SESSIONS_PER_BOOT ||
-          now() - lastAttempt < 3000) {
+          (lastAttempt !== null && current - lastAttempt < 3000)) {
         return { status: 429, body: { ok: false, errorCode: 'REALTIME_PILOT_LIMIT' } }
       }
       // Reserve a trial before requesting an ephemeral token; never reissue
       // unbounded credentials after repeated upstream failures.
       busy = true
       granted++
-      lastAttempt = now()
+      lastAttempt = current
       try {
         const response = await fetchFn('https://api.openai.com/v1/realtime/client_secrets', {
           method: 'POST',
           headers: {
             Authorization: 'Bearer ' + env.OPENAI_API_KEY,
             'Content-Type': 'application/json',
+            // A stable pseudonymous value created only on the trusted server.
+            // Never send the raw owner PIN or other personal identifiers.
+            'OpenAI-Safety-Identifier': createHash('sha256')
+              .update('lumia-owner-realtime:' + env.ORBIA_REALTIME_OWNER_PIN)
+              .digest('hex'),
           },
           body: JSON.stringify(realtimeSessionConfig()),
           signal: AbortSignal.timeout(10000),
