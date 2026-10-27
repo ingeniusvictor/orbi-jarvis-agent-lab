@@ -72,6 +72,9 @@ jobs:
       - name: VL-06 Shared mic lease and Windows device recovery
         run: npx tsx scripts/certify-lumia-mic-lease-vl06.ts
 
+      - name: VL-06 Whisper repeated acoustic-label regression
+        run: npx tsx scripts/certify-lumia-whisper-background-vl06.ts
+
       - name: VL-06 Safe Windows preflight contract
         run: node scripts/certify-lumia-windows-preflight-vl06.mjs
 
