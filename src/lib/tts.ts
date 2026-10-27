@@ -10,6 +10,17 @@ import {
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
 import { findEarlySpeechBoundary } from './first-audio-chunk'
+import { createStreamingMp3, type StreamedAudio } from './streaming-mp3'
+
+/** Owner-enabled desktop experiment. Default stays full-file playback. */
+const CLOUD_AUDIO_STREAMING = import.meta.env.VITE_LUMIA_STREAMING_TTS === '1'
+
+type AudioSource = string | StreamedAudio
+
+function disposeAudioSource(source: AudioSource): void {
+  if (typeof source === 'string') URL.revokeObjectURL(source)
+  else source.dispose()
+}
 
 /**
  * Speech output.
@@ -106,6 +117,11 @@ export const diag = {
   // No transcripts, credentials or voice samples are stored in these fields.
   firstTextMs: null as number | null,
   firstAudioMs: null as number | null,
+  /** Streaming opt-in is separate from the active output format. */
+  streamOptIn: CLOUD_AUDIO_STREAMING,
+  transport: 'buffered' as 'buffered' | 'mse-stream',
+  streamChunks: 0,
+  streamFailures: 0,
 }
 
 if (typeof window !== 'undefined') {
@@ -418,7 +434,7 @@ function shape(text: string): string {
 type Item = {
   text: string
   /** Generation starts one sentence ahead, not all at once. */
-  audio?: Promise<string | null> | null
+  audio?: Promise<AudioSource | null> | null
 }
 
 export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
@@ -437,6 +453,12 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
   }
 
   let currentAudio: HTMLAudioElement | null = null
+  const audioAbort = new AbortController()
+  const ownedSources = new Set<AudioSource>()
+  const releaseSource = (source: AudioSource) => {
+    ownedSources.delete(source)
+    disposeAudioSource(source)
+  }
   let nativeInFlight = false
   let drained: Array<() => void> = []
 
@@ -467,7 +489,7 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
   }
 
   /** null means "no audio pipeline, use the system voice directly". */
-  function synthesise(text: string): Promise<string | null> | null {
+  function synthesise(text: string): Promise<AudioSource | null> | null {
     const runtime = caps().voice
     const requested = runtime?.requested?.ttsMode ?? 'auto'
     const localReady = Boolean(runtime?.local?.ttsAvailable)
@@ -487,6 +509,7 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
       return fetchLocalAudio(
         text,
         runtime?.activeProfile?.speakerRef ?? 'ef_dora',
+        audioAbort.signal,
       ).catch(() => null)
     }
 
@@ -494,7 +517,7 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
     // enough hardware telemetry to decide when neural local TTS is worthwhile.
     if (USE_ELEVENLABS || caps().tts || nativeBroken) {
       diag.engine = 'elevenlabs'
-      return fetchCloudAudio(text).catch(() => null)
+      return fetchCloudAudio(text, audioAbort.signal).catch(() => null)
     }
     if (TTS_ENGINE === 'kokoro' && !kokoro.isUnavailable()) {
       diag.engine = 'kokoro'
@@ -506,7 +529,19 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
 
   /** Start generating an item's audio if it hasn't begun. */
   const prime = (item: Item | undefined) => {
-    if (item && item.audio === undefined) item.audio = synthesise(item.text)
+    if (!item || item.audio !== undefined) return
+    const pending = synthesise(item.text)
+    item.audio = pending ? pending.then((source) => {
+      if (!source) return null
+      // Primed audio can complete after a voice interruption. Do not leak the
+      // blob URL or keep streaming a sentence that will never be played.
+      if (cancelled) {
+        disposeAudioSource(source)
+        return null
+      }
+      ownedSources.add(source)
+      return source
+    }) : null
   }
 
   async function pump(): Promise<void> {
@@ -536,11 +571,11 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
     if (cancelled) return
     setSpeaking(item.text)
     try {
-      const url = item.audio ? await item.audio : null
+      const source = item.audio ? await item.audio : null
       if (cancelled) return
       // A failed generation is not a failed turn — drop to the system voice.
-      if (url) {
-        await playUrl(url, item.text)
+      if (source) {
+        await playUrl(source, item.text)
         return
       }
 
@@ -558,10 +593,13 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
         diag.engine = 'elevenlabs'
         console.warn('[jarvis] system voice is not producing sound — using the bridge speech proxy from here on')
       }
-      const rescue = await fetchCloudAudio(item.text).catch(() => null)
+      const rescue = await fetchCloudAudio(item.text, audioAbort.signal).catch(() => null)
       if (rescue && !cancelled) {
+        ownedSources.add(rescue)
         diag.rescued++
         await playUrl(rescue, item.text)
+      } else if (rescue) {
+        disposeAudioSource(rescue)
       }
     } finally {
       if (speaking === item.text) setSpeaking('')
@@ -694,9 +732,11 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
       speechSynthesis.speak(u)
     })
 
-  const playUrl = (url: string, text: string) =>
+  const playUrl = (source: AudioSource, text: string) =>
     new Promise<void>((resolve) => {
+      const url = typeof source === 'string' ? source : source.url
       const audio = new Audio(url)
+      diag.transport = typeof source === 'string' ? 'buffered' : 'mse-stream'
       currentAudio = audio
       // The generated path is an engine speaking just as much as the OS voice
       // is, so it keeps the same books. `spoken` counts the hand-off, `started`
@@ -739,13 +779,22 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
       tick()
 
       let done = false
+      let beganPlaying = false
+      // A media-source that never opens must not wedge the full conversation.
+      const startWatchdog = typeof source === 'string' ? null : setTimeout(() => {
+        if (done || beganPlaying) return
+        diag.streamFailures++
+        diag.lastError = 'stream-start-timeout'
+        finish()
+      }, 12000)
       const finish = () => {
         if (done) return
         done = true
+        if (startWatchdog) clearTimeout(startWatchdog)
         cancelAnimationFrame(raf)
         outLevel = 0.12
-        markOutputAudible(false)
-        URL.revokeObjectURL(url)
+        if (beganPlaying) markOutputAudible(false)
+        releaseSource(source)
         if (currentAudio === audio) currentAudio = null
         resolve()
       }
@@ -754,6 +803,7 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
       // verdict — and the T self-test — tell the truth on the premium path.
       audio.onplaying = () => {
         if (done || cancelled) return
+        beganPlaying = true
         markOutputAudible(true)
         notifyFirstAudio()
         diag.started++
@@ -859,10 +909,12 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
         // Leaving the engine cancelled is what silences every later sentence.
         speechSynthesis.resume()
       }
+      audioAbort.abort()
       if (currentAudio) {
         currentAudio.pause()
         currentAudio = null
       }
+      for (const source of ownedSources) releaseSource(source)
       outLevel = 0
       settleDrained()
     },
@@ -873,10 +925,12 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
 async function fetchLocalAudio(
   text: string,
   speaker: string,
+  signal?: AbortSignal,
 ): Promise<string | null> {
   if (BACKEND !== 'bridge') return null
   try {
     const res = await fetch(`${BRIDGE_HTTP_URL}/tts/local`, {
+      signal,
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text, speaker }),
@@ -890,26 +944,38 @@ async function fetchLocalAudio(
 
 /** Only used when USE_ELEVENLABS is on. Bridge proxy first (it already holds
  *  the key), then a direct key, then null to fall back to the native voice. */
-async function fetchCloudAudio(text: string): Promise<string | null> {
+async function fetchCloudAudio(text: string, signal?: AbortSignal): Promise<AudioSource | null> {
   if (BACKEND === 'bridge') {
     try {
       const res = await fetch(`${BRIDGE_HTTP_URL}/tts`, {
+        signal,
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      if (res.ok) return URL.createObjectURL(await res.blob())
+      if (res.ok) {
+        if (CLOUD_AUDIO_STREAMING && !signal?.aborted) {
+          const streamed = createStreamingMp3(res, {
+            onChunk: () => { diag.streamChunks++ },
+            onFailure: () => { diag.streamFailures++ },
+          })
+          if (streamed) return streamed
+        }
+        return URL.createObjectURL(await res.blob())
+      }
     } catch {
-      /* fall through */
+      /* fall through to the pre-existing direct provider if configured */
     }
   }
 
+  if (signal?.aborted) return null
   if (env.elevenKey) {
     try {
       const res = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${env.elevenVoiceId}/stream` +
           `?output_format=mp3_22050_32&optimize_streaming_latency=3`,
         {
+          signal,
           method: 'POST',
           headers: {
             'xi-api-key': env.elevenKey,
