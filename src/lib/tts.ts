@@ -60,7 +60,7 @@ const echoMemory: EchoMemoryItem[] = []
 
 /** Recognition lags the speakers by a few hundred milliseconds, so a sentence
  *  keeps arriving at the microphone well after it has finished playing. */
-const ECHO_TAIL_MS = 1800
+export const ECHO_TAIL_MS = 1800
 /** Local Whisper can finish decoding several seconds after playback began.
  *  Keep a bounded rolling reference of what L.U.M.I.A. actually attempted to
  *  say so an older sentence cannot come back as a fake second speaker. */
