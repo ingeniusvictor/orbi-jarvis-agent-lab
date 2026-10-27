@@ -9,6 +9,18 @@ import {
 } from '../config'
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
+import { findEarlySpeechBoundary } from './first-audio-chunk'
+import { createStreamingMp3, type StreamedAudio } from './streaming-mp3'
+
+/** Owner-enabled desktop experiment. Default stays full-file playback. */
+const CLOUD_AUDIO_STREAMING = import.meta.env.VITE_LUMIA_STREAMING_TTS === '1'
+
+type AudioSource = string | StreamedAudio
+
+function disposeAudioSource(source: AudioSource): void {
+  if (typeof source === 'string') URL.revokeObjectURL(source)
+  else source.dispose()
+}
 
 /**
  * Speech output.
@@ -59,7 +71,7 @@ const echoMemory: EchoMemoryItem[] = []
 
 /** Recognition lags the speakers by a few hundred milliseconds, so a sentence
  *  keeps arriving at the microphone well after it has finished playing. */
-const ECHO_TAIL_MS = 1800
+export const ECHO_TAIL_MS = 1800
 /** Local Whisper can finish decoding several seconds after playback began.
  *  Keep a bounded rolling reference of what L.U.M.I.A. actually attempted to
  *  say so an older sentence cannot come back as a fake second speaker. */
@@ -101,6 +113,15 @@ export const diag = {
   rescued: 0,
   voice: '',
   lastText: '',
+  // Timings from accepted utterance to first model text / audible speech.
+  // No transcripts, credentials or voice samples are stored in these fields.
+  firstTextMs: null as number | null,
+  firstAudioMs: null as number | null,
+  /** Streaming opt-in is separate from the active output format. */
+  streamOptIn: CLOUD_AUDIO_STREAMING,
+  transport: 'buffered' as 'buffered' | 'mse-stream',
+  streamChunks: 0,
+  streamFailures: 0,
 }
 
 if (typeof window !== 'undefined') {
@@ -413,17 +434,31 @@ function shape(text: string): string {
 type Item = {
   text: string
   /** Generation starts one sentence ahead, not all at once. */
-  audio?: Promise<string | null> | null
+  audio?: Promise<AudioSource | null> | null
 }
 
-export function createSpeaker(): Speaker {
+export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
   const queue: Item[] = []
   let buffer = ''
   let cancelled = false
   let outLevel = 0
   let pumping = false
+  // An explicit first-phrase fast path applies only once per speaker/answer.
+  let firstChunkQueued = false
+  let firstAudioNotified = false
+  const notifyFirstAudio = () => {
+    if (cancelled || firstAudioNotified) return
+    firstAudioNotified = true
+    onFirstAudioStart?.()
+  }
 
   let currentAudio: HTMLAudioElement | null = null
+  const audioAbort = new AbortController()
+  const ownedSources = new Set<AudioSource>()
+  const releaseSource = (source: AudioSource) => {
+    ownedSources.delete(source)
+    disposeAudioSource(source)
+  }
   let nativeInFlight = false
   let drained: Array<() => void> = []
 
@@ -449,11 +484,12 @@ export function createSpeaker(): Speaker {
     } else {
       queue.push(item)
     }
+    firstChunkQueued = true
     void pump()
   }
 
   /** null means "no audio pipeline, use the system voice directly". */
-  function synthesise(text: string): Promise<string | null> | null {
+  function synthesise(text: string): Promise<AudioSource | null> | null {
     const runtime = caps().voice
     const requested = runtime?.requested?.ttsMode ?? 'auto'
     const localReady = Boolean(runtime?.local?.ttsAvailable)
@@ -473,6 +509,7 @@ export function createSpeaker(): Speaker {
       return fetchLocalAudio(
         text,
         runtime?.activeProfile?.speakerRef ?? 'ef_dora',
+        audioAbort.signal,
       ).catch(() => null)
     }
 
@@ -480,7 +517,7 @@ export function createSpeaker(): Speaker {
     // enough hardware telemetry to decide when neural local TTS is worthwhile.
     if (USE_ELEVENLABS || caps().tts || nativeBroken) {
       diag.engine = 'elevenlabs'
-      return fetchCloudAudio(text).catch(() => null)
+      return fetchCloudAudio(text, audioAbort.signal).catch(() => null)
     }
     if (TTS_ENGINE === 'kokoro' && !kokoro.isUnavailable()) {
       diag.engine = 'kokoro'
@@ -492,7 +529,19 @@ export function createSpeaker(): Speaker {
 
   /** Start generating an item's audio if it hasn't begun. */
   const prime = (item: Item | undefined) => {
-    if (item && item.audio === undefined) item.audio = synthesise(item.text)
+    if (!item || item.audio !== undefined) return
+    const pending = synthesise(item.text)
+    item.audio = pending ? pending.then((source) => {
+      if (!source) return null
+      // Primed audio can complete after a voice interruption. Do not leak the
+      // blob URL or keep streaming a sentence that will never be played.
+      if (cancelled) {
+        disposeAudioSource(source)
+        return null
+      }
+      ownedSources.add(source)
+      return source
+    }) : null
   }
 
   async function pump(): Promise<void> {
@@ -522,12 +571,15 @@ export function createSpeaker(): Speaker {
     if (cancelled) return
     setSpeaking(item.text)
     try {
-      const url = item.audio ? await item.audio : null
+      const source = item.audio ? await item.audio : null
       if (cancelled) return
       // A failed generation is not a failed turn — drop to the system voice.
-      if (url) {
-        await playUrl(url, item.text)
-        return
+      if (source) {
+        const played = await playUrl(source, item.text)
+        // If an opted-in MSE stream failed before producing *any* sound, use
+        // the existing system-voice recovery. Never repeat words that already
+        // became audible, even if the network fails mid-sentence.
+        if (played || cancelled || typeof source === 'string') return
       }
 
       const spoke = await speakNative(item.text)
@@ -544,10 +596,13 @@ export function createSpeaker(): Speaker {
         diag.engine = 'elevenlabs'
         console.warn('[jarvis] system voice is not producing sound — using the bridge speech proxy from here on')
       }
-      const rescue = await fetchCloudAudio(item.text).catch(() => null)
+      const rescue = await fetchCloudAudio(item.text, audioAbort.signal).catch(() => null)
       if (rescue && !cancelled) {
+        ownedSources.add(rescue)
         diag.rescued++
         await playUrl(rescue, item.text)
+      } else if (rescue) {
+        disposeAudioSource(rescue)
       }
     } finally {
       if (speaking === item.text) setSpeaking('')
@@ -617,8 +672,10 @@ export function createSpeaker(): Speaker {
       }
 
       u.onstart = () => {
+        if (done || cancelled) return
         started = true
         markOutputAudible(true)
+        notifyFirstAudio()
         diag.started++
         diag.lastError = ''
         if (watchdog) clearTimeout(watchdog)
@@ -678,9 +735,11 @@ export function createSpeaker(): Speaker {
       speechSynthesis.speak(u)
     })
 
-  const playUrl = (url: string, text: string) =>
-    new Promise<void>((resolve) => {
+  const playUrl = (source: AudioSource, text: string) =>
+    new Promise<boolean>((resolve) => {
+      const url = typeof source === 'string' ? source : source.url
       const audio = new Audio(url)
+      diag.transport = typeof source === 'string' ? 'buffered' : 'mse-stream'
       currentAudio = audio
       // The generated path is an engine speaking just as much as the OS voice
       // is, so it keeps the same books. `spoken` counts the hand-off, `started`
@@ -723,21 +782,33 @@ export function createSpeaker(): Speaker {
       tick()
 
       let done = false
+      let beganPlaying = false
+      // A media-source that never opens must not wedge the full conversation.
+      const startWatchdog = typeof source === 'string' ? null : setTimeout(() => {
+        if (done || beganPlaying) return
+        diag.streamFailures++
+        diag.lastError = 'stream-start-timeout'
+        finish()
+      }, 12000)
       const finish = () => {
         if (done) return
         done = true
+        if (startWatchdog) clearTimeout(startWatchdog)
         cancelAnimationFrame(raf)
         outLevel = 0.12
-        markOutputAudible(false)
-        URL.revokeObjectURL(url)
+        if (beganPlaying) markOutputAudible(false)
+        releaseSource(source)
         if (currentAudio === audio) currentAudio = null
-        resolve()
+        resolve(beganPlaying)
       }
       // Sound is genuinely coming out. This is the cloud/neural counterpart of
       // SpeechSynthesisUtterance.onstart, and it is what makes the diagnostics
       // verdict — and the T self-test — tell the truth on the premium path.
       audio.onplaying = () => {
+        if (done || cancelled) return
+        beganPlaying = true
         markOutputAudible(true)
+        notifyFirstAudio()
         diag.started++
         diag.lastError = ''
       }
@@ -791,6 +862,18 @@ export function createSpeaker(): Speaker {
         buffer = buffer.slice(cut)
       }
 
+      // Start the FIRST phrase at a natural clause boundary before a lengthy
+      // sentence is complete. This reduces time-to-first-audio while retaining
+      // word boundaries, ordered playback, interruption and sentence handling.
+      // No repeated early cuts: subsequent phrases preserve the old cadence.
+      if (!firstChunkQueued) {
+        const earlyCut = findEarlySpeechBoundary(buffer)
+        if (earlyCut !== null) {
+          enqueue(buffer.slice(0, earlyCut))
+          buffer = buffer.slice(earlyCut)
+        }
+      }
+
       // Unpunctuated prose would otherwise sit here silently until the answer
       // ended, defeating the whole point of streaming.
       if (buffer.length > MAX_UNSPOKEN) {
@@ -829,10 +912,12 @@ export function createSpeaker(): Speaker {
         // Leaving the engine cancelled is what silences every later sentence.
         speechSynthesis.resume()
       }
+      audioAbort.abort()
       if (currentAudio) {
         currentAudio.pause()
         currentAudio = null
       }
+      for (const source of ownedSources) releaseSource(source)
       outLevel = 0
       settleDrained()
     },
@@ -843,10 +928,12 @@ export function createSpeaker(): Speaker {
 async function fetchLocalAudio(
   text: string,
   speaker: string,
+  signal?: AbortSignal,
 ): Promise<string | null> {
   if (BACKEND !== 'bridge') return null
   try {
     const res = await fetch(`${BRIDGE_HTTP_URL}/tts/local`, {
+      signal,
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text, speaker }),
@@ -860,26 +947,38 @@ async function fetchLocalAudio(
 
 /** Only used when USE_ELEVENLABS is on. Bridge proxy first (it already holds
  *  the key), then a direct key, then null to fall back to the native voice. */
-async function fetchCloudAudio(text: string): Promise<string | null> {
+async function fetchCloudAudio(text: string, signal?: AbortSignal): Promise<AudioSource | null> {
   if (BACKEND === 'bridge') {
     try {
       const res = await fetch(`${BRIDGE_HTTP_URL}/tts`, {
+        signal,
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      if (res.ok) return URL.createObjectURL(await res.blob())
+      if (res.ok) {
+        if (CLOUD_AUDIO_STREAMING && !signal?.aborted) {
+          const streamed = createStreamingMp3(res, {
+            onChunk: () => { diag.streamChunks++ },
+            onFailure: () => { diag.streamFailures++ },
+          })
+          if (streamed) return streamed
+        }
+        return URL.createObjectURL(await res.blob())
+      }
     } catch {
-      /* fall through */
+      /* fall through to the pre-existing direct provider if configured */
     }
   }
 
+  if (signal?.aborted) return null
   if (env.elevenKey) {
     try {
       const res = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${env.elevenVoiceId}/stream` +
           `?output_format=mp3_22050_32&optimize_streaming_latency=3`,
         {
+          signal,
           method: 'POST',
           headers: {
             'xi-api-key': env.elevenKey,
