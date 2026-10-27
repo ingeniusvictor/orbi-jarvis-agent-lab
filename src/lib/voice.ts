@@ -251,6 +251,7 @@ function makeAssembler(
   let held = ''
   let timer: ReturnType<typeof setTimeout> | null = null
   let firstAt = 0
+  let lastFeedAt = 0
 
   const clear = () => {
     if (timer) clearTimeout(timer)
@@ -262,12 +263,19 @@ function makeAssembler(
     const text = held.trim()
     held = ''
     firstAt = 0
-    if (text) h.emit(text)
+    if (text) {
+      // Actual hold between the last recognized fragment and dispatch.
+      diag.assemblyHoldMs = lastFeedAt
+        ? Math.max(0, Math.round(performance.now() - lastFeedAt))
+        : null
+      h.emit(text)
+    }
   }
 
   return {
     feed(text, active) {
       if (!text.trim()) return
+      lastFeedAt = performance.now()
       held = `${held} ${text}`.replace(/\s+/g, ' ').trim()
       if (!firstAt) firstAt = Date.now()
       // The caption shows the whole thought as it assembles, not just the
@@ -443,8 +451,14 @@ export const diag = {
   maxQueueDepth: 0,
   /** Background/guard segments dropped to keep voice responsive. */
   queueDrops: 0,
-  /** Milliseconds the last transcription round-trip took. */
+  /** Milliseconds the last transcription round-trip took (legacy field; browser path records idle time). */
   idleMs: 0,
+  /** Completed local/cloud bridge transcription in ms, including audio conversion. Browser STT is opaque. */
+  sttRoundTripMs: null as number | null,
+  /** Actual delay from the last accepted transcript fragment to turn dispatch. */
+  assemblyHoldMs: null as number | null,
+  /** Last post-TTS follow-up hold, recorded without storing speech. */
+  postSpeechGuardMs: 2600,
 }
 
 /** Record why a transcript went nowhere. Silence always has a reason; this is
@@ -663,6 +677,9 @@ async function startVadBridgeVoice(
       }
       const { text } = (await res.json()) as { text?: string }
       const said = (text ?? '').trim()
+      if (capturedMode === 'command') {
+        diag.sttRoundTripMs = Math.max(0, Math.round(performance.now() - t0))
+      }
       diag.lastError = ''
 
       // A previous segment may have completed the command while this one was
@@ -908,6 +925,8 @@ async function startVadBridgeVoice(
  * assistant that keeps listening.
  */
 function startBrowserVoice(h: VoiceHandlers): Voice {
+  // Native browser SpeechRecognition does not expose a trusted STT request duration.
+  diag.sttRoundTripMs = null
   const Ctor =
     (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
   if (!Ctor) {

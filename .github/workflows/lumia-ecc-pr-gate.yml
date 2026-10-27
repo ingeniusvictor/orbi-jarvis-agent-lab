@@ -45,6 +45,12 @@ jobs:
       - name: ECC context budget contract
         run: node scripts/certify-lumia-context-budget.mjs
 
+      - name: First-audio low-latency segmentation
+        run: npx tsx scripts/certify-first-audio-chunk.ts
+
+      - name: VL-02 Voice latency policy certification
+        run: npx tsx scripts/certify-lumia-voice-latency-vl02.ts
+
       - name: Production build
         run: npm run build
 
