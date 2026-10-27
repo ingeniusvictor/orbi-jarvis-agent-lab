@@ -80,22 +80,25 @@ export async function inspectVoicePreflight({
       if (expectedBridge) {
         report.bridge.stt = String(payload.voice.effective?.effectiveStt ?? 'unknown')
         report.bridge.tts = String(payload.voice.effective?.effectiveTts ?? 'unknown')
-        // These requests carry NO owner PIN and NO valid authorization.
-        // Realtime must fail closed BEFORE contacting the paid provider.
+        // IMPORTANT: Every PIN failure from an *allowed* origin increments
+        // the owner's brute-force lockout counter. Preflight runs frequently;
+        // it must NEVER simulate wrong PINs from localhost. Probe only requests
+        // rejected *before* PIN verification: missing Origin and foreign Origin.
+        // Neither contains a PIN, requests a paid grant, nor consumes lockout.
         const noOrigin = await fetchFn(url + '/voice/realtime/client-secret', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: '{}', cache: 'no-store', signal: AbortSignal.timeout(2500),
         })
-        const wrongPin = await fetchFn(url + '/voice/realtime/client-secret', {
+        const untrustedOrigin = await fetchFn(url + '/voice/realtime/client-secret', {
           method: 'POST',
           headers: {
-            Origin: 'http://localhost:5173',
+            Origin: 'http://realtime-preflight.invalid',
             'content-type': 'application/json',
           },
           body: '{}', cache: 'no-store', signal: AbortSignal.timeout(2500),
         })
         report.bridge.guardedRealtimeEndpoint =
-          noOrigin.status === 403 && wrongPin.status === 403
+          noOrigin.status === 403 && untrustedOrigin.status === 403
         if (!report.bridge.guardedRealtimeEndpoint) {
           report.warnings.push('Realtime endpoint did not reject both unauthorized probes.')
         }
