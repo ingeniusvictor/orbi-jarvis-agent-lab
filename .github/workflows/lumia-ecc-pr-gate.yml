@@ -45,6 +45,9 @@ jobs:
       - name: ECC context budget contract
         run: node scripts/certify-lumia-context-budget.mjs
 
+      - name: LUMIA Autonomy A1 read-only task certification
+        run: node scripts/certify-lumia-read-only-task-queue.mjs
+
       - name: Production build
         run: npm run build
 
