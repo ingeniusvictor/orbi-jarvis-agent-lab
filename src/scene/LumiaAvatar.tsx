@@ -12,6 +12,8 @@ type Prepared = {
   reactive: THREE.MeshStandardMaterial[]
   center: THREE.Vector3
   height: number
+  /** Face-only edition is explicitly marked inside the uploaded GLB. */
+  faceOnly: boolean
 }
 
 /**
@@ -34,20 +36,41 @@ const OPTICAL_LIFT = 0.095
  * to the right of the reactor centre, so correct that in screen space.
  */
 const OPTICAL_SHIFT_PX = -28
+const FACE_MODEL_PROFILE = 'face-v1'
+
+/**
+ * The Windows installer preserves the original path and adds a metadata marker
+ * to its replacement GLB. Only marked face-only models get a new optical fit;
+ * the existing full-body mascot is unaffected, and the owner can restore the
+ * original GLB without modifying code.
+ */
+function isFaceOnlyAvatar(scene: THREE.Object3D): boolean {
+  let isFace = false
+  scene.traverse((node) => {
+    if (node.userData?.lumiaAvatarProfile === FACE_MODEL_PROFILE) isFace = true
+  })
+  return isFace
+}
 
 function cloneMaterial(
   material: THREE.Material,
   reactive: THREE.MeshStandardMaterial[],
+  faceOnly: boolean,
 ): THREE.Material {
   const clone = material.clone()
 
   if (clone instanceof THREE.MeshStandardMaterial) {
     // Preserve the authored maps while giving the model enough internal light
     // to read as part of the reactor instead of as a normal opaque 3D asset.
-    clone.emissive = new THREE.Color('#0b3d42')
-    clone.emissiveIntensity = 0.34
-    clone.metalness = Math.max(0.22, clone.metalness)
-    clone.roughness = Math.min(0.58, clone.roughness)
+    // Face-only asset comes with authored PBR/skin/crystal textures. Preserve
+    // those maps and their metallic response; strong emissive retuning would
+    // bleach facial details after the scene's bloom pass.
+    clone.emissive = new THREE.Color(faceOnly ? '#051c23' : '#0b3d42')
+    clone.emissiveIntensity = faceOnly ? 0.12 : 0.34
+    if (!faceOnly) {
+      clone.metalness = Math.max(0.22, clone.metalness)
+      clone.roughness = Math.min(0.58, clone.roughness)
+    }
     reactive.push(clone)
   }
 
@@ -75,6 +98,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
   const prepared = useMemo<Prepared>(() => {
     const reactive: THREE.MeshStandardMaterial[] = []
     const object = scene.clone(true)
+    const faceOnly = isFaceOnlyAvatar(object)
 
     object.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
@@ -84,8 +108,8 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
       child.receiveShadow = false
 
       child.material = Array.isArray(child.material)
-        ? child.material.map((material) => cloneMaterial(material, reactive))
-        : cloneMaterial(child.material, reactive)
+        ? child.material.map((material) => cloneMaterial(material, reactive, faceOnly))
+        : cloneMaterial(child.material, reactive, faceOnly)
     })
 
     const box = new THREE.Box3().setFromObject(object)
@@ -97,6 +121,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
       reactive,
       center,
       height: Math.max(size.y, 0.001),
+      faceOnly,
     }
   }, [scene])
 
@@ -104,7 +129,9 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
     if (!root.current) return
 
     const fit = Math.min(viewport.width, viewport.height)
-    const targetHeight = fit * 0.45
+    // A head alone can occupy more of the inner circle without any feet or
+    // antenna extending outside the hologram. Retain the classic size otherwise.
+    const targetHeight = fit * (prepared.faceOnly ? 0.52 : 0.45)
     const modelScale = targetHeight / prepared.height
     const t = state.clock.elapsedTime
     const phase = useStore.getState().phase
@@ -142,7 +169,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
     root.current.scale.setScalar(modelScale * voicePulse)
     const worldPerPixelX = viewport.width / Math.max(canvasWidth, 1)
     root.current.position.set(
-      OPTICAL_SHIFT_PX * worldPerPixelX,
+      (prepared.faceOnly ? 0 : OPTICAL_SHIFT_PX) * worldPerPixelX,
       Math.sin(t * 0.82) * floatAmount,
       0.12,
     )
@@ -158,7 +185,9 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
 
     // Let L.U.M.I.A.'s own surfaces breathe with the same accent/audio energy
     // as the surrounding hologram.
-    const targetIntensity = 0.28 + drive.level * 0.75
+    const targetIntensity = prepared.faceOnly
+      ? 0.10 + drive.level * 0.28
+      : 0.28 + drive.level * 0.75
     for (const material of prepared.reactive) {
       material.emissive.lerp(drive.reactor.color, Math.min(1, dt * 3))
       material.emissiveIntensity +=
@@ -171,7 +200,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
       <group
         position={[
           -prepared.center.x,
-          -prepared.center.y + prepared.height * OPTICAL_LIFT,
+          -prepared.center.y + prepared.height * (prepared.faceOnly ? 0 : OPTICAL_LIFT),
           -prepared.center.z,
         ]}
       >
