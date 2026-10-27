@@ -150,6 +150,7 @@ const launcher = readFileSync(
   new URL('../PROBAR_VOZ_LOCAL_LUMIA_WINDOWS.cmd', import.meta.url), 'utf8',
 )
 for (const flag of [
+  'set "VITE_BACKEND=bridge"',
   'set "ORBIA_BRAIN_PROVIDER=ollama"',
   'set "JARVIS_ALLOW_WRITES=0"',
   'set "ORBIA_REALTIME_EXPERIMENT=0"',
