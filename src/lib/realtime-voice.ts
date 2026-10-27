@@ -1,5 +1,6 @@
 import { BRIDGE_HTTP_URL } from '../config'
 import { getMic } from './audio'
+import { createRealtimeTurnMeter, type RealtimeTurnStats } from './realtime-turn-metrics'
 
 /**
  * VL-05: isolated speech-to-speech trial, NOT the canonical LUMIA brain.
@@ -27,10 +28,12 @@ export function isRealtimePilotUiEnabled(): boolean {
 export async function startRealtimeVoiceTrial({
   pin,
   onState,
+  onMetrics,
   signal,
 }: {
   pin: string
   onState: (state: RealtimeState, message?: string) => void
+  onMetrics?: (stats: RealtimeTurnStats) => void
   signal?: AbortSignal
 }): Promise<RealtimeCall> {
   if (!isRealtimePilotUiEnabled() || typeof pin !== 'string' || pin.length < 12) {
@@ -45,6 +48,7 @@ export async function startRealtimeVoiceTrial({
   const playback = new Audio()
   playback.autoplay = true
   const channel = pc.createDataChannel('oai-events')
+  const metrics = createRealtimeTurnMeter((stats) => onMetrics?.(stats))
   let clone: MediaStreamTrack | null = null
   let stopped = false
   let closed = false
@@ -131,15 +135,17 @@ export async function startRealtimeVoiceTrial({
     if (stopped) return
     let data: { type?: string }
     try { data = JSON.parse(String(event.data)) } catch { return }
+    if (typeof data.type === 'string') metrics.onEvent(data.type)
     // Deliberately ignore generated instructions and function calls: no bridge
     // from this session to the canonical agent's tool execution permissions.
     if (data.type === 'input_audio_buffer.speech_started') {
       onState('interrupted')
-    } else if (data.type === 'response.created' ||
+    } else if (data.type === 'output_audio_buffer.started' ||
+               data.type === 'response.created' ||
                data.type === 'response.output_audio.delta') {
       onState('speaking')
-    } else if (data.type === 'response.done' ||
-               data.type === 'output_audio_buffer.stopped') {
+    } else if (data.type === 'output_audio_buffer.stopped' ||
+               data.type === 'output_audio_buffer.cleared') {
       onState('listening')
     } else if (data.type === 'error') {
       onState('error', 'El servicio de voz notificó un error.')
