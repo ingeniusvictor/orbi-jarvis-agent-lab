@@ -102,6 +102,10 @@ export const diag = {
   rescued: 0,
   voice: '',
   lastText: '',
+  // Timings from accepted utterance to first model text / audible speech.
+  // No transcripts, credentials or voice samples are stored in these fields.
+  firstTextMs: null as number | null,
+  firstAudioMs: null as number | null,
 }
 
 if (typeof window !== 'undefined') {
@@ -417,7 +421,7 @@ type Item = {
   audio?: Promise<string | null> | null
 }
 
-export function createSpeaker(): Speaker {
+export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
   const queue: Item[] = []
   let buffer = ''
   let cancelled = false
@@ -425,6 +429,12 @@ export function createSpeaker(): Speaker {
   let pumping = false
   // An explicit first-phrase fast path applies only once per speaker/answer.
   let firstChunkQueued = false
+  let firstAudioNotified = false
+  const notifyFirstAudio = () => {
+    if (cancelled || firstAudioNotified) return
+    firstAudioNotified = true
+    onFirstAudioStart?.()
+  }
 
   let currentAudio: HTMLAudioElement | null = null
   let nativeInFlight = false
@@ -621,8 +631,10 @@ export function createSpeaker(): Speaker {
       }
 
       u.onstart = () => {
+        if (done || cancelled) return
         started = true
         markOutputAudible(true)
+        notifyFirstAudio()
         diag.started++
         diag.lastError = ''
         if (watchdog) clearTimeout(watchdog)
@@ -741,7 +753,9 @@ export function createSpeaker(): Speaker {
       // SpeechSynthesisUtterance.onstart, and it is what makes the diagnostics
       // verdict — and the T self-test — tell the truth on the premium path.
       audio.onplaying = () => {
+        if (done || cancelled) return
         markOutputAudible(true)
+        notifyFirstAudio()
         diag.started++
         diag.lastError = ''
       }
