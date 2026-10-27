@@ -38,6 +38,15 @@ const OPTICAL_LIFT = 0.095
  */
 const OPTICAL_SHIFT_PX = -28
 
+/**
+ * Face-only screenshot acceptance AV-01B (27 Oct 2026): the shoulders and
+ * hair were close to the reactor rim, and the face sat slightly left of its
+ * visual centre. Keep offsets in CSS pixels for consistent desktop framing.
+ * The original robot retains its established optical calibration.
+ */
+const FACE_HEIGHT_FRACTION = 0.47
+const FACE_SHIFT_PX = 25
+
 function cloneMaterial(
   material: THREE.Material,
   reactive: THREE.MeshStandardMaterial[],
@@ -117,7 +126,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
     const fit = Math.min(viewport.width, viewport.height)
     // A head alone can occupy more of the inner circle without any feet or
     // antenna extending outside the hologram. Retain the classic size otherwise.
-    const targetHeight = fit * (prepared.faceOnly ? 0.52 : 0.45)
+    const targetHeight = fit * (prepared.faceOnly ? FACE_HEIGHT_FRACTION : 0.45)
     const modelScale = targetHeight / prepared.height
     const t = state.clock.elapsedTime
     const phase = useStore.getState().phase
@@ -155,7 +164,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
     root.current.scale.setScalar(modelScale * voicePulse)
     const worldPerPixelX = viewport.width / Math.max(canvasWidth, 1)
     root.current.position.set(
-      (prepared.faceOnly ? 0 : OPTICAL_SHIFT_PX) * worldPerPixelX,
+      (prepared.faceOnly ? FACE_SHIFT_PX : OPTICAL_SHIFT_PX) * worldPerPixelX,
       Math.sin(t * 0.82) * floatAmount,
       0.12,
     )
