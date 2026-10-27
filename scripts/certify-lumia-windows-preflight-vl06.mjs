@@ -163,7 +163,7 @@ for (const flag of [
   assert.ok(launcher.includes(flag), 'Windows launcher must include: ' + flag)
 }
 assert.doesNotMatch(launcher, /git\s+(checkout|reset|merge|push|switch)\b/i)
-assert.doesNotMatch(launcher, /\bnpm\s+ci\b(?!.*echo)/i) // installation is documented, not executed.
+assert.doesNotMatch(launcher, /^(?!\s*rem\b|\s*echo\b).*?\b(?:call\s+)?npm\s+ci\b/im) // documented, never run.
 assert.doesNotMatch(launcher, /set\s+"?OPENAI_API_KEY=/i)
 assert.doesNotMatch(launcher, /set\s+"?ORBIA_REALTIME_OWNER_PIN=/i)
 
