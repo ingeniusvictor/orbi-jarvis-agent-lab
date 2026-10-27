@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { inspectVoicePreflight } from './lumia-voice-preflight.mjs'
 import { createRealtimeGrantService } from '../bridge/orbia/realtime-grants.mjs'
 
@@ -142,6 +143,29 @@ assert.ok(!printable.includes(secretValue))
 assert.ok(!printable.includes('API-PRIVATE-SECRET-XYZ'))
 assert.equal(withSecrets.flags.ownerPinConfigured, true)
 assert.equal(withSecrets.flags.apiKeyConfigured, true)
+
+// The Windows launcher must remain a transient, read-only LOCAL check.
+// It must not enable the paid Realtime path or inherit a cloud brain choice.
+const launcher = readFileSync(
+  new URL('../PROBAR_VOZ_LOCAL_LUMIA_WINDOWS.cmd', import.meta.url), 'utf8',
+)
+for (const flag of [
+  'set "ORBIA_BRAIN_PROVIDER=ollama"',
+  'set "JARVIS_ALLOW_WRITES=0"',
+  'set "ORBIA_REALTIME_EXPERIMENT=0"',
+  'set "VITE_LUMIA_REALTIME_EXPERIMENT=0"',
+  'set "VITE_USE_ELEVENLABS=0"',
+  'set "ORBIA_LUMIA_STT_MODE=local"',
+  'set "ORBIA_LUMIA_TTS_MODE=local"',
+  'set "VITE_LUMIA_ACOUSTIC_LAB=1"',
+  'call npm run start:lumia',
+]) {
+  assert.ok(launcher.includes(flag), 'Windows launcher must include: ' + flag)
+}
+assert.doesNotMatch(launcher, /git\s+(checkout|reset|merge|push|switch)\b/i)
+assert.doesNotMatch(launcher, /\bnpm\s+ci\b(?!.*echo)/i) // installation is documented, not executed.
+assert.doesNotMatch(launcher, /set\s+"?OPENAI_API_KEY=/i)
+assert.doesNotMatch(launcher, /set\s+"?ORBIA_REALTIME_OWNER_PIN=/i)
 
 console.log('LUMIA VL-06 Windows/offline preflight contract: PASS')
 console.log('No paid token requests or secrets printed; unauthorized probes must deny: PASS')
