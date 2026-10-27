@@ -63,6 +63,15 @@ jobs:
       - name: VL-05B Realtime lifecycle and PIN lockout hardening
         run: node scripts/certify-lumia-realtime-vl05b.mjs
 
+      - name: VL-06 Privacy-safe Realtime turnaround metrics
+        run: npx tsx scripts/certify-lumia-realtime-metrics-vl06.ts
+
+      - name: VL-06 Safe Windows preflight contract
+        run: node scripts/certify-lumia-windows-preflight-vl06.mjs
+
+      - name: VL-06 Offline preflight CLI smoke
+        run: node scripts/lumia-voice-preflight.mjs --json
+
       - name: Production build
         run: npm run build
 
