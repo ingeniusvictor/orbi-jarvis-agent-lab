@@ -60,6 +60,9 @@ jobs:
       - name: VL-05 Owner-gated WebRTC session contract
         run: node scripts/certify-lumia-realtime-vl05.mjs
 
+      - name: VL-05B Realtime lifecycle and PIN lockout hardening
+        run: node scripts/certify-lumia-realtime-vl05b.mjs
+
       - name: Production build
         run: npm run build
 
