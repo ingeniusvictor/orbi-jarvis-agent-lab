@@ -31,7 +31,7 @@ export async function getMic(): Promise<MediaStream> {
 
 export function startAnalyser(): Promise<void> {
   if (analyserOpening) return analyserOpening
-  const attempt = (async () => {
+  const attempt: Promise<void> = (async () => {
     const sourceStream = await getMic()
     if (analyser && analyserStream === sourceStream && ctx?.state !== 'closed') return
 
