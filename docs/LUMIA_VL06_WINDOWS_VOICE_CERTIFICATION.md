@@ -53,11 +53,37 @@ o, de forma equivalente:
     npm run voice:preflight
 
 El preflight --live hace GET /health local y dos POST sin PIN al endpoint
-experimental de credenciales, que DEBEN devolver 403. Estas pruebas
+experimental de credenciales, que DEBEN devolver 403. Uno NO incluye
+Origin y el otro usa un Origin expresamente no autorizado. La auditoría
+encontró que simular un PIN incorrecto desde un origen local permitido
+podía bloquear al propietario tras varias ejecuciones; eso se corrigió.
+Las pruebas ahora se rechazan **antes del contador de errores de PIN**,
 no reciben ni envían audio, no solicitan credenciales temporales y no
 llaman a ningún proveedor de pago. No afirman medir el micrófono.
 
 Si falta el bridge o no protege los POST sin autorización: FAIL.
+
+## Opción rápida para Windows: un solo archivo y sin cambiar .env.local
+
+Con la rama VL-06 actualizada y \`npm ci\` ejecutado, haz doble clic en:
+
+    PROBAR_VOZ_LOCAL_LUMIA_WINDOWS.cmd
+
+Este archivo arranca LUMIA + el laboratorio acústico local mediante
+variables de entorno **temporales de la terminal**. No modifica .env.local,
+no instala nada, no altera Git y no solicita credenciales de pago. Fuerza
+Ollama y el modo local del STT/TTS (con los fallbacks ya implementados),
+apaga Realtime, ElevenLabs explícito y los ajustes de voz experimentales, y
+desactiva herramientas de escritura. Para finalizar, pulsa Ctrl+C.
+
+Si una ventana de LUMIA ya ocupa el puerto 8787, ciérrala antes de iniciar
+otra: dos bridges en competencia invalidarían la prueba.
+
+**Importante:** si no has instalado Whisper, Kokoro u Ollama, el laboratorio
+de dispositivos puede funcionar, pero la prueba completa de conversación
+local necesitará instalar/verificar esos componentes. El reconocimiento
+por navegador puede utilizar servicios de la propia plataforma y no equivale
+a un modo estrictamente sin transmisión de STT.
 
 ## 3. Laboratorio acústico local en el navegador (SIN API)
 
