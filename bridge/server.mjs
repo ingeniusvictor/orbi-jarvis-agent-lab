@@ -49,10 +49,12 @@ import {
 } from './orbia/local-tts.mjs'
 import { transcribeMultivoiceLocalWav } from './orbia/multivoice-stt.mjs'
 import { ensureWhisperServer } from './orbia/whisper-server-runtime.mjs'
+import { createRealtimeGrantService } from './orbia/realtime-grants.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
 const speakerEnrollmentSamples = []
 const SPEAKER_SAMPLE_LIMIT = 10 * 1024 * 1024
+const realtimeGrants = createRealtimeGrantService()
 
 
 /**
@@ -692,7 +694,7 @@ function corsFor(req) {
   const headers = { vary: 'origin' }
   if (origin) {
     headers['access-control-allow-origin'] = origin
-    headers['access-control-allow-headers'] = 'content-type, x-orbia-voice-mode'
+    headers['access-control-allow-headers'] = 'content-type, x-orbia-voice-mode, x-orbia-realtime-pin'
   }
   return headers
 }
@@ -738,6 +740,26 @@ const handleRequest = async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, cors)
     return res.end()
+  }
+
+  if (req.method === 'POST' && req.url === '/voice/realtime/client-secret') {
+    // Extra authorization beyond the normal bridge origin policy. The secret
+    // is ONLY obtainable from an allowed local UI with a separate owner PIN,
+    // an explicit cloud-trial switch and remaining per-boot trial budget.
+    // No Origin means no browser identity, so fail closed.
+    const result = await realtimeGrants.grant({
+      origin,
+      pin: req.headers['x-orbia-realtime-pin'],
+      bridgePort: PORT,
+    })
+    res.writeHead(result.status, {
+      ...cors,
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+      'pragma': 'no-cache',
+      'x-content-type-options': 'nosniff',
+    })
+    return res.end(JSON.stringify(result.body))
   }
 
   if (req.method === 'GET' && req.url === '/health') {

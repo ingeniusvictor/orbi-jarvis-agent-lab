@@ -45,6 +45,24 @@ jobs:
       - name: ECC context budget contract
         run: node scripts/certify-lumia-context-budget.mjs
 
+      - name: First-audio low-latency segmentation
+        run: npx tsx scripts/certify-first-audio-chunk.ts
+
+      - name: VL-02 Voice latency policy certification
+        run: npx tsx scripts/certify-lumia-voice-latency-vl02.ts
+
+      - name: VL-03 Adaptive turn-taking certification
+        run: npx tsx scripts/certify-lumia-adaptive-turns-vl03.ts
+
+      - name: VL-04 Progressive MP3 audio transport certification
+        run: npx tsx scripts/certify-lumia-tts-stream-vl04.ts
+
+      - name: VL-05 Owner-gated WebRTC session contract
+        run: node scripts/certify-lumia-realtime-vl05.mjs
+
+      - name: VL-05B Realtime lifecycle and PIN lockout hardening
+        run: node scripts/certify-lumia-realtime-vl05b.mjs
+
       - name: Production build
         run: npm run build
 
