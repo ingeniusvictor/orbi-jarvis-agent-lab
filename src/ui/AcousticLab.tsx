@@ -32,6 +32,7 @@ export function AcousticLab({
   const [heardTone, setHeardTone] = useState(false)
   const [status, setStatus] = useState('')
   const activeRef = useRef(false)
+  const disposedRef = useRef(false)
   const ctxRef = useRef<AudioContext | null>(null)
   const trackRef = useRef<MediaStreamTrack | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
@@ -63,15 +64,28 @@ export function AcousticLab({
     if (!activeRef.current) return
     activeRef.current = false
     releaseResources()
-    setRunning(false)
-    onResumeNormal()
+    if (!disposedRef.current) {
+      setRunning(false)
+      onResumeNormal()
+    }
   }
 
-  useEffect(() => () => {
-    // Unmount is not permission to restart a parent that is itself unloading.
-    activeRef.current = false
-    releaseResources()
-    // The ref-owned AudioContext and tracks are the only retained resources.
+  useEffect(() => {
+    disposedRef.current = false
+    const closeOnHidden = () => {
+      if (document.visibilityState === 'hidden' && activeRef.current) {
+        setStatus('Se ocultó la ventana: liberé el micrófono por seguridad.')
+        stop()
+      }
+    }
+    document.addEventListener('visibilitychange', closeOnHidden)
+    return () => {
+      disposedRef.current = true
+      activeRef.current = false
+      document.removeEventListener('visibilitychange', closeOnHidden)
+      releaseResources()
+      // Never restart the recognizer while the parent is tearing down.
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -82,6 +96,15 @@ export function AcousticLab({
       return
     }
     activeRef.current = true
+    // The timeout begins BEFORE asking the browser for microphone permission.
+    // Otherwise a never-answered permission prompt can leave the normal voice
+    // loop suspended indefinitely.
+    timeoutRef.current = setTimeout(() => {
+      if (activeRef.current) {
+        setStatus('La prueba alcanzó el límite local de 45 segundos.')
+        stop()
+      }
+    }, 45_000)
     setRunning(true)
     setDbfs(-100)
     setPeakDbfs(null)
@@ -99,6 +122,11 @@ export function AcousticLab({
       if (!track) throw new Error('No hay una entrada de micrófono activa.')
       const clone = track.clone()
       trackRef.current = clone
+      clone.addEventListener('ended', () => {
+        if (!activeRef.current || disposedRef.current) return
+        setStatus('El micrófono se desconectó. Cerré la prueba y recuperé LUMIA.')
+        stop()
+      }, { once: true })
       const input = ctx.createMediaStreamSource(new MediaStream([clone]))
       sourceRef.current = input
       const analyser = ctx.createAnalyser()
@@ -119,12 +147,6 @@ export function AcousticLab({
         frameRef.current = requestAnimationFrame(tick)
       }
       frameRef.current = requestAnimationFrame(tick)
-      timeoutRef.current = setTimeout(() => {
-        if (activeRef.current) {
-          setStatus('La prueba alcanzó el límite local de 45 segundos.')
-          stop()
-        }
-      }, 45_000)
       setStatus('Micrófono abierto solo para medir nivel. Habla normalmente.')
     } catch (err) {
       setStatus(err instanceof Error ? err.message : 'No se pudo abrir el micrófono.')
