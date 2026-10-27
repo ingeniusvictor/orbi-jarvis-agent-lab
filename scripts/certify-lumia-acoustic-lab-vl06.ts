@@ -66,6 +66,13 @@ assert.match(lab, /input\.connect\(analyser\)/)
 assert.doesNotMatch(lab, /input\.connect\(ctx\.destination\)/)
 assert.match(lab, /45_000/)
 assert.match(lab, /onResumeNormal\(\)/)
+assert.ok(lab.indexOf('timeoutRef.current = setTimeout') <
+  lab.indexOf('const stream = await getMic()'),
+  'The timeout must cover microphone permission waits, not only active recording.')
+assert.match(lab, /clone\.addEventListener\('ended'/)
+assert.match(lab, /document\.addEventListener\('visibilitychange', closeOnHidden\)/)
+assert.match(lab, /if \(!activeRef\.current \|\| disposedRef\.current\) return/)
+assert.match(lab, /disposedRef\.current = true/)
 assert.match(app, /VITE_LUMIA_ACOUSTIC_LAB === '1'/)
 assert.match(app, /experimentOwner\.current \? 'deaf'/)
 assert.match(app, /if \(experimentOwner\.current\) return/)
