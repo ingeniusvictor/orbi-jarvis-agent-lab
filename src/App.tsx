@@ -113,6 +113,7 @@ export default function App() {
    * the phase, the speaker, or the busy state on its way to the floor.
    */
   const turn = useRef(0)
+  const activeReply = useRef<string | null>(null)
   const booting = useRef(false)
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const voicePoll = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -162,6 +163,12 @@ export default function App() {
   const respond = async (said: string): Promise<void> => {
     const mine = ++turn.current
     const stale = () => mine !== turn.current
+    const previousReply = activeReply.current
+    if (previousReply) {
+      store.getState().updateTurn(previousReply, {
+        status: 'interrupted', finishedAt: Date.now(),
+      })
+    }
 
     clearIdle()
     const s = store.getState()
@@ -170,7 +177,13 @@ export default function App() {
     s.clearPanels()
     s.clearBlades()
     s.setCaption('')
-    s.pushTurn({ id: newId(), role: 'user', text: said })
+    const acceptedAt = Date.now()
+    s.pushTurn({ id: newId(), role: 'user', text: said, at: acceptedAt })
+    const turnId = newId()
+    activeReply.current = turnId
+    // Show a pending response immediately, even when the brain never yields a
+    // token. It is crucial evidence for 40s waits and unanswered questions.
+    s.pushTurn({ id: turnId, role: 'jarvis', text: '', at: acceptedAt, status: 'pending' })
     s.setPhase('thinking')
 
     const responseStartedAt = performance.now()
@@ -179,13 +192,17 @@ export default function App() {
     const spk = createSpeaker(() => {
       // The callback fires only once, on real OS/audio-element playback, not
       // on synthesized text, buffering or TTS network completion.
-      if (!stale()) ttsDiag.firstAudioMs = Math.round(performance.now() - responseStartedAt)
+      if (!stale()) {
+        ttsDiag.firstAudioMs = Math.round(performance.now() - responseStartedAt)
+        store.getState().updateTurn(turnId, {
+          firstAudioAt: Date.now(), status: 'playing',
+        })
+      }
     })
     speaker.current = spk
     sfx.duck(true)
     music.duck(true)
 
-    const turnId = newId()
     let started = false
     let filled = false
 
@@ -196,14 +213,16 @@ export default function App() {
           if (!started) {
             started = true
             ttsDiag.firstTextMs = Math.round(performance.now() - responseStartedAt)
+            store.getState().updateTurn(turnId, {
+              firstTextAt: Date.now(), status: 'generating',
+            })
             store.getState().setPhase('speaking')
             // The answer arriving is what ends the tool phase — a timer would
             // clear the readout while a slow tool was still running.
             store.getState().setActiveTool(null)
             music.working(false)
-            store.getState().pushTurn({ id: turnId, role: 'jarvis', text: '' })
           }
-          store.getState().appendToLastTurn(delta)
+          store.getState().appendToTurn(turnId, delta)
           spk.push(delta)
         },
         onTool: (name) => {
@@ -228,6 +247,16 @@ export default function App() {
 
       if (stale()) return
 
+      // Some providers return only the final text and no streaming deltas.
+      // Capture it rather than misclassifying a successful answer as silence.
+      if (!started && text.trim()) {
+        started = true
+        ttsDiag.firstTextMs = Math.round(performance.now() - responseStartedAt)
+        s.updateTurn(turnId, { text, firstTextAt: Date.now(), status: 'generating' })
+        s.setPhase('speaking')
+        spk.push(text)
+      }
+
       // The bridge keeps conversation state in its own session, so history is
       // only threaded through on the direct path.
       if (!usingBridge) {
@@ -240,16 +269,30 @@ export default function App() {
 
       await spk.end()
       if (stale()) return
-      sfx.play('done')
+      if (!started && !text.trim()) {
+        const note = 'El cerebro terminó sin generar texto de respuesta.'
+        store.getState().updateTurn(turnId, {
+          status: 'no-response', finishedAt: Date.now(), errorNote: note,
+        })
+        store.getState().setError(note)
+      } else {
+        store.getState().updateTurn(turnId, {
+          status: 'complete', finishedAt: Date.now(),
+        })
+        sfx.play('done')
+      }
     } catch (err) {
       if (stale()) return
       console.error(err)
       sfx.play('error')
-      store
-        .getState()
-        .setError(err instanceof Error ? err.message : 'Something went wrong.')
+      const failure = err instanceof Error ? err.message : 'Error desconocido.'
+      store.getState().updateTurn(turnId, {
+        status: 'error', finishedAt: Date.now(), errorNote: failure,
+      })
+      store.getState().setError(failure)
     } finally {
       if (!stale()) {
+        if (activeReply.current === turnId) activeReply.current = null
         speaker.current = null
         sfx.duck(false)
         music.duck(false)
@@ -331,6 +374,12 @@ export default function App() {
 
     silence()
     if (wasBusy) {
+      if (activeReply.current) {
+        store.getState().updateTurn(activeReply.current, {
+          status: 'interrupted', finishedAt: Date.now(),
+        })
+        activeReply.current = null
+      }
       // Abandon the answer in flight. The turn counter moves in respond()'s
       // replacement; bumping it here covers the case where nothing replaces it.
       turn.current++
@@ -383,6 +432,7 @@ export default function App() {
       wakeMatched: event.wakeMatched,
       mode: event.capturedMode,
       at: event.at,
+      sttMs: event.sttMs,
     })
   }
 
