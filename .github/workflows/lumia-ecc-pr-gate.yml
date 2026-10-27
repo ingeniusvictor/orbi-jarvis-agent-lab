@@ -54,6 +54,9 @@ jobs:
       - name: VL-03 Adaptive turn-taking certification
         run: npx tsx scripts/certify-lumia-adaptive-turns-vl03.ts
 
+      - name: VL-04 Progressive MP3 audio transport certification
+        run: npx tsx scripts/certify-lumia-tts-stream-vl04.ts
+
       - name: Production build
         run: npm run build
 
