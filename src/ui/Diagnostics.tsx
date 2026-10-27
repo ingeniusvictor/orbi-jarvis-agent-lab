@@ -43,6 +43,9 @@ type VoiceDiag = {
   sttRoundTripMs: number | null
   assemblyHoldMs: number | null
   postSpeechGuardMs: number
+  adaptiveTurnsEnabled: boolean
+  acousticWindowMs: number
+  turnHoldReason: string
 }
 
 type TtsDiag = {
@@ -147,6 +150,9 @@ export function Diagnostics() {
         bad={v.assemblyHoldMs != null && v.assemblyHoldMs > 1500}
       />
       <Row k="post-speech echo guard" v={`${v.postSpeechGuardMs ?? 2600} ms`} />
+      <Row k="adaptive turn policy" v={v.adaptiveTurnsEnabled ? 'ON · experimental' : 'OFF · legacy'} />
+      <Row k="last VAD silence window" v={`${v.acousticWindowMs ?? 650} ms`} />
+      <Row k="last turn decision" v={String(v.turnHoldReason ?? 'baseline')} />
       <Row k="mode" v={`${v.mode ?? '—'} (phase ${phase})`} />
       <Row k="accepted" v={String(v.accepted ?? 0)} bad={(v.accepted ?? 0) === 0} />
       <Row k="wakes" v={String(v.wakes ?? 0)} />
