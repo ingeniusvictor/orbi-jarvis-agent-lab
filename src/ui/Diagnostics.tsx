@@ -39,6 +39,13 @@ type VoiceDiag = {
   maxQueueDepth: number
   queueDrops: number
   idleMs: number
+  engine: string
+  sttRoundTripMs: number | null
+  assemblyHoldMs: number | null
+  postSpeechGuardMs: number
+  adaptiveTurnsEnabled: boolean
+  acousticWindowMs: number
+  turnHoldReason: string
 }
 
 type TtsDiag = {
@@ -51,6 +58,8 @@ type TtsDiag = {
   rescued: number
   voice: string
   lastText: string
+  firstTextMs: number | null
+  firstAudioMs: number | null
 }
 
 const ago = (t: number) => (t ? `${((Date.now() - t) / 1000).toFixed(1)}s ago` : '—')
@@ -129,7 +138,21 @@ export function Diagnostics() {
       <Row k="duplicate STT" v={String(v.duplicates ?? 0)} />
       <Row k="STT queue" v={`${v.queueDepth ?? 0} (max ${v.maxQueueDepth ?? 0})`} bad={(v.queueDepth ?? 0) > 2} />
       <Row k="queue drops" v={String(v.queueDrops ?? 0)} />
-      <Row k="STT latency" v={`${v.idleMs ?? 0} ms`} bad={(v.idleMs ?? 0) > 5000} />
+      <Row k="STT provider" v={String(v.engine ?? 'browser')} />
+      <Row
+        k="STT conversion + request"
+        v={v.sttRoundTripMs == null ? 'browser-managed / unavailable' : `${v.sttRoundTripMs} ms`}
+        bad={v.sttRoundTripMs != null && v.sttRoundTripMs > 3000}
+      />
+      <Row
+        k="assembly hold (observed)"
+        v={v.assemblyHoldMs == null ? '—' : `${v.assemblyHoldMs} ms`}
+        bad={v.assemblyHoldMs != null && v.assemblyHoldMs > 1500}
+      />
+      <Row k="post-speech echo guard" v={`${v.postSpeechGuardMs ?? 2600} ms`} />
+      <Row k="adaptive turn policy" v={v.adaptiveTurnsEnabled ? 'ON · experimental' : 'OFF · legacy'} />
+      <Row k="last VAD silence window" v={`${v.acousticWindowMs ?? 650} ms`} />
+      <Row k="last turn decision" v={String(v.turnHoldReason ?? 'baseline')} />
       <Row k="mode" v={`${v.mode ?? '—'} (phase ${phase})`} />
       <Row k="accepted" v={String(v.accepted ?? 0)} bad={(v.accepted ?? 0) === 0} />
       <Row k="wakes" v={String(v.wakes ?? 0)} />
@@ -140,6 +163,8 @@ export function Diagnostics() {
       <div className="diag-sec">SPEAKING · press T to test</div>
       <Row k="engine" v={String(t.engine ?? 'system')} />
       <Row k="voice" v={String(t.voice || '—')} />
+      <Row k="first model text" v={t.firstTextMs == null ? '—' : `${t.firstTextMs} ms`} />
+      <Row k="first audible word" v={t.firstAudioMs == null ? '—' : `${t.firstAudioMs} ms`} />
       <Row k="handed to OS" v={String(t.spoken ?? 0)} />
       <Row k="actually spoke" v={String(t.started ?? 0)} bad={(t.started ?? 0) === 0} />
       <Row k="failures" v={String(t.failures ?? 0)} bad={(t.failures ?? 0) > 0} />
