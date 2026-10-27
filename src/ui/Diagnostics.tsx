@@ -51,6 +51,8 @@ type TtsDiag = {
   rescued: number
   voice: string
   lastText: string
+  firstTextMs: number | null
+  firstAudioMs: number | null
 }
 
 const ago = (t: number) => (t ? `${((Date.now() - t) / 1000).toFixed(1)}s ago` : '—')
@@ -140,6 +142,8 @@ export function Diagnostics() {
       <div className="diag-sec">SPEAKING · press T to test</div>
       <Row k="engine" v={String(t.engine ?? 'system')} />
       <Row k="voice" v={String(t.voice || '—')} />
+      <Row k="first model text" v={t.firstTextMs == null ? '—' : `${t.firstTextMs} ms`} />
+      <Row k="first audible word" v={t.firstAudioMs == null ? '—' : `${t.firstAudioMs} ms`} />
       <Row k="handed to OS" v={String(t.spoken ?? 0)} />
       <Row k="actually spoke" v={String(t.started ?? 0)} bad={(t.started ?? 0) === 0} />
       <Row k="failures" v={String(t.failures ?? 0)} bad={(t.failures ?? 0) > 0} />

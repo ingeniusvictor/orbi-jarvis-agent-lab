@@ -12,7 +12,7 @@ import {
   type VoiceTranscriptEvent,
 } from './lib/voice'
 import { voiceModeForPhase } from './lib/voice-focus'
-import { createSpeaker, cycleVoice, currentVoiceName } from './lib/tts'
+import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag } from './lib/tts'
 import * as sfx from './lib/sfx'
 import * as music from './lib/music'
 import * as hands from './lib/hands'
@@ -155,7 +155,14 @@ export default function App() {
     s.pushTurn({ id: newId(), role: 'user', text: said })
     s.setPhase('thinking')
 
-    const spk = createSpeaker()
+    const responseStartedAt = performance.now()
+    ttsDiag.firstTextMs = null
+    ttsDiag.firstAudioMs = null
+    const spk = createSpeaker(() => {
+      // The callback fires only once, on real OS/audio-element playback, not
+      // on synthesized text, buffering or TTS network completion.
+      if (!stale()) ttsDiag.firstAudioMs = Math.round(performance.now() - responseStartedAt)
+    })
     speaker.current = spk
     sfx.duck(true)
     music.duck(true)
@@ -170,6 +177,7 @@ export default function App() {
           if (stale()) return
           if (!started) {
             started = true
+            ttsDiag.firstTextMs = Math.round(performance.now() - responseStartedAt)
             store.getState().setPhase('speaking')
             // The answer arriving is what ends the tool phase — a timer would
             // clear the readout while a slow tool was still running.
