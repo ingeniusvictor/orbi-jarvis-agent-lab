@@ -57,6 +57,7 @@ export type VoiceTranscriptEvent = {
   wakeMatched: boolean
   capturedMode: VoiceMode
   at: number
+  sttMs?: number
 }
 
 export type VoiceHandlers = {
@@ -759,6 +760,7 @@ async function startVadBridgeVoice(
         wakeMatched: capturedMode === 'wake' && WAKE.test(said),
         capturedMode: capturedMode as VoiceMode,
         at: Date.now(),
+        sttMs: Math.max(0, Math.round(performance.now() - t0)),
       })
 
       if (selfEcho) {
