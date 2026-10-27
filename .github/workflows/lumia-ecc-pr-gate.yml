@@ -84,6 +84,9 @@ jobs:
       - name: AV-01 Face GLB optical profile and classic fallback
         run: npx tsx scripts/certify-lumia-avatar-face-av01.ts
 
+      - name: TL-01 Conversation timeline and 40s no-response diagnostics
+        run: npx tsx scripts/certify-lumia-conversation-timeline-tl01.ts
+
       - name: Production build
         run: npm run build
 
