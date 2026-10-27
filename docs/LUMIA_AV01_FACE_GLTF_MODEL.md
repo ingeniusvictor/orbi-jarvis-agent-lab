@@ -36,8 +36,10 @@ cerebro, permisos, herramientas ni fases de LUMIA.
 El GLB aportado en la conversación no está almacenado en GitHub:
 la conexión de edición disponible permite escribir código, pero no
 transferir directamente este archivo binario local de aproximadamente
-4 MB. Esta rama contiene solamente las adaptaciones compatibles con
-ambas versiones del avatar; no reemplaza por sí sola el GLB remoto.
+4 MB. El GLB **anterior** tampoco se almacena en GitHub: la ruta local
+original ya estaba documentada como un asset de ~17 MB no versionado.
+Esta rama contiene solamente las adaptaciones compatibles con ambos
+avatares; no reemplaza por sí sola los archivos de Windows.
 
 Se entrega al propietario, aparte de GitHub, un ZIP con:
 - `lumia.glb` — archivo binario con marcador AV-01.
@@ -51,9 +53,9 @@ modelo original en `local-asset-backups\lumia.pre-face.glb` y
 sobrescribe únicamente `public\models\lumia\lumia.glb`, tras lo
 cual se recarga Chrome con Ctrl+Shift+R.
 
-Se hace una modificación local de un archivo versionado por Git: antes
-de cambiar de rama o actualizar el repositorio, hay que revisar el
-trabajo local y conservar el nuevo GLB para evitar sobrescribirlo.
+Ambos GLB son activos locales, no versionados en este repositorio. Antes
+de limpiar o reinstalar la carpeta local, conserva el rostro nuevo y el
+respaldo. Los cambios de código de esta rama sí se versionan por Git.
 
 Para revertir: restaurar el GLB respaldado en su ruta original
 y recargar la pestaña. El componente AV-01 detectará la ausencia del
