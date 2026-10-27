@@ -81,6 +81,9 @@ jobs:
       - name: VL-06 Offline preflight CLI smoke
         run: node scripts/lumia-voice-preflight.mjs --json
 
+      - name: AV-01 Face GLB optical profile and classic fallback
+        run: npx tsx scripts/certify-lumia-avatar-face-av01.ts
+
       - name: Production build
         run: npm run build
 
