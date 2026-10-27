@@ -57,6 +57,9 @@ jobs:
       - name: VL-04 Progressive MP3 audio transport certification
         run: npx tsx scripts/certify-lumia-tts-stream-vl04.ts
 
+      - name: VL-05 Owner-gated WebRTC session contract
+        run: node scripts/certify-lumia-realtime-vl05.mjs
+
       - name: Production build
         run: npm run build
 
