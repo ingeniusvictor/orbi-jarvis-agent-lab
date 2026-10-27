@@ -39,6 +39,10 @@ type VoiceDiag = {
   maxQueueDepth: number
   queueDrops: number
   idleMs: number
+  engine: string
+  sttRoundTripMs: number | null
+  assemblyHoldMs: number | null
+  postSpeechGuardMs: number
 }
 
 type TtsDiag = {
@@ -131,7 +135,18 @@ export function Diagnostics() {
       <Row k="duplicate STT" v={String(v.duplicates ?? 0)} />
       <Row k="STT queue" v={`${v.queueDepth ?? 0} (max ${v.maxQueueDepth ?? 0})`} bad={(v.queueDepth ?? 0) > 2} />
       <Row k="queue drops" v={String(v.queueDrops ?? 0)} />
-      <Row k="STT latency" v={`${v.idleMs ?? 0} ms`} bad={(v.idleMs ?? 0) > 5000} />
+      <Row k="STT provider" v={String(v.engine ?? 'browser')} />
+      <Row
+        k="STT conversion + request"
+        v={v.sttRoundTripMs == null ? 'browser-managed / unavailable' : `${v.sttRoundTripMs} ms`}
+        bad={v.sttRoundTripMs != null && v.sttRoundTripMs > 3000}
+      />
+      <Row
+        k="assembly hold (observed)"
+        v={v.assemblyHoldMs == null ? '—' : `${v.assemblyHoldMs} ms`}
+        bad={v.assemblyHoldMs != null && v.assemblyHoldMs > 1500}
+      />
+      <Row k="post-speech echo guard" v={`${v.postSpeechGuardMs ?? 2600} ms`} />
       <Row k="mode" v={`${v.mode ?? '—'} (phase ${phase})`} />
       <Row k="accepted" v={String(v.accepted ?? 0)} bad={(v.accepted ?? 0) === 0} />
       <Row k="wakes" v={String(v.wakes ?? 0)} />
