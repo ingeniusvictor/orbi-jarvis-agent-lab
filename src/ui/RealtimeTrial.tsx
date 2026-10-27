@@ -25,16 +25,27 @@ export function RealtimeTrial({
   const active = useRef<RealtimeCall | null>(null)
   const aborting = useRef<AbortController | null>(null)
   const suspended = useRef(false)
+  const stopping = useRef(false)
 
   const stop = useCallback(() => {
-    aborting.current?.abort()
+    // Aborting a handshake synchronously invokes its "closed" callback.
+    // Mark recovery before aborting so nested callbacks cannot start two
+    // microphone/Whisper loops or restore an already-ended conversation.
+    if (stopping.current) return
+    stopping.current = true
+    const shouldResume = suspended.current
+    suspended.current = false
+    const controller = aborting.current
     aborting.current = null
-    active.current?.stop()
+    const call = active.current
     active.current = null
-    setState('closed')
-    if (suspended.current) {
-      suspended.current = false
-      onResumeNormal()
+    try {
+      controller?.abort()
+      call?.stop()
+      setState('closed')
+      if (shouldResume) onResumeNormal()
+    } finally {
+      stopping.current = false
     }
   }, [onResumeNormal])
 
