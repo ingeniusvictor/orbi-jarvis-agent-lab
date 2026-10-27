@@ -9,6 +9,7 @@ import {
 } from '../config'
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
+import { findEarlySpeechBoundary } from './first-audio-chunk'
 
 /**
  * Speech output.
@@ -422,6 +423,8 @@ export function createSpeaker(): Speaker {
   let cancelled = false
   let outLevel = 0
   let pumping = false
+  // An explicit first-phrase fast path applies only once per speaker/answer.
+  let firstChunkQueued = false
 
   let currentAudio: HTMLAudioElement | null = null
   let nativeInFlight = false
@@ -449,6 +452,7 @@ export function createSpeaker(): Speaker {
     } else {
       queue.push(item)
     }
+    firstChunkQueued = true
     void pump()
   }
 
@@ -789,6 +793,18 @@ export function createSpeaker(): Speaker {
         }
         enqueue(candidate)
         buffer = buffer.slice(cut)
+      }
+
+      // Start the FIRST phrase at a natural clause boundary before a lengthy
+      // sentence is complete. This reduces time-to-first-audio while retaining
+      // word boundaries, ordered playback, interruption and sentence handling.
+      // No repeated early cuts: subsequent phrases preserve the old cadence.
+      if (!firstChunkQueued) {
+        const earlyCut = findEarlySpeechBoundary(buffer)
+        if (earlyCut !== null) {
+          enqueue(buffer.slice(0, earlyCut))
+          buffer = buffer.slice(earlyCut)
+        }
       }
 
       // Unpunctuated prose would otherwise sit here silently until the answer
