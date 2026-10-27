@@ -149,6 +149,9 @@ export function AcousticLab({
       frameRef.current = requestAnimationFrame(tick)
       setStatus('Micrófono abierto solo para medir nivel. Habla normalmente.')
     } catch (err) {
+      // A permission or AudioContext promise can reject *after* the user
+      // closed the lab. Never overwrite the closed/timeout status then.
+      if (!activeRef.current || disposedRef.current) return
       setStatus(err instanceof Error ? err.message : 'No se pudo abrir el micrófono.')
       stop()
     }
