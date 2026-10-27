@@ -41,11 +41,13 @@ export function turnStateLabel(reply: Turn, now: number): string {
 
 /** A plain text clipboard report; no recordings, API keys or background upload. */
 export function exportConversationTimeline({
-  heard, turns, at,
+  heard, turns, at, error, errorAt,
 }: {
   heard: HeardLine[]
   turns: Turn[]
   at: number
+  error?: string | null
+  errorAt?: number | null
 }): string {
   const lines = [`LUMIA · DIAGNÓSTICO DE CONVERSACIÓN · ${dateLabel(at)}`,
     'Reloj local del navegador. STT = procesamiento observado, no duración física del habla.',
@@ -53,6 +55,7 @@ export function exportConversationTimeline({
   for (const item of heard) {
     lines.push(`[${timeLabel(item.at)}] ${item.mode}/${item.kind} (${item.provider})${item.sttMs == null ? '' : ` · STT ${item.sttMs} ms`}: ${item.text}`)
   }
+  if (error) lines.push(`ERROR GENERAL [${timeLabel(errorAt)}]: ${error}`)
   lines.push('COMANDOS Y RESPUESTAS:')
   for (const t of turns) {
     if (t.role === 'user') {
