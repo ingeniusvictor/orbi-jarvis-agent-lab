@@ -4,6 +4,7 @@ import {
   type RealtimeCall,
   type RealtimeState,
 } from '../lib/realtime-voice'
+import { type RealtimeTurnStats } from '../lib/realtime-turn-metrics'
 
 /**
  * Deliberately distinct from LUMIA's normal microphone and command loop.
@@ -22,6 +23,9 @@ export function RealtimeTrial({
   const [pin, setPin] = useState('')
   const [state, setState] = useState<RealtimeState>('closed')
   const [message, setMessage] = useState('')
+  const [metrics, setMetrics] = useState<RealtimeTurnStats>({
+    count: 0, lastMs: null, medianMs: null, p95Ms: null, interrupted: 0,
+  })
   const active = useRef<RealtimeCall | null>(null)
   const aborting = useRef<AbortController | null>(null)
   const suspended = useRef(false)
@@ -57,6 +61,7 @@ export function RealtimeTrial({
   const start = async () => {
     if (state !== 'closed' || pin.trim().length < 12 || !available) return
     setMessage('')
+    setMetrics({ count: 0, lastMs: null, medianMs: null, p95Ms: null, interrupted: 0 })
     setPin('') // Never retain the owner PIN in component state after submission.
     const submittedPin = pin.trim()
     const controller = new AbortController()
@@ -68,6 +73,7 @@ export function RealtimeTrial({
       const result = await startRealtimeVoiceTrial({
         pin: submittedPin,
         signal: controller.signal,
+        onMetrics: setMetrics,
         onState: (next, note) => {
           if (note) setMessage(note)
           if (next === 'closed') stop()
@@ -139,6 +145,35 @@ export function RealtimeTrial({
             state === 'listening' ? 'escuchando' :
               state === 'speaking' ? 'hablando' :
                 state === 'interrupted' ? 'detectando voz' : 'error'}
+      </div>
+      <div aria-label="Métricas de latencia WebRTC" style={{
+        background: '#0d2a36', borderRadius: 10, padding: 10, marginTop: 10,
+      }}>
+        <strong>Mediciones de turnos (sin grabaciones)</strong>
+        <div>Muestras: {metrics.count} · Interrupciones: {metrics.interrupted}</div>
+        <div>Última: {metrics.lastMs == null ? '—' : metrics.lastMs + ' ms'}</div>
+        <div>Mediana: {metrics.medianMs == null ? '—' : metrics.medianMs + ' ms'}</div>
+        <div>P95: {metrics.p95Ms == null ? '—' : metrics.p95Ms + ' ms'}</div>
+        <small style={{ color: '#9dc6d0' }}>
+          Desde detección de fin de voz hasta que el servidor comienza a enviar
+          audio; NO mide el primer sonido audible en el parlante.
+        </small>
+        {metrics.count > 0 && (
+          <button type="button" onClick={() => {
+            const summary = JSON.stringify({
+              phase: 'VL-06', clock: 'WebRTC data-channel proxy',
+              ...metrics,
+              containsAudioOrTranscript: false,
+            }, null, 2)
+            void navigator.clipboard.writeText(summary).catch(() =>
+              setMessage('No pude copiar automáticamente las métricas.'),
+            )
+          }} style={{
+            display: 'block', marginTop: 8, background: '#163e4e',
+            color: '#e5faff', padding: '5px 9px', border: '1px solid #437986',
+            borderRadius: 8, cursor: 'pointer',
+          }}>Copiar resumen sin datos privados</button>
+        )}
       </div>
       {!inSession && (
         <label style={{ display: 'block', marginTop: 12 }}>
