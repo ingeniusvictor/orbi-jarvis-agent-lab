@@ -4,6 +4,8 @@ import { Hud } from './ui/Hud'
 import { Boot } from './ui/Boot'
 import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
+import { RealtimeTrial } from './ui/RealtimeTrial'
+import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
 import {
   startVoice,
@@ -816,6 +818,35 @@ export default function App() {
       <Hud />
       <Boot />
       <Diagnostics />
+      {isRealtimePilotUiEnabled() && (
+        <RealtimeTrial
+          available={phase !== 'offline' && phase !== 'boot'}
+          onSuspendNormal={() => {
+            // Never run the established Whisper/browser/agent voice loop at
+            // the same time as the owner-authorized realtime experiment.
+            clearIdle()
+            invalidateVoiceRestart()
+            voice.current?.stop()
+            silence()
+            turn.current++
+            interrupt()
+            music.working(false)
+            music.duck(false)
+            sfx.duck(false)
+            store.getState().setPhase('thinking')
+          }}
+          onResumeNormal={() => {
+            void restartVoice()
+              .then(() => goDormant())
+              .catch((err: unknown) => {
+                store.getState().setError(
+                  err instanceof Error ? err.message : 'No se pudo reanudar el reconocimiento local.',
+                )
+                goDormant()
+              })
+          }}
+        />
+      )}
       <Ignition onStart={() => void powerOn()} />
     </>
   )
