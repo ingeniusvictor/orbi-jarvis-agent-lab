@@ -300,8 +300,8 @@ export default function App() {
     void (async () => {
       await greeting.end()
       const guardMs = followupGuardMs()
-        voiceDiag.postSpeechGuardMs = guardMs
-        await new Promise((r) => setTimeout(r, guardMs))
+      voiceDiag.postSpeechGuardMs = guardMs
+      await new Promise((r) => setTimeout(r, guardMs))
       if (speaker.current === greeting) speaker.current = null
       const now = store.getState().phase
       if (now === 'waking' || now === 'speaking') listen(AWAIT_SPEECH_MS)
