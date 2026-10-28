@@ -1,0 +1,20 @@
+{
+  "id": "LUMIA-AV01B-FACE-2026-10-28",
+  "file": "public/models/lumia/lumia.glb",
+  "sha256": "a1d48cb762fb00ecb2e89270ca7755b7ad7ac1e7e384e0cc21a796494418f56f",
+  "bytes": 4128456,
+  "format": "glTF 2.0 binary",
+  "variant": "face-only",
+  "marker": {
+    "path": "nodes[0].extras.lumiaAvatarProfile",
+    "value": "face-v1"
+  },
+  "calibration": {
+    "heightFraction": 0.47,
+    "cssShiftPixels": 25
+  },
+  "origin": "User-supplied GLB, verified from prior Windows installation package",
+  "geometry": "Original embedded geometry and texture binary chunk preserved",
+  "stagedInRepository": false,
+  "note": "Binary excluded by .gitignore pending owner-side git push. No claim that GLB has been uploaded."
+}
