@@ -23,6 +23,23 @@
 
 **Las pruebas CI validan contratos y compilación, no confirman por sí solas funcionamiento de micrófono, TTS, visión ni FPS en Windows.**
 
+## Confirmación posterior: publicación binaria realizada
+
+**2026-10-28 — publicado y certificado en GitHub.**
+
+- Commit de incorporación: `0478540e1ef997428794187203b0c0e2584bb6e5`.
+- Ruta remota incluida en el árbol Git: `public/models/lumia/lumia.glb`.
+- Tamaño confirmado remotamente: `4.128.456` bytes.
+- SHA-256 certificado por GitHub Actions: `a1d48cb762fb00ecb2e89270ca7755b7ad7ac1e7e384e0cc21a796494418f56f`.
+- Certificación exitosa: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/40715289290
+- La salida CI confirma explícitamente `FULL FACE GLB BINARY CHECKSUM + PROFILE + CALIBRATION PASS`.
+- PR consolidado: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/28
+- `main` sigue sin modificar; el PR permanece de revisión, sin fusionar.
+
+**Nota histórica:** las secciones siguientes describen el procedimiento de transferencia que
+estaba pendiente cuando se preparó originalmente este documento. El propietario
+ya ejecutó el script, confirmó el push y la prueba automática verificó el GLB.
+
 ## Nuevo avatar: archivo identificado y verificado
 
 En la conversación original se suministró `LUMIA solo rostro(1).glb`, y posteriormente un ZIP de instalación `LUMIA_Nuevo_Rostro_Instalacion_Windows.zip`. El GLB de ese ZIP contiene el marcador `nodes[0].extras.lumiaAvatarProfile = "face-v1"` compatible con `src/scene/avatar-profile.ts`.
