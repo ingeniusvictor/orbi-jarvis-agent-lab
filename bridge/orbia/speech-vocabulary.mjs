@@ -14,6 +14,8 @@ export const ORBI_SPEECH_VOCABULARY = Object.freeze([
   'ORBI',
   'Qwen',
   'Ollama',
+  'IA local',
+  'inteligencia artificial local',
   'Whisper',
   'Kokoro',
   'BESS',
@@ -40,6 +42,13 @@ export const ORBI_SPEECH_INITIAL_PROMPT =
  */
 export function normalizeTechnicalSpeechText(value) {
   return String(value ?? '')
+    // Whisper base/es can hear "IA local" as "una y local". Only repair
+    // this exact acoustic variant within explicit technical intent. Never
+    // rewrite short, contextless "A lo local", "E-A", or ordinary "una".
+    .replace(
+      /\\b((?:trabajar|trabajo|usar|utilizar|configurar|entrenar|crear|instalar|programar|aprender|consultar|modelo|modelos|asistente|inteligencia artificial)[^.!?]{0,85}?)\\buna\\s+y\\s+local\\b/giu,
+      '$1IA local',
+    )
     .replace(/\bM\s*P\s*T\s*T\b/giu, 'MPPT')
     .replace(/\bM\s*T\s*T\s*P\b/giu, 'MPPT')
     .replace(/\bM\s*P\s*P\s*T\b/giu, 'MPPT')
