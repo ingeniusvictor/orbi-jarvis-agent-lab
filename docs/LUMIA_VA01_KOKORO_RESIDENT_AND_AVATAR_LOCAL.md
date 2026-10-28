@@ -88,3 +88,51 @@ Solo después de actualizar el código experimental al nuevo branch:
 - Para volver atrás: detener el bridge y reiniciar con variable 0.
 
 La rama protegida `main` y el acceso directo original no cambian.
+
+
+## ASUS TUF — primera medición física con Kokoro residente (28-oct-2026)
+
+Evidencia: captura de LUMIA en Chrome entregada por propietario después de
+instalar Whisper.cpp y Kokoro local, ejecutar `npm run start:lumia` con
+`ORBIA_KOKORO_RESIDENT_ENABLED=1`, y comprobar el puente `/health`.
+
+Entorno: ASUS TUF i5-10300H / 32 GB / GTX 1650 Ti 4 GB;
+Ollama 0.40.12; `qwen3.5:2b-q4_K_M` en **100 % GPU**, contexto 4096;
+`effectiveStt=local`, `effectiveTts=local`, `voiceProfile=lumia-kokoro`;
+`sttAvailable=true`, `ttsAvailable=true`. La interfaz muestra ahora
+«L.U.M.I.A. · Kokoro local» tras sincronizar HUD después del probe VRM
+(commit `447d310`). Estas pruebas certifican selección y ejecución real,
+pero no evalúan el contenido de cada archivo de audio ni benchmark de
+fluidez reproducido múltiples veces.
+
+Mediciones visibles en pantalla:
+- Saludo inicial: primer texto a **+1,96 s**, primer audio a **+5,24 s**,
+  pausa entre frases **1,13 s**, Kokoro **1,12 s**, total **13,94 s**.
+- Pregunta sobre IA local: Whisper STT de la frase final **4644 ms**
+  (otra transcripción parcial **3588 ms**); primer texto **+2,83 s**,
+  primer audio **+9,01 s**, segunda frase **pausa 4,69 s**, atribución
+  **texto 0,00 s / Kokoro 4,68 s**.
+- Una captura anterior sin residente registró **pausa 8,15 s**; la
+  diferencia 8,15 → 1,13 s de las introducciones es prometedora, pero
+  **NO es un A/B controlado de frases iguales**.
+
+Hallazgos cualitativos:
+- Se conserva el rostro AV-01B sin deformaciones graves visibles;
+  botón «VISIÓN · FOTO» expuesto (todavía sin prueba de integración).
+- La transcripción de «IA local» apareció como un término semejante a
+  «hiálocal»: error de STT a investigar en audio con consentimiento.
+- Aunque pidió «en cuatro frases», el modelo generó visualmente dos
+  oraciones. Analizar límite de tokens y adherencia a instrucciones por
+  separado de la latencia de voz.
+- En el turno largo la pausa se explica principalmente por la síntesis
+  Kokoro (4,68 s), no espera por texto (0,00 s).
+
+**Próximo experimento aislado**: cambiar únicamente
+`VITE_LUMIA_TTS_PREFETCH_NEXT=1` antes de iniciar Vite/LUMIA y mantener
+`ORBIA_KOKORO_RESIDENT_ENABLED=1`; repetir una solicitud igual con
+registros «COPIAR REGISTRO» y diagnóstico D. Esta bandera ya existe en
+`src/lib/tts.ts`. Se espera evaluar si preparar la siguiente frase en
+paralelo con la reproducción reduce el tiempo de silencio; **no
+garantizar aceleración** por modelo ONNX ni afectar el código GLB. Revertir
+desactivando bandera y reiniciando si hay errores de audio. No activar
+herramientas de escritura, APIs pagas ni exposición remota durante pruebas.
