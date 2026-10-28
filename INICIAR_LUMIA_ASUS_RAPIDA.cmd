@@ -22,6 +22,8 @@ rem Opt-in ASUS pilot: shorten only the first local Kokoro chunk for measured on
 set "VITE_LUMIA_FAST_FIRST_CHUNK=1"
 rem Optical face-only horizontal correction in CSS pixels; default canon remains +25.
 set "VITE_LUMIA_FACE_SHIFT_PX=0"
+rem ASUS only: 8 percent smaller face bust inside hologram rings; classic avatar unchanged.
+set "VITE_LUMIA_FACE_SCALE=0.92"
 set "VITE_LUMIA_VISUAL_INPUT_VI01=1"
 set "ORBIA_LUMIA_VISION_ENABLED=1"
 set "JARVIS_ALLOW_WRITES=0"

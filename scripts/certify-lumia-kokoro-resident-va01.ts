@@ -49,6 +49,7 @@ assert.match(hud, /Voz #\{index \+ 1\}/)
 assert.match(copied, /Audio #\$\{index \+ 1\}/)
 assert.match(avatar, /const FACE_HEIGHT_FRACTION = 0\.47/)
 assert.match(avatar, /const FACE_SHIFT_PX = 25/)
+assert.match(avatar, /VITE_LUMIA_FACE_SCALE/)
 
 // Parse Node module syntax without starting a voice worker or spending tokens.
 const check = spawnSync(process.execPath, ['--check', new URL('../bridge/orbia/resident-tts.mjs', import.meta.url).pathname], { encoding: 'utf8' })

@@ -10,6 +10,7 @@ import {
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
 import { findEarlySpeechBoundary } from './first-audio-chunk'
+import { isIncompleteLumiaSpelling, normalizeSpokenLumiaName } from './speech-pronunciation'
 import { attributePhraseGap } from './phrase-gap-attribution'
 import { createStreamingMp3, type StreamedAudio } from './streaming-mp3'
 
@@ -433,7 +434,7 @@ function outputContext(): AudioContext | null {
  */
 function shape(text: string): string {
   return (
-    text
+    normalizeSpokenLumiaName(text)
       // Models leak markdown even when told not to, and a synthesiser will
       // happily read "https colon slash slash" out loud. Strip the syntax and
       // keep the words.
@@ -938,7 +939,10 @@ export function createSpeaker(
     },
     push(delta) {
       if (cancelled) return
-      buffer += delta
+      buffer = normalizeSpokenLumiaName(buffer + delta)
+      // Prevent a streamed dotted self-introduction ("L. U. M. I. A.")
+      // from being spoken one letter at a time as separate sentences.
+      if (isIncompleteLumiaSpelling(buffer)) return
 
       // Drain every complete sentence sitting in the buffer.
       for (;;) {

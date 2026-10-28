@@ -48,6 +48,23 @@ const FACE_HEIGHT_FRACTION = 0.47
 const FACE_SHIFT_PX = 25
 
 /**
+ * Per-machine face-only size correction. Preserve the approved canonical
+ * fraction and the legacy robot by default. This multiplier shrinks the
+ * complete bust uniformly around its geometric centre, never editing GLB.
+ * Small, opt-in ASUS trial: 0.92 gives 8% more breathing room inside the rings.
+ */
+const faceScaleSetting = import.meta.env.VITE_LUMIA_FACE_SCALE
+const faceScaleParsed = Number(faceScaleSetting)
+const FACE_SCALE_EFFECTIVE =
+  faceScaleSetting !== undefined &&
+  String(faceScaleSetting).trim() !== '' &&
+  Number.isFinite(faceScaleParsed) &&
+  faceScaleParsed >= 0.80 &&
+  faceScaleParsed <= 1
+    ? faceScaleParsed
+    : 1
+
+/**
  * Optional per-machine horizontal optical calibration for face-v1 ONLY.
  * The original +25px approved baseline is preserved when no override is set.
  * On ASUS, the owner's live capture shows the face a little right of centre;
@@ -179,7 +196,9 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
               ? 0.22
               : 0
 
-    root.current.scale.setScalar(modelScale * voicePulse)
+    root.current.scale.setScalar(
+      modelScale * voicePulse * (prepared.faceOnly ? FACE_SCALE_EFFECTIVE : 1),
+    )
     const worldPerPixelX = viewport.width / Math.max(canvasWidth, 1)
     root.current.position.set(
       (prepared.faceOnly ? FACE_SHIFT_EFFECTIVE_PX : OPTICAL_SHIFT_PX) * worldPerPixelX,
