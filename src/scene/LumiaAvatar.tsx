@@ -47,6 +47,24 @@ const OPTICAL_SHIFT_PX = -28
 const FACE_HEIGHT_FRACTION = 0.47
 const FACE_SHIFT_PX = 25
 
+/**
+ * Optional per-machine horizontal optical calibration for face-v1 ONLY.
+ * The original +25px approved baseline is preserved when no override is set.
+ * On ASUS, the owner's live capture shows the face a little right of centre;
+ * VITE_LUMIA_FACE_SHIFT_PX=0 is a reversible trial (no GLB changes).
+ * Numeric range [-80, 80] prevents accidentally losing the avatar offscreen.
+ * Vite reads this on server launch; restarting is required to apply changes.
+ */
+const faceShiftSetting = import.meta.env.VITE_LUMIA_FACE_SHIFT_PX
+const faceShiftParsed = Number(faceShiftSetting)
+const FACE_SHIFT_EFFECTIVE_PX =
+  faceShiftSetting !== undefined &&
+  String(faceShiftSetting).trim() !== '' &&
+  Number.isFinite(faceShiftParsed) &&
+  Math.abs(faceShiftParsed) <= 80
+    ? faceShiftParsed
+    : FACE_SHIFT_PX
+
 function cloneMaterial(
   material: THREE.Material,
   reactive: THREE.MeshStandardMaterial[],
@@ -164,7 +182,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
     root.current.scale.setScalar(modelScale * voicePulse)
     const worldPerPixelX = viewport.width / Math.max(canvasWidth, 1)
     root.current.position.set(
-      (prepared.faceOnly ? FACE_SHIFT_PX : OPTICAL_SHIFT_PX) * worldPerPixelX,
+      (prepared.faceOnly ? FACE_SHIFT_EFFECTIVE_PX : OPTICAL_SHIFT_PX) * worldPerPixelX,
       Math.sin(t * 0.82) * floatAmount,
       0.12,
     )
