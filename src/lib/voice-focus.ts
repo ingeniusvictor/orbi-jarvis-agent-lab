@@ -76,6 +76,20 @@ export function shouldInterruptBusyAssistant(
  * Whisper sometimes emits bracketed acoustic annotations for music/noise.
  * They are useful evidence in ESCUCHANDO but must never become commands.
  */
+const ACOUSTIC_LABEL = '(?:musica|music|silencio|silence|ruido|noise|aplausos|applause|risas|laughter)'
+const BRACKETED_ACOUSTIC = String.raw`(?:\[\s*${ACOUSTIC_LABEL}\s*\]|\(\s*${ACOUSTIC_LABEL}\s*\))`
+const ONE_ACOUSTIC_LABEL = new RegExp(
+  String.raw`^(?:\[|\()?\s*${ACOUSTIC_LABEL}\s*(?:\]|\))?[.!?]*$`,
+)
+const REPEATED_ACOUSTIC_LABELS = new RegExp(
+  String.raw`^${BRACKETED_ACOUSTIC}(?:[\s,.;!?¡¿-]*${BRACKETED_ACOUSTIC})+[\s.!?]*$`,
+)
+
+/**
+ * Pure Whisper music/noise annotations may repeat inside one transcript.
+ * They are visible as non-speech telemetry but never enter command assembly.
+ * Natural speech containing an acoustic label remains untouched.
+ */
 export function isNonSpeechTranscript(text: string): boolean {
   const value = String(text ?? '')
     .trim()
@@ -83,9 +97,7 @@ export function isNonSpeechTranscript(text: string): boolean {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
 
-  return /^(?:\[|\()?\s*(?:musica|music|silencio|silence|ruido|noise|aplausos|applause|risas|laughter)\s*(?:\]|\))?[.!?]*$/.test(
-    value,
-  )
+  return ONE_ACOUSTIC_LABEL.test(value) || REPEATED_ACOUSTIC_LABELS.test(value)
 }
 
 

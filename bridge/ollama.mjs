@@ -31,6 +31,7 @@ import {
 import { buildVoiceRuntimeStatus } from './orbia/voice-status.mjs'
 import { applyVoiceRuntimeControl } from './orbia/voice-control.mjs'
 import { parseVoiceRuntimeControl } from './orbia/voice-runtime.mjs'
+import { createOllamaReplyGate } from './orbia/ollama-json-stream.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
@@ -42,6 +43,9 @@ export const OLLAMA_VOICE_NUM_PREDICT = Math.max(
   Math.min(180, Number(process.env.JARVIS_OLLAMA_NUM_PREDICT) || 120),
 )
 
+// Default conservative buffered JSON. Experimental streamed Spanish reply
+// requires explicit opt-in; do not emit a raw Ollama thinking channel.
+const STREAM_VOICE = process.env.ORBIA_OLLAMA_VOICE_STREAM === '1'
 const getVoiceRuntimeSnapshot = () => buildVoiceRuntimeStatus()
 
 const localToolRegistry = new ToolRegistry()
@@ -388,6 +392,84 @@ export async function streamOllama({
       ''
 
     return typeof candidate === 'string' ? candidate.trim() : ''
+  }
+
+  if (STREAM_VOICE) {
+    const gate = createOllamaReplyGate({ onText })
+    let rawLines = ''
+    let chunks = 0
+    let lastPacket = null
+    const streamedStartedAt = performance.now()
+    try {
+      const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model, messages, stream: true, think: false,
+          format: responseSchema,
+          keep_alive: OLLAMA_KEEP_ALIVE,
+          options: { temperature: 0, num_predict: OLLAMA_VOICE_NUM_PREDICT },
+        }),
+        signal,
+      })
+      if (!res.ok || !res.body) {
+        throw new Error(`Ollama streaming unavailable: HTTP ${res.status}`)
+      }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      const consume = (line) => {
+        if (!line.trim()) return
+        if (++chunks > 4000) throw new Error('Ollama stream exceeded the safe packet limit')
+        const packet = JSON.parse(line)
+        if (packet.error) throw new Error('Ollama streaming returned an error')
+        const delta = packet.message?.content
+        if (typeof delta === 'string' && delta) gate.feed(delta)
+        if (packet.done === true) lastPacket = packet
+      }
+      try {
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          rawLines += decoder.decode(value, { stream: true })
+          if (rawLines.length > 128 * 1024) throw new Error('Ollama stream buffer overflow')
+          let nl
+          while ((nl = rawLines.indexOf('\n')) >= 0) {
+            const line = rawLines.slice(0, nl)
+            rawLines = rawLines.slice(nl + 1)
+            consume(line)
+          }
+        }
+        rawLines += decoder.decode()
+        if (rawLines.trim()) consume(rawLines)
+      } finally {
+        reader.releaseLock()
+      }
+      if (!lastPacket) throw new Error('Ollama stream ended without a completion marker')
+      const streamed = gate.finish()
+      const finalText = sanitizeLumiaVoiceOutput(streamed)
+      // All already-emitted speech must be a prefix of the final answer.
+      // This is an opt-in experiment; if a model violates the contract after
+      // audible output, signal the error rather than replaying duplicate text.
+      if (!finalText) throw new Error('Ollama streamed response empty')
+      const totalMs = Number(lastPacket.total_duration ?? 0) / 1_000_000
+      const promptMs = Number(lastPacket.prompt_eval_duration ?? 0) / 1_000_000
+      const evalMs = Number(lastPacket.eval_duration ?? 0) / 1_000_000
+      const tokens = Number(lastPacket.eval_count ?? 0)
+      console.log(
+        `[orbia] LUMIA streamed latency model=${model}` +
+        ` observed=${Math.round(performance.now() - streamedStartedAt)}ms` +
+        ` total=${totalMs.toFixed(0)}ms prompt=${promptMs.toFixed(0)}ms` +
+        ` generate=${evalMs.toFixed(0)}ms output=${tokens}tok` +
+        (evalMs > 0 ? ` speed=${(tokens / evalMs * 1000).toFixed(1)}tok/s` : ''),
+      )
+      return finalText
+    } catch (error) {
+      if (signal?.aborted) throw error
+      // A partial answer may already have been spoken; repeating it with the
+      // buffered fallback would be confusing and could double-execute intent.
+      if (gate.startedSpeaking) throw error
+      console.warn('[lumia] stream unavailable before speech; using validated buffered answer')
+    }
   }
 
   let raw = await runStructured(messages)
