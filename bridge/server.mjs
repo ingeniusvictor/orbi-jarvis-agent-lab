@@ -49,6 +49,7 @@ import {
 } from './orbia/local-tts.mjs'
 import { transcribeMultivoiceLocalWav } from './orbia/multivoice-stt.mjs'
 import { ensureWhisperServer } from './orbia/whisper-server-runtime.mjs'
+import { prewarmResidentKokoro } from './orbia/resident-tts.mjs'
 import { createRealtimeGrantService } from './orbia/realtime-grants.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
@@ -1051,15 +1052,18 @@ const handleRequest = async (req, res) => {
     }
 
     try {
+      const voiceStartedAt = performance.now()
       const result = await synthesizeLocalSpeech(payload?.text, {
         speaker: payload?.speaker || 'ef_dora',
       })
+      const synthesisMs = Math.round(performance.now() - voiceStartedAt)
       res.writeHead(200, {
         ...cors,
         'content-type': result.mimeType,
         'cache-control': 'no-cache',
         'x-orbia-voice-provider': result.provider,
         'x-orbia-voice-speaker': result.speaker,
+        'x-orbia-tts-synthesis-ms': String(synthesisMs),
       })
       return res.end(Buffer.from(result.audio))
     } catch (err) {
@@ -1452,6 +1456,17 @@ if (!voiceRuntimeAtBoot.local.ttsAvailable) {
   console.warn(
     `${CONSOLE_TAG} Kokoro missing: ${missingKokoro.join(', ') || 'unknown'} · run INSTALAR_VOZ_LOCAL_LUMIA.cmd`,
   )
+}
+
+// Resident Kokoro is an explicitly enabled Windows experiment, independent
+// from Whisper's own resident-server setting. Prepare it during Ollama warm-up,
+// not on the first few spoken words.
+if (voiceRuntimeAtBoot.local.ttsAvailable &&
+    process.env.ORBIA_KOKORO_RESIDENT_ENABLED === '1') {
+  void prewarmResidentKokoro().then((ready) => {
+    if (ready.ready) console.log(`${CONSOLE_TAG} Kokoro resident ready · local model kept loaded`)
+    else console.warn(`${CONSOLE_TAG} Kokoro resident unavailable; standard local voice remains ready`)
+  })
 }
 
 if (
