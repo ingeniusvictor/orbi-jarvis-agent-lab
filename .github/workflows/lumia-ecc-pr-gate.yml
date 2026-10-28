@@ -98,6 +98,9 @@ jobs:
       - name: VA-02 ASUS bounded local WAV recovery and no paid rescue
         run: npx tsx scripts/certify-lumia-local-playback-recovery-va02.ts
 
+      - name: CG-01 Detect repeated previous answers to unrelated voice questions
+        run: node scripts/certify-lumia-stale-answer-cg01.mjs
+
       - name: RC-01 IA local STT and opt-in streaming Ollama reply
         run: npx tsx scripts/certify-lumia-voice-rc01.ts
 
