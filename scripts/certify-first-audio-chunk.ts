@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { findEarlySpeechBoundary } from '../src/lib/first-audio-chunk'
+import { readFileSync } from 'node:fs'
+import { findEarlySpeechBoundary, findFastLocalFirstBoundary } from '../src/lib/first-audio-chunk'
 
 const short = 'Hola, ¿en qué puedo ayudarte?'
 assert.equal(findEarlySpeechBoundary(short), null, 'Short answers wait for normal flush.')
@@ -72,3 +73,19 @@ for (let length = 1; length <= spanish.length; length++) {
   }
 }
 console.log('LUMIA VL-07: ASUS opt-in early Kokoro phrase boundary: PASS')
+
+
+// VL-08: a whole Qwen JSON answer cannot bypass fast first-local chunking.
+const oversizedFirst = 'La Inteligencia Artificial Local es una tecnología que permite ejecutar modelos de inteligencia artificial directamente en tu dispositivo, sin necesidad de enviar tus datos a un servidor externo. Para usarla, primero necesitas instalar el software adecuado.'
+const endOfFirst = oversizedFirst.indexOf('. ') + 2
+const fastCut = findFastLocalFirstBoundary(oversizedFirst, endOfFirst)
+assert.ok(fastCut !== null && fastCut <= 88 && fastCut < endOfFirst)
+assert.match(oversizedFirst.slice(0, fastCut), /\s$/)
+assert.equal(oversizedFirst.slice(0, fastCut) + oversizedFirst.slice(fastCut), oversizedFirst)
+assert.equal(findFastLocalFirstBoundary('Hola. ' + oversizedFirst, 6), null)
+assert.equal(findFastLocalFirstBoundary('Hola.', null), null)
+assert.equal(findFastLocalFirstBoundary('x'.repeat(230), null), null)
+const tts = readFileSync(new URL('../src/lib/tts.ts', import.meta.url), 'utf8')
+assert.ok(tts.indexOf('const preCut = findFastLocalFirstBoundary(') <
+  tts.indexOf('// Drain every complete sentence sitting in the buffer.'))
+console.log('LUMIA VL-08: buffered first-long-sentence split and text preservation PASS')

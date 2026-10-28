@@ -9,7 +9,7 @@ import {
 } from '../config'
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
-import { findEarlySpeechBoundary } from './first-audio-chunk'
+import { findEarlySpeechBoundary, findFastLocalFirstBoundary } from './first-audio-chunk'
 import { isIncompleteLumiaSpelling, normalizeSpokenLumiaName } from './speech-pronunciation'
 import { attributePhraseGap } from './phrase-gap-attribution'
 import { createStreamingMp3, type StreamedAudio } from './streaming-mp3'
@@ -1000,6 +1000,24 @@ export function createSpeaker(
       // from being spoken one letter at a time as separate sentences.
       if (isIncompleteLumiaSpelling(buffer)) return
 
+      // The local Qwen JSON path delivers complete answers at once.
+      // Split a very long FIRST sentence before the normal sentence loop,
+      // otherwise even the fast first-chunk pilot synthesizes a huge WAV.
+      const localVoice = caps().voice
+      const fastLocal = FAST_LOCAL_FIRST_CHUNK &&
+        localVoice?.requested?.ttsMode === 'local' &&
+        localVoice?.local?.ttsAvailable === true
+      if (!firstChunkQueued && fastLocal) {
+        const firstSentence = SENTENCE_END.exec(buffer)
+        const preCut = findFastLocalFirstBoundary(
+          buffer, firstSentence ? firstSentence.index + firstSentence[0].length : null,
+        )
+        if (preCut !== null) {
+          enqueue(buffer.slice(0, preCut))
+          buffer = buffer.slice(preCut)
+        }
+      }
+
       // Drain every complete sentence sitting in the buffer.
       for (;;) {
         const m = SENTENCE_END.exec(buffer)
@@ -1027,10 +1045,6 @@ export function createSpeaker(
       // word boundaries, ordered playback, interruption and sentence handling.
       // No repeated early cuts: subsequent phrases preserve the old cadence.
       if (!firstChunkQueued) {
-        const localVoice = caps().voice
-        const fastLocal = FAST_LOCAL_FIRST_CHUNK &&
-          localVoice?.requested?.ttsMode === 'local' &&
-          localVoice?.local?.ttsAvailable === true
         const earlyCut = findEarlySpeechBoundary(buffer, { fastLocal })
         if (earlyCut !== null) {
           enqueue(buffer.slice(0, earlyCut))

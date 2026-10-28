@@ -56,3 +56,16 @@ export function findEarlySpeechBoundary(
   const atMax = buffer.lastIndexOf(' ', maxChars)
   return atMax >= minChars ? atMax + 1 : null
 }
+
+
+/** VL-08: when full JSON arrives at once, split only an oversized first
+ * sentence into a short, word-safe initial Kokoro phrase. */
+export function findFastLocalFirstBoundary(
+  buffer: string, firstSentenceEnd: number | null,
+): number | null {
+  const cut = findEarlySpeechBoundary(buffer, { fastLocal: true })
+  if (cut === null) return null
+  if (firstSentenceEnd !== null && firstSentenceEnd <= FAST_LOCAL_MAX_CHARS) return null
+  if (firstSentenceEnd !== null && cut >= firstSentenceEnd) return null
+  return cut
+}
