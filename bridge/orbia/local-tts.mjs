@@ -10,6 +10,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { localVoicePaths, probeLocalVoiceCapabilities } from './local-voice-probe.mjs'
+import { synthesizeResidentKokoro } from './resident-tts.mjs'
 
 export const MAX_LOCAL_TTS_CHARS = 4000
 export const LOCAL_TTS_TIMEOUT_MS = 30_000
@@ -49,6 +50,26 @@ export async function synthesizeLocalSpeech(
   const readiness = probeLocalVoiceCapabilities({ env })
   if (!readiness.tts.localAvailable) {
     fail('VOICE_TTS_UNAVAILABLE', 'Local Kokoro runtime or model is unavailable.')
+  }
+
+  if (env.ORBIA_KOKORO_RESIDENT_ENABLED === '1') {
+    try {
+      const bytes = await synthesizeResidentKokoro(input, {
+        env, timeoutMs, speaker: String(speaker || 'ef_dora'),
+      })
+      return Object.freeze({
+        audio: bytes,
+        mimeType: 'audio/wav',
+        format: 'wav',
+        provider: 'kokoro-local-resident',
+        speaker: String(speaker || 'ef_dora'),
+      })
+    } catch (err) {
+      // Owner-gated optimization must not break the certified one-shot path.
+      // Do not include spoken text or file contents in logs.
+      console.warn('[lumia] Kokoro resident worker unavailable; using standard local synthesis:',
+        String(err?.message ?? err))
+    }
   }
 
   const { kokoroPython, kokoroScript } = localVoicePaths(env)
