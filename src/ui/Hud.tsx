@@ -427,6 +427,12 @@ export function Hud() {
                       <span key={index} className="voice-line-stage">
                         Voz #{index + 1} {timeLabel(segment.at)}
                         {segment.gapMs !== null ? ` · pausa ${(segment.gapMs / 1000).toFixed(2)} s` : ''}
+                        {segment.waitingTextMs !== null
+                          ? ` · texto ${(segment.waitingTextMs / 1000).toFixed(2)} s` : ''}
+                        {segment.waitingAudioMs !== null
+                          ? ` · Kokoro ${(segment.waitingAudioMs / 1000).toFixed(2)} s` : ''}
+                        {segment.waitingPlaybackMs !== null
+                          ? ` · reproducción ${(segment.waitingPlaybackMs / 1000).toFixed(2)} s` : ''}
                         {' · '}{segment.text.slice(0, 66)}
                       </span>
                     ))}
