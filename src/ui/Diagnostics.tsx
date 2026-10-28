@@ -64,6 +64,10 @@ type TtsDiag = {
   transport: string
   streamChunks: number
   streamFailures: number
+  localSynthesisMs: number | null
+  localSynthesisCount: number
+  lastInterPhraseSilenceMs: number | null
+  maxInterPhraseSilenceMs: number
 }
 
 const ago = (t: number) => (t ? `${((Date.now() - t) / 1000).toFixed(1)}s ago` : '—')
@@ -173,6 +177,10 @@ export function Diagnostics() {
       <Row k="audio transport" v={String(t.transport ?? 'buffered')} />
       <Row k="MP3 stream chunks" v={String(t.streamChunks ?? 0)} />
       <Row k="MP3 stream failures" v={String(t.streamFailures ?? 0)} bad={(t.streamFailures ?? 0) > 0} />
+      <Row k="Kokoro last phrase synthesis" v={t.localSynthesisMs == null ? '—' : `${t.localSynthesisMs} ms`} bad={(t.localSynthesisMs ?? 0) > 5000} />
+      <Row k="Kokoro phrases synthesized" v={String(t.localSynthesisCount ?? 0)} />
+      <Row k="last audible gap between phrases" v={t.lastInterPhraseSilenceMs == null ? '—' : `${t.lastInterPhraseSilenceMs} ms`} bad={(t.lastInterPhraseSilenceMs ?? 0) > 3000} />
+      <Row k="maximum audible phrase gap" v={`${t.maxInterPhraseSilenceMs ?? 0} ms`} bad={(t.maxInterPhraseSilenceMs ?? 0) > 3000} />
       <Row k="handed to OS" v={String(t.spoken ?? 0)} />
       <Row k="actually spoke" v={String(t.started ?? 0)} bad={(t.started ?? 0) === 0} />
       <Row k="failures" v={String(t.failures ?? 0)} bad={(t.failures ?? 0) > 0} />
