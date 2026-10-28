@@ -113,3 +113,51 @@ Pendientes de confirmación:
 - El Ryzen mantiene `qwen3:1.7b` como candidato de voz rápido y
   `qwen3.5:0.8b` como candidato visual; el enrutamiento entre ambos NO
   está certificado en LUMIA ni debe asumirse implementado.
+
+## Auditoría de calidad de transcripción — CSV/TXT revisados (28-oct-2026)
+
+Se analizaron los originales `LUMIA_VISION_METRICAS.csv` y
+`LUMIA_VISION_RESPUESTAS.txt` proporcionados por el propietario,
+contrastándolos con la infografía fuente de 2048 × 1152 («DÍA 1 TU
+PRIMER AGENTE: CORREO Y WHATSAPP»). El conjunto de referencia tiene
+**26 líneas significativas**: título (1), encabezados numerados (6),
+indicaciones de los seis bloques (18) y cierre inferior (1).
+Las métricas no incluyen calentamiento; se hizo **una ejecución por resolución**.
+
+| Variante | Tiempo total | Tiempo imagen+prompt | Tokens generados | Exactas/26 | Errores |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Original 2048×1152 | 49,03 s | 36,43 s | 204 | 24/26 | «Crealo», «yelige» |
+| 1280×720 | 19,76 s | 11,35 s | 205 | 24/26 | «Crealo», «eliges» |
+| **1024×576** | **15,53 s** | **7,10 s** | **205** | **26/26** | **ninguno** |
+| 768×432 | 21,53 s | 13,02 s | 204 | 24/26 | «Creao», «uso limitado» |
+
+**Diferencia semántica importante:** a 768 píxeles la línea fuente
+«No es uso ilimitado» se convirtió en «No es uso limitado». Este error
+cambia el sentido de la advertencia y muestra por qué «6/6 encabezados»
+NO equivale a una transcripción completa y segura.
+
+En esta ejecución única, 1024 píxeles fue **68,3 %** más rápido en tiempo
+total frente al original (3,16×), y **80,5 %** más rápido en evaluación de
+imagen+prompt. Las velocidades de generación (21,92 / 24,97 / 24,65 /
+24,20 tok/s) no explican la mayor parte de la diferencia.
+
+**Decisión AV/VI-01:** Mantener 1024 píxeles como primer tamaño del
+selector visual local. Ya está implementado en
+`src/lib/visual-input.ts`; no se necesita ajustar ese archivo para
+este experimento. Para capturas verticales, texto denso o seriales,
+considerar recortes dirigidos o pruebas de mayor resolución. Una
+reducción a 1024 por el lado mayor no garantiza legibilidad del texto
+pequeño (en una captura de 720×1600 pasa a 461×1024).
+
+**Límites de certificación:** 
+- Se evaluó **una sola imagen**, con una corrida por resolución.
+- No se certifican OCR general, exactitud de seriales, lectura de alarmas,
+  ausencia de alucinaciones o comportamiento durante voz y micrófono.
+- La conversión a JPEG del navegador VI-01 puede diferir del
+  preprocesamiento realizado por el benchmark PowerShell.
+- La ruta dual `qwen3:1.7b` conversación /
+  `qwen3.5:0.8b` visión Ryzen sigue siendo propuesta,
+  **no conmutador ya implementado**.
+- La integración ASUS `qwen3.5:2b-q4_K_M` y la validación física
+  completa con avatar y Whisper/Kokoro permanecen pendientes.
+
