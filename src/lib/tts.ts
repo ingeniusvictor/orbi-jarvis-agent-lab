@@ -832,7 +832,9 @@ export function createSpeaker(
       // SpeechSynthesisUtterance.onstart, and it is what makes the diagnostics
       // verdict — and the T self-test — tell the truth on the premium path.
       audio.onplaying = () => {
-        if (done || cancelled) return
+        // Chrome can re-fire playing after buffering/resume. A phrase has one
+        // physical start and must have exactly one timestamp in the timeline.
+        if (done || cancelled || beganPlaying) return
         beganPlaying = true
         markOutputAudible(true)
         notifyFirstAudio()
