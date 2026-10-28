@@ -36,9 +36,34 @@ await assert.rejects(
 )
 
 assert.ok(ORBI_SPEECH_VOCABULARY.includes('Qwen'))
-assert.ok(ORBI_SPEECH_VOCABULARY.includes('L.U.M.I.A.'))
+assert.ok(ORBI_SPEECH_VOCABULARY.includes('Lumi'))
 assert.match(ORBI_SPEECH_INITIAL_PROMPT, /Qwen/)
 assert.match(ORBI_SPEECH_INITIAL_PROMPT, /Ollama/)
+assert.match(ORBI_SPEECH_INITIAL_PROMPT, /VRAM/)
+assert.equal(
+  normalizeTechnicalSpeechText('Pícame cómo funciona una IA local.'),
+  'Explícame cómo funciona una IA local.',
+)
+assert.equal(
+  normalizeTechnicalSpeechText('pícame como funciona la GPU'),
+  'Explícame como funciona la GPU',
+)
+assert.equal(
+  normalizeTechnicalSpeechText('Pícame la mano.'),
+  'Pícame la mano.',
+)
+assert.equal(
+  normalizeTechnicalSpeechText('¿Qué modelo recomiendas para 4 gigas de Virran?'),
+  '¿Qué modelo recomiendas para 4 gigas de VRAM?',
+)
+assert.equal(
+  normalizeTechnicalSpeechText('La ingeniera Virran recomienda más RAM.'),
+  'La ingeniera Virran recomienda más RAM.',
+)
+assert.equal(
+  normalizeTechnicalSpeechText('Hola Lumi, ¿qué modelo recomiendas?'),
+  'Hola Lumi, ¿qué modelo recomiendas?',
+)
 assert.equal(
   normalizeTechnicalSpeechText('Explícame qué es un MTTP.'),
   'Explícame qué es un MPPT.',
