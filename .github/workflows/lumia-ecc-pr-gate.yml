@@ -107,6 +107,9 @@ jobs:
       - name: VI-01 Owner-selected photograph in local multimodal Ollama
         run: npx tsx scripts/certify-lumia-visual-input-vi01.ts
 
+      - name: AV-01B Owner face GLB / SHA-256 check or explicit publication pending
+        run: node scripts/certify-lumia-avatar-asset.mjs
+
       - name: Production build
         run: npm run build
 
