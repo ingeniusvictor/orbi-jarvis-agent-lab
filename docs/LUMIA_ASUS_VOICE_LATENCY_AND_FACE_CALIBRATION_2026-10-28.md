@@ -92,3 +92,51 @@ propietario puede ajustar solo el valor de
 12 vulnerabilidades, incluidas dos críticas, en la cadena de dependencias;
 no habilitar acceso de red externa ni escrituras hasta auditoría y
 actualización validadas. Cambios solo en PR #28, `main` protegido.
+
+
+## Incidente ASUS: la conversación pasa a FONDO tras la respuesta (captura 18:42)
+
+El propietario observó un turno completado y luego dos nuevos mensajes
+entendidos en la columna ESCUCHANDO pero no respondidos:
+
+- 15:40:58, COMMAND: «Pícame cómo funciona una IA local» (error de
+  dictado probable de «Explícame...»).
+- 15:41:25, respuesta finalizada, total 27,55 segundos, primer audio
+  +8,08 segundos. Audio #2 sin silencio perceptible: pausa 0,01 s.
+- 15:41:39, FONDO: «El modelo de IA local me recomiendas para 4 gigas
+  de Virran.» Probablemente refería 4 GB de VRAM. **No fue comando**.
+- 15:42:05, FONDO: «¡Adiós!», tampoco comando.
+- HUD: «EN ESPERA — DI 'LUMI'».
+
+Diagnóstico: LUMIA **no estaba bloqueada**: había vuelto a
+`dormant/wake`, y el speech sin palabra de activación queda en el
+registro pero no se entrega al LLM. Después de una respuesta el código
+deja una ventana de continuación de 11 s
+(`FOLLOW_UP_MS`), precedida por un periodo antieco de 2600 ms; el
+horario exacto depende de comienzo/fin reales y del momento en que
+Whisper devuelve el segmento. Esto merece una medición de las
+transiciones, pero **no se debe hacer que cualquier frase de fondo
+despierte LUMIA** por seguridad y ruido doméstico.
+
+Para probar inmediatamente, decir en un solo segmento:
+«Lumi, ¿qué modelo local me recomiendas para cuatro gigabytes de VRAM?»
+o usar Espacio para activar manualmente una pregunta.
+
+ASR: `bridge/orbia/speech-vocabulary.mjs` ahora añade
+`VRAM`, `GPU`, `memoria de video`, `Explícame` y
+`recomiéndame` en el contexto técnico del modo COMMAND. Además
+normaliza únicamente dos errores observados muy concretos:
+«Pícame cómo funciona» al inicio de frase y
+«4 gigas de Virran» cuando hay tamaño explícito.
+Las frases parecidas en otros contextos permanecen intactas. Los
+tests de adaptador comprueban los dos casos y que no se sustituyen
+expresiones ordinarias.
+
+Esto es una **corrección textual post-STT, no una mejora demostrada
+del audio de Whisper**. La próxima prueba debe registrar los segmentos
+crudos, proveedor, STT tiempo y el resultado del comando; si continúa
+siendo errático, considerar A/B del modelo Whisper multilingual small
+con base, midiendo precisión y latencia. No cambiar modelo para todo
+el sistema sin evidencia, ni habilitar servidor persistente que antes
+produjo falsas activaciones. El perfil Grok-like necesitaría diseño
+de seguimiento opt-in que no admita órdenes sensibles sin activación.
