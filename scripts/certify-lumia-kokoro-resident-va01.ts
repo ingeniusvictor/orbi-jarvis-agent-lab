@@ -40,7 +40,7 @@ assert.ok(voice.indexOf('synthesizeResidentKokoro(input') < voice.indexOf('const
 assert.match(bridge, /void prewarmResidentKokoro\(\)/)
 assert.match(bridge, /x-orbia-tts-synthesis-ms/)
 assert.match(tts, /localSynthesisMs: null as number \| null/)
-assert.match(tts, /notifyPhraseStart\(text\)/)
+assert.match(tts, /notifyPhraseStart\(item\)/)
 assert.match(tts, /const PREFETCH_NEXT_PHRASE = import\.meta\.env\.VITE_LUMIA_TTS_PREFETCH_NEXT === '1'/)
 assert.match(tts, /if \(pumping && PREFETCH_NEXT_PHRASE\) prime\(queue\[0\]\)/)
 assert.match(app, /pushSpokenSegment\(turnId, phrase\)/)
