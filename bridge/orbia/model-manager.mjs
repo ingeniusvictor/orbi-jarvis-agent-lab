@@ -252,7 +252,8 @@ export function parseModelControl(prompt, history = []) {
     /\b(?:lista|listar|muestra|mostrar|dime) (?:los )?modelos\b/.test(text) ||
     /\b(?:puedes|podrias|puede|eres capaz de) (?:cambiar|cambiarte|usar) (?:de |a |otro )?modelo\b/.test(text)
 
-  if (asksForInventory || explicitCount || explicitWhich || shortFollowup || inventoryFromContext) {
+  if (explicitCount) return { action: 'count' }
+  if (asksForInventory || explicitWhich || shortFollowup || inventoryFromContext) {
     return { action: 'list' }
   }
 
