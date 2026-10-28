@@ -2,6 +2,7 @@ import type { AskHandlers } from './anthropic'
 import type { Blade, Panel } from '../store'
 import { BRIDGE_WS_URL } from '../config'
 import type { VoiceRuntimeCapabilities } from './capabilities'
+import type { LocalVisualImage } from './visual-input'
 
 /**
  * Client for the local bridge (see bridge/server.mjs).
@@ -357,6 +358,7 @@ let pending: { finish: (fallback?: string) => void } | null = null
 export async function ask(
   prompt: string,
   handlers: AskHandlers,
+  image?: LocalVisualImage,
 ): Promise<{ text: string; tools: string[] }> {
   /**
    * A new question supersedes the one in flight.
@@ -508,7 +510,10 @@ export async function ask(
     arm()
 
     try {
-      ws.send(JSON.stringify({ type: 'ask', text: prompt, id, conversationId }))
+      ws.send(JSON.stringify({
+        type: 'ask', text: prompt, id, conversationId,
+        ...(image ? { image } : {}),
+      }))
     } catch (err) {
       // The socket can go into CLOSING between connect() resolving and here.
       fail(err instanceof Error ? err : new Error(String(err)))
