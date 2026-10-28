@@ -381,7 +381,7 @@ export async function streamOllama({
     additionalProperties: false,
   }
 
-  const runStructured = async (requestMessages) => {
+  const runStructured = async (requestMessages, numPredict = OLLAMA_VOICE_NUM_PREDICT) => {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -399,7 +399,7 @@ export async function streamOllama({
           // Voice replies are intentionally short. This prevents a malformed
           // local turn from generating hundreds of tokens before the user
           // hears anything, while leaving ample room for two spoken sentences.
-          num_predict: OLLAMA_VOICE_NUM_PREDICT,
+          num_predict: numPredict,
         },
       }),
       signal,
@@ -546,27 +546,31 @@ export async function streamOllama({
   let raw = await runStructured(messages)
   let text = parseAnswer(raw)
 
-  // One bounded repair attempt. Do not fail an otherwise healthy conversation
-  // merely because a small local model named the JSON field incorrectly.
+  // Recover one malformed structured reply using the actual latest question.
+  // Never ask Ollama to reformat only its invalid output: that loses the user
+  // intent. Keep the usual 120-token limit for successful first attempts.
   if (!text) {
-    raw = await runStructured([
+    console.warn('[lumia] invalid local JSON: retrying latest user question once')
+    const recent = Array.isArray(history) ? history.slice(-2) : []
+    const retryMessages = [
       {
         role: 'system',
         content:
-          'Convierte la respuesta dada a un único objeto JSON que cumpla exactamente ' +
-          'el esquema solicitado. El campo "respuesta" debe contener solo la respuesta ' +
-          'final en español latinoamericano, sin razonamiento, traducciones ni comentarios.',
+          systemPrompt +
+          '\nResponde ÚNICAMENTE a la última pregunta. El contexto anterior ' +
+          'sirve para interpretar referencias, no para repetir respuestas viejas. ' +
+          'Responde en una o dos frases breves, sin inventar información. ' +
+          'Devuelve solamente un objeto JSON con la propiedad "respuesta".',
       },
-      {
-        role: 'user',
-        content: raw || 'No hubo contenido útil. Responde brevemente en español.',
-      },
-    ])
-    text = parseAnswer(raw)
-  }
-
-  if (!text) {
-    throw new Error('Ollama no entregó una respuesta final válida en español.')
+      ...recent,
+      { role: 'user', content: prompt },
+    ]
+    const retriedRaw = await runStructured(retryMessages, 256)
+    text = parseAnswer(retriedRaw)
+    if (!text) {
+      console.warn('[lumia] JSON still invalid after one local retry')
+      text = 'Te escuché, pero el modelo local no pudo generar una respuesta válida. ¿Puedes repetir tu pregunta?'
+    }
   }
 
   text = sanitizeLumiaVoiceOutput(text)
