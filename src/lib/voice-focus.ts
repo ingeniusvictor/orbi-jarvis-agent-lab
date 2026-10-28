@@ -73,8 +73,44 @@ export function shouldInterruptBusyAssistant(
 
 
 /**
+ * A segment can begin while the assistant is finishing its spoken answer
+ * (GUARD), but Whisper can return the transcript only AFTER the assistant
+ * has entered standby (WAKE). Passing that text through onUtterance silently
+ * fails: App.onUtterance deliberately rejects dormant commands.
+ *
+ * Recover only a fresh explicit addressed *request*, not generic speech,
+ * a bare wake word, noise, or a GUARD interrupt without the name. The caller
+ * still applies its self-echo / non-speech filters and wake debounce first.
+ */
+export function shouldRecoverGuardToWake(
+  capturedMode: FocusVoiceMode,
+  currentMode: FocusVoiceMode,
+  text: string,
+  { wake, bareWake }: { wake: RegExp; bareWake: RegExp },
+): boolean {
+  if (capturedMode !== 'guard' || currentMode !== 'wake') return false
+  const said = String(text ?? '').trim()
+  if (!said || bareWake.test(said)) return false
+  return wake.test(said)
+}
+
+/**
  * Whisper sometimes emits bracketed acoustic annotations for music/noise.
  * They are useful evidence in ESCUCHANDO but must never become commands.
+ */
+const ACOUSTIC_LABEL = '(?:musica|music|silencio|silence|ruido|noise|aplausos|applause|risas|laughter)'
+const BRACKETED_ACOUSTIC = String.raw`(?:\[\s*${ACOUSTIC_LABEL}\s*\]|\(\s*${ACOUSTIC_LABEL}\s*\))`
+const ONE_ACOUSTIC_LABEL = new RegExp(
+  String.raw`^(?:\[|\()?\s*${ACOUSTIC_LABEL}\s*(?:\]|\))?[.!?]*$`,
+)
+const REPEATED_ACOUSTIC_LABELS = new RegExp(
+  String.raw`^${BRACKETED_ACOUSTIC}(?:[\s,.;!?¡¿-]*${BRACKETED_ACOUSTIC})+[\s.!?]*$`,
+)
+
+/**
+ * Pure Whisper music/noise annotations may repeat inside one transcript.
+ * They are visible as non-speech telemetry but never enter command assembly.
+ * Natural speech containing an acoustic label remains untouched.
  */
 export function isNonSpeechTranscript(text: string): boolean {
   const value = String(text ?? '')
@@ -83,9 +119,7 @@ export function isNonSpeechTranscript(text: string): boolean {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
 
-  return /^(?:\[|\()?\s*(?:musica|music|silencio|silence|ruido|noise|aplausos|applause|risas|laughter)\s*(?:\]|\))?[.!?]*$/.test(
-    value,
-  )
+  return ONE_ACOUSTIC_LABEL.test(value) || REPEATED_ACOUSTIC_LABELS.test(value)
 }
 
 

@@ -9,11 +9,13 @@ import {
 import { startVad, type Vad } from './vad'
 import { caps } from './capabilities'
 import { audioBlobToPcmWav } from './wav'
+import { decideTextTurnHold } from './adaptive-turn'
 import {
   isNonSpeechTranscript,
   isRapidDuplicateTranscript,
   shouldDropStaleVoiceSegment,
   shouldInterruptBusyAssistant,
+  shouldRecoverGuardToWake,
   transcriptSegmentIsStillActive,
   type FocusVoiceMode,
 } from './voice-focus'
@@ -56,6 +58,7 @@ export type VoiceTranscriptEvent = {
   wakeMatched: boolean
   capturedMode: VoiceMode
   at: number
+  sttMs?: number
 }
 
 export type VoiceHandlers = {
@@ -203,6 +206,9 @@ const BROWSER_SETTLE_MS = 300
 const BROWSER_CONTINUE_MS = 2400
 const BROWSER_MAX_HOLD_MS = 30000
 
+/** Experiment off by default; never changes Voice Gate or action authority. */
+const ADAPTIVE_TURNS_ENABLED = import.meta.env.VITE_LUMIA_ADAPTIVE_TURNS === '1'
+
 /**
  * How long to keep waiting, given what has been said so far.
  * 0 means "this is a complete thought, send it now".
@@ -243,6 +249,7 @@ function makeAssembler(
     settleMs?: number
     continueMs?: number
     maxHoldMs?: number
+    adaptive?: boolean
   } = {},
 ): Assembler {
   const settleMs = timing.settleMs ?? SETTLE_MS
@@ -251,6 +258,8 @@ function makeAssembler(
   let held = ''
   let timer: ReturnType<typeof setTimeout> | null = null
   let firstAt = 0
+  let lastFeedAt = 0
+  let segments = 0
 
   const clear = () => {
     if (timer) clearTimeout(timer)
@@ -262,12 +271,21 @@ function makeAssembler(
     const text = held.trim()
     held = ''
     firstAt = 0
-    if (text) h.emit(text)
+    segments = 0
+    if (text) {
+      // Actual hold between the last recognized fragment and dispatch.
+      diag.assemblyHoldMs = lastFeedAt
+        ? Math.max(0, Math.round(performance.now() - lastFeedAt))
+        : null
+      h.emit(text)
+    }
   }
 
   return {
     feed(text, active) {
       if (!text.trim()) return
+      lastFeedAt = performance.now()
+      segments++
       held = `${held} ${text}`.replace(/\s+/g, ' ').trim()
       if (!firstAt) firstAt = Date.now()
       // The caption shows the whole thought as it assembles, not just the
@@ -283,10 +301,19 @@ function makeAssembler(
         return
       }
 
+      const decision = decideTextTurnHold({
+        text: held,
+        baselineMs: holdFor(held, settleMs, continueMs),
+        settleMs,
+        continueMs,
+        segments,
+        enabled: timing.adaptive,
+      })
       const wait = Math.min(
-        holdFor(held, settleMs, continueMs),
+        decision.holdMs,
         Math.max(0, maxHoldMs - (Date.now() - firstAt)),
       )
+      diag.turnHoldReason = decision.reason
       diag.waitedMs = wait
       if (wait === 0) {
         fire()
@@ -299,6 +326,7 @@ function makeAssembler(
       clear()
       held = ''
       firstAt = 0
+      segments = 0
       diag.holding = ''
     },
     held: () => held,
@@ -443,8 +471,18 @@ export const diag = {
   maxQueueDepth: 0,
   /** Background/guard segments dropped to keep voice responsive. */
   queueDrops: 0,
-  /** Milliseconds the last transcription round-trip took. */
+  /** Milliseconds the last transcription round-trip took (legacy field; browser path records idle time). */
   idleMs: 0,
+  /** Completed local/cloud bridge transcription in ms, including audio conversion. Browser STT is opaque. */
+  sttRoundTripMs: null as number | null,
+  /** Actual delay from the last accepted transcript fragment to turn dispatch. */
+  assemblyHoldMs: null as number | null,
+  /** Last post-TTS follow-up hold, recorded without storing speech. */
+  postSpeechGuardMs: 2600,
+  /** Acoustic policy only alters *local command* segmentation on explicit opt-in. */
+  adaptiveTurnsEnabled: ADAPTIVE_TURNS_ENABLED,
+  acousticWindowMs: 650,
+  turnHoldReason: 'baseline',
 }
 
 /** Record why a transcript went nowhere. Silence always has a reason; this is
@@ -612,6 +650,8 @@ async function startVadBridgeVoice(
       h.onUtterance(text)
     },
     partial: (text) => h.onPartial(text),
+  }, {
+    adaptive: ADAPTIVE_TURNS_ENABLED,
   })
 
   /**
@@ -663,6 +703,9 @@ async function startVadBridgeVoice(
       }
       const { text } = (await res.json()) as { text?: string }
       const said = (text ?? '').trim()
+      if (capturedMode === 'command') {
+        diag.sttRoundTripMs = Math.max(0, Math.round(performance.now() - t0))
+      }
       diag.lastError = ''
 
       // A previous segment may have completed the command while this one was
@@ -715,9 +758,13 @@ async function startVadBridgeVoice(
         text: said,
         provider: provider === 'local' ? 'whisper-local' : 'elevenlabs',
         kind: selfEcho ? 'self-echo' : nonSpeech ? 'non-speech' : 'speech',
-        wakeMatched: capturedMode === 'wake' && WAKE.test(said),
+        wakeMatched:
+          WAKE.test(said) &&
+          (capturedMode === 'wake' ||
+            (capturedMode === 'guard' && h.mode() === 'wake')),
         capturedMode: capturedMode as VoiceMode,
         at: Date.now(),
+        sttMs: Math.max(0, Math.round(performance.now() - t0)),
       })
 
       if (selfEcho) {
@@ -750,12 +797,41 @@ async function startVadBridgeVoice(
           return
         }
 
+        // When this GUARD segment was captured, L.U.M.I.A. was still
+        // finishing a previous turn. If Whisper returns only after the UI has
+        // timed out to WAKE/standby, onUtterance would silently discard the
+        // user's fully recognized request. Re-enter through the actual wake
+        // path, but only for an explicit addressed command (never background
+        // TV, acoustic labels, or generic household speech).
+        const trailing = WAKE.test(said) ? afterWake(said) : ''
+        const currentMode = h.mode()
+        if (shouldRecoverGuardToWake('guard', currentMode, said, {
+          wake: WAKE,
+          bareWake: BARE_WAKE,
+        })) {
+          if (Date.now() - lastWake > WAKE_DEBOUNCE) {
+            lastWake = Date.now()
+            diag.wakes++
+            diag.dropped = ''
+            diag.accepted++
+            h.onWake(trailing)
+          } else {
+            drop('guard-to-wake recovery suppressed by wake debounce')
+          }
+          return
+        }
+
+        // A stale GUARD-only override or bare name must not cancel an idle
+        // assistant or accidentally inject a question into the next session.
+        if (currentMode === 'wake') {
+          drop('guard transcript arrived in standby without a full wake request')
+          return
+        }
+
         h.onSpeechStart()
 
-        // "Lumi, explícame..." is an intentional barge-in and should become a
-        // new command. A bare "Lumi" or "para" only stops the current answer
-        // and leaves the assistant listening for what comes next.
-        const trailing = WAKE.test(said) ? afterWake(said) : ''
+        // "Lumi, explícame..." while still busy is intentional barge-in.
+        // A bare "Lumi" or "para" only stops an active answer.
         if (trailing) h.onUtterance(trailing)
         return
       }
@@ -810,6 +886,9 @@ async function startVadBridgeVoice(
   }
 
   vad = await startVad({
+    adaptiveEndpointing: () =>
+      ADAPTIVE_TURNS_ENABLED && provider === 'local' && h.mode() === 'command',
+    onEndpointWindow: (windowMs) => { diag.acousticWindowMs = windowMs },
     suppress: () =>
       provider === 'local' &&
       h.mode() === 'guard' &&
@@ -908,6 +987,8 @@ async function startVadBridgeVoice(
  * assistant that keeps listening.
  */
 function startBrowserVoice(h: VoiceHandlers): Voice {
+  // Native browser SpeechRecognition does not expose a trusted STT request duration.
+  diag.sttRoundTripMs = null
   const Ctor =
     (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
   if (!Ctor) {
@@ -945,6 +1026,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
       settleMs: BROWSER_SETTLE_MS,
       continueMs: BROWSER_CONTINUE_MS,
       maxHoldMs: BROWSER_MAX_HOLD_MS,
+      adaptive: ADAPTIVE_TURNS_ENABLED,
     },
   )
 

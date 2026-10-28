@@ -1,4 +1,5 @@
 import { getMic } from './audio'
+import { BASELINE_VAD_SILENCE_MS, chooseAcousticSilenceMs } from './adaptive-turn'
 
 /**
  * Voice-activity detection and segment capture.
@@ -31,6 +32,10 @@ export type VadHandlers = {
   /** Optional upstream mute gate. When true no segment is recorded at all.
    * Used by local Whisper while L.U.M.I.A.'s loudspeaker output is audible. */
   suppress?: () => boolean
+  /** Owner-enabled experiment; only active for locally captured command audio. */
+  adaptiveEndpointing?: () => boolean
+  /** Observe the final silence window without exposing any captured audio. */
+  onEndpointWindow?: (windowMs: number) => void
   /** The signal crossed into speech. Instant; this is the barge-in trigger. */
   onStart: () => void
   /** Speech ended. The blob is one complete, decodable audio file. */
@@ -78,7 +83,7 @@ const START_MS = 110
  * should always have been — a cheap "have they stopped making noise" — and the
  * shorter window gets the transcript moving sooner.
  */
-const SILENCE_MS = 650
+const SILENCE_MS = BASELINE_VAD_SILENCE_MS
 /** Nobody speaks one segment for this long; cut it and transcribe what we have. */
 const MAX_MS = 20000
 
@@ -261,7 +266,17 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
       if (smoothEnergy > release) lastLoud = now
       const quietFor = now - lastLoud
       const runFor = now - speechStartedAt
-      if (quietFor >= SILENCE_MS || runFor >= MAX_MS) {
+      // Speech duration is the last *voiced* point, not total wall time.
+      // Otherwise a very short word could switch policy during its silence.
+      const endpointMs = h.adaptiveEndpointing?.()
+        ? chooseAcousticSilenceMs({
+            voicedDurationMs: Math.max(0, lastLoud - speechStartedAt),
+            adaptive: true,
+            guarded: guard,
+          })
+        : SILENCE_MS
+      if (quietFor >= endpointMs || runFor >= MAX_MS) {
+        h.onEndpointWindow?.(endpointMs)
         armedAt = 0
         endSegment()
       }
