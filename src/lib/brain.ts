@@ -22,15 +22,21 @@ export type { ConnectionState } from './bridge'
 
 export const usingBridge = BACKEND === 'bridge'
 
+export type LocalVisionImage = { mimeType: 'image/jpeg'; data: string }
+
 /** Conversation state lives in the bridge session, so history is only threaded
  *  through on the direct path. */
 export async function ask(
   prompt: string,
   history: Msg[],
   handlers: AskHandlers,
+  image?: LocalVisionImage,
 ): Promise<{ text: string; tools: string[] }> {
+  if (image && !usingBridge) {
+    throw new Error('La visión local requiere el bridge de LUMIA.')
+  }
   return usingBridge
-    ? bridge.ask(prompt, handlers)
+    ? bridge.ask(prompt, handlers, image)
     : direct.ask([...history, { role: 'user', content: prompt }], handlers)
 }
 

@@ -1,18 +1,25 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Scene } from './scene/Scene'
 import { Hud } from './ui/Hud'
 import { Boot } from './ui/Boot'
 import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
+import { RealtimeTrial } from './ui/RealtimeTrial'
+import { AcousticLab } from './ui/AcousticLab'
+import { VisualInput } from './ui/VisualInput'
+import type { LocalVisualImage } from './lib/visual-input'
+import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
 import {
   startVoice,
+  diag as voiceDiag,
   type Voice,
   type VoiceMode,
   type VoiceTranscriptEvent,
 } from './lib/voice'
 import { voiceModeForPhase } from './lib/voice-focus'
-import { createSpeaker, cycleVoice, currentVoiceName } from './lib/tts'
+import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
+import { resolveFollowupGuardMs } from './lib/followup-latency'
 import * as sfx from './lib/sfx'
 import * as music from './lib/music'
 import * as hands from './lib/hands'
@@ -70,7 +77,16 @@ const FOLLOW_UP_MS = 11000
  * SpeechRecognition after TTS has technically ended. Keep the app in guard mode
  * briefly so those delayed echo results are discarded instead of becoming a
  * brand-new user turn that makes L.U.M.I.A. answer herself in a loop. */
-const POST_SPEECH_GUARD_MS = 2600
+const FAST_LOCAL_FOLLOWUP = import.meta.env.VITE_LUMIA_FAST_LOCAL_FOLLOWUP === '1'
+
+// Owner-side opt-in only. The browser recognizer remains at the certified hold.
+// Never start listening before the actual synthesized-output echo tail expires.
+const followupGuardMs = () =>
+  resolveFollowupGuardMs({
+    engine: voiceDiag.engine,
+    fastLocalFollowup: FAST_LOCAL_FOLLOWUP,
+    echoTailMs: ECHO_TAIL_MS,
+  })
 
 /** crypto.randomUUID needs a secure context, which a LAN address over plain
  *  http is not. Not worth failing a whole turn over an id. */
@@ -99,10 +115,15 @@ export default function App() {
    * the phase, the speaker, or the busy state on its way to the floor.
    */
   const turn = useRef(0)
+  const activeReply = useRef<string | null>(null)
   const booting = useRef(false)
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const voicePoll = useRef<ReturnType<typeof setInterval> | null>(null)
   const voiceRestart = useRef(0)
+  // Exclusive voice-device test ownership: the paid WebRTC trial and the
+  // local hardware test must NEVER share the normal assistant mic loop.
+  const experimentOwner = useRef<'realtime' | 'acoustic' | null>(null)
+  const [activeExperiment, setActiveExperiment] = useState<'realtime' | 'acoustic' | null>(null)
 
   // -- helpers --------------------------------------------------------------
 
@@ -141,9 +162,15 @@ export default function App() {
 
   // -- one turn -------------------------------------------------------------
 
-  const respond = async (said: string): Promise<void> => {
+  const respond = async (said: string, image?: LocalVisualImage): Promise<void> => {
     const mine = ++turn.current
     const stale = () => mine !== turn.current
+    const previousReply = activeReply.current
+    if (previousReply) {
+      store.getState().updateTurn(previousReply, {
+        status: 'interrupted', finishedAt: Date.now(),
+      })
+    }
 
     clearIdle()
     const s = store.getState()
@@ -152,15 +179,33 @@ export default function App() {
     s.clearPanels()
     s.clearBlades()
     s.setCaption('')
-    s.pushTurn({ id: newId(), role: 'user', text: said })
+    const acceptedAt = Date.now()
+    s.pushTurn({ id: newId(), role: 'user', text: said, at: acceptedAt })
+    const turnId = newId()
+    activeReply.current = turnId
+    // Show a pending response immediately, even when the brain never yields a
+    // token. It is crucial evidence for 40s waits and unanswered questions.
+    s.pushTurn({ id: turnId, role: 'jarvis', text: '', at: acceptedAt, status: 'pending' })
     s.setPhase('thinking')
 
-    const spk = createSpeaker()
+    const responseStartedAt = performance.now()
+    ttsDiag.firstTextMs = null
+    ttsDiag.firstAudioMs = null
+    const spk = createSpeaker(() => {
+      // First *actual playback*, not the request to Kokoro or model output.
+      if (!stale()) {
+        ttsDiag.firstAudioMs = Math.round(performance.now() - responseStartedAt)
+        store.getState().updateTurn(turnId, {
+          firstAudioAt: Date.now(), status: 'playing',
+        })
+      }
+    }, (phrase) => {
+      if (!stale()) store.getState().pushSpokenSegment(turnId, phrase)
+    })
     speaker.current = spk
     sfx.duck(true)
     music.duck(true)
 
-    const turnId = newId()
     let started = false
     let filled = false
 
@@ -170,14 +215,17 @@ export default function App() {
           if (stale()) return
           if (!started) {
             started = true
+            ttsDiag.firstTextMs = Math.round(performance.now() - responseStartedAt)
+            store.getState().updateTurn(turnId, {
+              firstTextAt: Date.now(), status: 'generating',
+            })
             store.getState().setPhase('speaking')
             // The answer arriving is what ends the tool phase — a timer would
             // clear the readout while a slow tool was still running.
             store.getState().setActiveTool(null)
             music.working(false)
-            store.getState().pushTurn({ id: turnId, role: 'jarvis', text: '' })
           }
-          store.getState().appendToLastTurn(delta)
+          store.getState().appendToTurn(turnId, delta)
           spk.push(delta)
         },
         onTool: (name) => {
@@ -198,9 +246,19 @@ export default function App() {
             spk.say(forTool(name))
           }
         },
-      })
+      }, image)
 
       if (stale()) return
+
+      // Some providers return only the final text and no streaming deltas.
+      // Capture it rather than misclassifying a successful answer as silence.
+      if (!started && text.trim()) {
+        started = true
+        ttsDiag.firstTextMs = Math.round(performance.now() - responseStartedAt)
+        s.updateTurn(turnId, { text, firstTextAt: Date.now(), status: 'generating' })
+        s.setPhase('speaking')
+        spk.push(text)
+      }
 
       // The bridge keeps conversation state in its own session, so history is
       // only threaded through on the direct path.
@@ -214,16 +272,30 @@ export default function App() {
 
       await spk.end()
       if (stale()) return
-      sfx.play('done')
+      if (!started && !text.trim()) {
+        const note = 'El cerebro terminó sin generar texto de respuesta.'
+        store.getState().updateTurn(turnId, {
+          status: 'no-response', finishedAt: Date.now(), errorNote: note,
+        })
+        store.getState().setError(note)
+      } else {
+        store.getState().updateTurn(turnId, {
+          status: 'complete', finishedAt: Date.now(),
+        })
+        sfx.play('done')
+      }
     } catch (err) {
       if (stale()) return
       console.error(err)
       sfx.play('error')
-      store
-        .getState()
-        .setError(err instanceof Error ? err.message : 'Something went wrong.')
+      const failure = err instanceof Error ? err.message : 'Error desconocido.'
+      store.getState().updateTurn(turnId, {
+        status: 'error', finishedAt: Date.now(), errorNote: failure,
+      })
+      store.getState().setError(failure)
     } finally {
       if (!stale()) {
+        if (activeReply.current === turnId) activeReply.current = null
         speaker.current = null
         sfx.duck(false)
         music.duck(false)
@@ -235,7 +307,9 @@ export default function App() {
         // second later. If we were already in command mode by then, L.U.M.I.A.
         // would accept her own answer as a new user request and answer it again,
         // creating the visible/spoken repetition loop.
-        await new Promise((r) => setTimeout(r, POST_SPEECH_GUARD_MS))
+        const guardMs = followupGuardMs()
+      voiceDiag.postSpeechGuardMs = guardMs
+      await new Promise((r) => setTimeout(r, guardMs))
 
         // Stay open for a natural follow-up once the echo tail is safely gone.
         if (!stale()) listen(FOLLOW_UP_MS)
@@ -247,9 +321,10 @@ export default function App() {
 
   /** What the voice loop should do with what it hears, derived from phase. */
   const mode = (): VoiceMode =>
-    voiceModeForPhase(store.getState().phase)
+    experimentOwner.current ? 'deaf' : voiceModeForPhase(store.getState().phase)
 
   const onWake = (trailing: string) => {
+    if (experimentOwner.current) return
     const phase = store.getState().phase
     if (phase === 'offline' || phase === 'boot') return
 
@@ -278,7 +353,9 @@ export default function App() {
     // are finished, otherwise "Aquí estoy" can become the next command.
     void (async () => {
       await greeting.end()
-      await new Promise((r) => setTimeout(r, POST_SPEECH_GUARD_MS))
+      const guardMs = followupGuardMs()
+      voiceDiag.postSpeechGuardMs = guardMs
+      await new Promise((r) => setTimeout(r, guardMs))
       if (speaker.current === greeting) speaker.current = null
       const now = store.getState().phase
       if (now === 'waking' || now === 'speaking') listen(AWAIT_SPEECH_MS)
@@ -290,6 +367,7 @@ export default function App() {
    * immediately, whatever he was doing.
    */
   const onSpeechStart = () => {
+    if (experimentOwner.current) return
     clearIdle()
     const phase = store.getState().phase
     if (phase === 'offline' || phase === 'boot' || phase === 'dormant') return
@@ -299,6 +377,12 @@ export default function App() {
 
     silence()
     if (wasBusy) {
+      if (activeReply.current) {
+        store.getState().updateTurn(activeReply.current, {
+          status: 'interrupted', finishedAt: Date.now(),
+        })
+        activeReply.current = null
+      }
       // Abandon the answer in flight. The turn counter moves in respond()'s
       // replacement; bumping it here covers the case where nothing replaces it.
       turn.current++
@@ -317,6 +401,7 @@ export default function App() {
   }
 
   const onUtterance = (text: string) => {
+    if (experimentOwner.current) return
     const phase = store.getState().phase
     if (phase === 'offline' || phase === 'boot' || phase === 'dormant') return
 
@@ -336,10 +421,12 @@ export default function App() {
   }
 
   const onPartial = (text: string) => {
+    if (experimentOwner.current) return
     store.getState().setCaption(text)
   }
 
   const onTranscript = (event: VoiceTranscriptEvent) => {
+    if (experimentOwner.current) return
     store.getState().pushHeardLine({
       id: event.id,
       text: event.text,
@@ -348,6 +435,7 @@ export default function App() {
       wakeMatched: event.wakeMatched,
       mode: event.capturedMode,
       at: event.at,
+      sttMs: event.sttMs,
     })
   }
 
@@ -362,6 +450,8 @@ export default function App() {
   const restartVoice = async () => {
     const generation = ++voiceRestart.current
     voice.current?.stop()
+    voice.current = null
+    if (experimentOwner.current) return
 
     const next = await startVoice({
       mode,
@@ -373,7 +463,7 @@ export default function App() {
       onError: onVoiceError,
     })
 
-    if (generation !== voiceRestart.current) {
+    if (generation !== voiceRestart.current || experimentOwner.current) {
       next.stop()
       return
     }
@@ -670,6 +760,12 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      // Global shortcuts remain installed while a voice lab owns the mic.
+      // They must never start turns or speak over the test's acoustic output.
+      if (experimentOwner.current) {
+        if (e.key === 'Escape' || e.code === 'Space') e.preventDefault()
+        return
+      }
 
       // V auditions the next British voice installed on this machine. Which
       // ones exist varies per Mac, so hearing them beats trusting a ranking.
@@ -787,12 +883,66 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const suspendForExperiment = (owner: 'realtime' | 'acoustic'): boolean => {
+    if (experimentOwner.current) return false
+    experimentOwner.current = owner
+    setActiveExperiment(owner)
+    clearIdle()
+    invalidateVoiceRestart()
+    voice.current?.stop()
+    voice.current = null
+    silence()
+    turn.current++
+    interrupt()
+    music.working(false)
+    music.duck(false)
+    sfx.duck(false)
+    store.getState().setPhase('thinking')
+    return true
+  }
+
+  const resumeFromExperiment = (owner: 'realtime' | 'acoustic'): void => {
+    if (experimentOwner.current !== owner) return
+    // Release ownership before restarting; generation mismatches will reject
+    // any recognizer packets emitted from an older suspended voice instance.
+    experimentOwner.current = null
+    setActiveExperiment(null)
+    goDormant()
+    void restartVoice().catch((err: unknown) => {
+      store.getState().setError(
+        err instanceof Error ? err.message : 'No se pudo recuperar el reconocimiento local.',
+      )
+    })
+  }
+
   return (
     <>
       <Scene />
       <Hud />
       <Boot />
       <Diagnostics />
+      {import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' && usingBridge && (
+        <VisualInput
+          available={phase !== 'offline' && phase !== 'boot'}
+          onAnalyze={(prompt, image) => respond(prompt, image)}
+        />
+      )}
+      {import.meta.env.VITE_LUMIA_ACOUSTIC_LAB === '1' && (
+        <AcousticLab
+          available={phase !== 'offline' && phase !== 'boot' &&
+            (activeExperiment === null || activeExperiment === 'acoustic')}
+          onSuspendNormal={() => suspendForExperiment('acoustic')}
+          onResumeNormal={() => resumeFromExperiment('acoustic')}
+        />
+      )}
+      {isRealtimePilotUiEnabled() && (
+        <RealtimeTrial
+          available={phase !== 'offline' && phase !== 'boot' &&
+            (activeExperiment === null || activeExperiment === 'realtime')}
+          onSuspendNormal={() => suspendForExperiment('realtime')}
+          onResumeNormal={() => resumeFromExperiment('realtime')}
+        />
+      )}
       <Ignition onStart={() => void powerOn()} />
     </>
   )
