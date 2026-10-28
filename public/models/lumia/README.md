@@ -15,6 +15,16 @@ Metadatos: `nodes[0].extras.lumiaAvatarProfile = "face-v1"`.
 La calibración visual ya está en código:
 `FACE_HEIGHT_FRACTION=0.47` y `FACE_SHIFT_PX=25`.
 
+## Estado: AV-01B publicado y certificado
+
+El rostro GLB **ya está versionado** en esta rama experimental desde el commit
+`0478540e1ef997428794187203b0c0e2584bb6e5`.
+
+La ejecución de GitHub Actions
+https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/40715289290
+verificó la presencia del binario, su SHA-256, el perfil `face-v1` y los
+parámetros de calibración. El código está consolidado, **no fusionado en main**.
+
 ## Comprobación de publicación
 
 El GLB no se añade fingiendo un puntero Git LFS sin contenido real. La
