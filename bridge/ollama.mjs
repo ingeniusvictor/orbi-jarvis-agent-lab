@@ -149,7 +149,17 @@ function modelInventoryToSpeech(models) {
     .map((item) => item.active ? `${item.name}, activo` : item.name)
     .join(', ')
 
-  return `Tengo disponibles ${names}.`
+  return `Tengo ${inventory.length} modelos instalados en Ollama: ${names}.`
+}
+
+function modelInventoryCountToSpeech(models) {
+  const inventory = buildModelInventory(models)
+  if (!inventory.length) {
+    return 'No encuentro modelos locales instalados en Ollama.'
+  }
+  const active = inventory.find((item) => item.active)?.name
+  return `Tengo ${inventory.length} modelos locales instalados en Ollama.` +
+    (active ? ` Ahora estoy usando ${active}.` : '')
 }
 
 export function toolResultToPrompt(execution) {
@@ -589,19 +599,21 @@ export function attachOllamaSession(socket) {
           return
         }
 
-        const modelControl = parseModelControl(prompt)
+        const modelControl = parseModelControl(prompt, history)
 
         if (modelControl) {
           const toolName =
-            modelControl.action === 'list'
-              ? 'orbi_model_registry'
-              : 'orbi_model_switch'
+            modelControl.action === 'switch'
+              ? 'orbi_model_switch'
+              : 'orbi_model_registry'
 
           send({ type: 'tool', ask, name: toolName })
 
           const probe = await probeOllama()
           if (!probe.ok) {
             answer = 'No puedo consultar los modelos locales porque Ollama no está disponible.'
+          } else if (modelControl.action === 'count') {
+            answer = modelInventoryCountToSpeech(probe.models)
           } else if (modelControl.action === 'list') {
             answer = modelInventoryToSpeech(probe.models)
           } else {
