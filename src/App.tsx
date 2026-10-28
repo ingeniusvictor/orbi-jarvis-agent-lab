@@ -688,6 +688,11 @@ export default function App() {
     // Ask the bridge which speech engines exist before the loop starts, so the
     // first spoken line already uses the best available Spanish voice.
     await probeCapabilities()
+    // The footer was initialized before the VRM probe and could incorrectly
+    // keep showing Windows system voice (e.g. Microsoft Helena) while local
+    // Kokoro was already the effective synthesizer. Sync the actual engine
+    // label after capability detection; no model/voice preference is changed.
+    store.getState().setVoice(currentVoiceName())
 
     // L.U.M.I.A.'s introduction happens before the recogniser starts. This is
     // deliberate: the assistant says her own wake word ("Lumi"), and starting
