@@ -21,6 +21,10 @@ const CLOUD_AUDIO_STREAMING = import.meta.env.VITE_LUMIA_STREAMING_TTS === '1'
 const PREFETCH_NEXT_PHRASE = import.meta.env.VITE_LUMIA_TTS_PREFETCH_NEXT === '1'
 /** ASUS opt-in only, first local Kokoro phrase; no change to later cadence. */
 const FAST_LOCAL_FIRST_CHUNK = import.meta.env.VITE_LUMIA_FAST_FIRST_CHUNK === '1'
+/** ASUS-only recovery for local WAV elements that never start or stop advancing. */
+const LOCAL_PLAYBACK_RECOVERY = import.meta.env.VITE_LUMIA_LOCAL_PLAYBACK_RECOVERY === '1'
+const LOCAL_WAV_START_TIMEOUT_MS = 12_000
+const LOCAL_WAV_STALL_TIMEOUT_MS = 15_000
 
 type AudioSource = string | StreamedAudio
 
@@ -129,6 +133,10 @@ export const diag = {
   transport: 'buffered' as 'buffered' | 'mse-stream',
   streamChunks: 0,
   streamFailures: 0,
+  localPlaybackRecovery: LOCAL_PLAYBACK_RECOVERY,
+  localPlaybackStartTimeouts: 0,
+  localPlaybackStalls: 0,
+  localPlaybackFallbacks: 0,
   /** Latest measured end-to-end local Kokoro generation request. */
   localSynthesisMs: null as number | null,
   localSynthesisCount: 0,
@@ -662,11 +670,24 @@ export function createSpeaker(
         // If an opted-in MSE stream failed before producing *any* sound, use
         // the existing system-voice recovery. Never repeat words that already
         // became audible, even if the network fails mid-sentence.
-        if (played || cancelled || typeof source === 'string') return
+        if (played || cancelled || (typeof source === 'string' && !LOCAL_PLAYBACK_RECOVERY)) return
+        // A local WAV never actually began: do not silently mark it delivered.
+        if (typeof source === 'string' && diag.engine === 'kokoro-local') {
+          diag.localPlaybackFallbacks++
+        }
       }
 
+      const recoveringLocal = diag.engine === 'kokoro-local' &&
+        LOCAL_PLAYBACK_RECOVERY
       const spoke = await speakNative(item)
       if (spoke || cancelled) return
+
+      // Offline ASUS must not call a paid rescue if BOTH local and OS output fail.
+      if (recoveringLocal) {
+        diag.failures++
+        diag.lastError = 'local-and-system-playback-failed'
+        return
+      }
 
       // The OS voice produced no sound. That is not recoverable by retrying it,
       // so latch it off and rescue this sentence through the bridge's speech
@@ -872,17 +893,50 @@ export function createSpeaker(
 
       let done = false
       let beganPlaying = false
-      // A media-source that never opens must not wedge the full conversation.
-      const startWatchdog = typeof source === 'string' ? null : setTimeout(() => {
-        if (done || beganPlaying) return
-        diag.streamFailures++
-        diag.lastError = 'stream-start-timeout'
-        finish()
-      }, 12000)
+      const recoverLocal = LOCAL_PLAYBACK_RECOVERY &&
+        typeof source === 'string' && diag.engine === 'kokoro-local'
+      let lastProgressAt = Date.now()
+      let lastProgressSeconds = 0
+
+      // A local blob should have the same bounded start guarantee as a stream.
+      const startWatchdog = typeof source !== 'string' || recoverLocal
+        ? setTimeout(() => {
+            if (done || beganPlaying) return
+            if (recoverLocal) {
+              diag.localPlaybackStartTimeouts++
+              diag.failures++
+              diag.lastError = 'local-wav-start-timeout'
+            } else {
+              diag.streamFailures++
+              diag.lastError = 'stream-start-timeout'
+            }
+            audio.pause()
+            finish()
+          }, LOCAL_WAV_START_TIMEOUT_MS)
+        : null
+
+      // Observe media time, not total sentence duration: long, healthy
+      // playback remains allowed, while a stalled element can release spk.end().
+      const stallWatchdog = recoverLocal ? setInterval(() => {
+        if (done || !beganPlaying) return
+        const currentSeconds = audio.currentTime
+        if (Number.isFinite(currentSeconds) && currentSeconds > lastProgressSeconds + 0.05) {
+          lastProgressSeconds = currentSeconds
+          lastProgressAt = Date.now()
+        } else if (Date.now() - lastProgressAt >= LOCAL_WAV_STALL_TIMEOUT_MS) {
+          diag.localPlaybackStalls++
+          diag.failures++
+          diag.lastError = 'local-wav-stalled'
+          audio.pause()
+          finish()
+        }
+      }, 1000) : null
+
       const finish = () => {
         if (done) return
         done = true
         if (startWatchdog) clearTimeout(startWatchdog)
+        if (stallWatchdog) clearInterval(stallWatchdog)
         cancelAnimationFrame(raf)
         outLevel = 0.12
         if (beganPlaying) {
@@ -901,6 +955,8 @@ export function createSpeaker(
         // physical start and must have exactly one timestamp in the timeline.
         if (done || cancelled || beganPlaying) return
         beganPlaying = true
+        lastProgressAt = Date.now()
+        lastProgressSeconds = audio.currentTime
         markOutputAudible(true)
         if (item.firstPhrase) {
           const beganAt = Date.now()
