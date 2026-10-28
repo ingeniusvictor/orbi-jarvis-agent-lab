@@ -18,6 +18,8 @@ const CLOUD_AUDIO_STREAMING = import.meta.env.VITE_LUMIA_STREAMING_TTS === '1'
 /** Owner-only pilot: pre-generate only the NEXT phrase while this one plays.
  * Default OFF, so existing synthesizer concurrency remains unchanged. */
 const PREFETCH_NEXT_PHRASE = import.meta.env.VITE_LUMIA_TTS_PREFETCH_NEXT === '1'
+/** ASUS opt-in only, first local Kokoro phrase; no change to later cadence. */
+const FAST_LOCAL_FIRST_CHUNK = import.meta.env.VITE_LUMIA_FAST_FIRST_CHUNK === '1'
 
 type AudioSource = string | StreamedAudio
 
@@ -129,6 +131,12 @@ export const diag = {
   /** Latest measured end-to-end local Kokoro generation request. */
   localSynthesisMs: null as number | null,
   localSynthesisCount: 0,
+  firstPhraseFastOptIn: FAST_LOCAL_FIRST_CHUNK,
+  firstPhraseChars: null as number | null,
+  firstPhraseQueuedMs: null as number | null,
+  firstPhraseSynthesisMs: null as number | null,
+  firstPhrasePlaybackWaitMs: null as number | null,
+  firstPhraseStartedMs: null as number | null,
   /** Silence from one phrase's audio completion until the next phrase begins. */
   lastInterPhraseSilenceMs: null as number | null,
   maxInterPhraseSilenceMs: 0,
@@ -453,6 +461,7 @@ type Item = {
   synthesisReadyAt?: number
   /** Generation starts one sentence ahead, not all at once. */
   audio?: Promise<AudioSource | null> | null
+  firstPhrase?: boolean
 }
 
 export function createSpeaker(
@@ -470,6 +479,12 @@ export function createSpeaker(
     waitingPlaybackMs: number | null
   }) => void,
 ): Speaker {
+  const speakerCreatedAt = Date.now()
+  diag.firstPhraseChars = null
+  diag.firstPhraseQueuedMs = null
+  diag.firstPhraseSynthesisMs = null
+  diag.firstPhrasePlaybackWaitMs = null
+  diag.firstPhraseStartedMs = null
   const queue: Item[] = []
   let buffer = ''
   let cancelled = false
@@ -528,7 +543,11 @@ export function createSpeaker(
     const text = shape(sentence)
     if (!text) return
 
-    const item: Item = { text, queuedAt: Date.now() }
+    const item: Item = { text, queuedAt: Date.now(), firstPhrase: !firstChunkQueued }
+    if (item.firstPhrase) {
+      diag.firstPhraseChars = text.length
+      diag.firstPhraseQueuedMs = Math.max(0, item.queuedAt - speakerCreatedAt)
+    }
     if (priority) {
       // Genuinely ahead of the queue this time. The old `say()` appended to the
       // same chain and only appeared to preempt because it was called when the
@@ -592,6 +611,9 @@ export function createSpeaker(
     const pending = synthesise(item.text)
     item.audio = pending ? pending.then((source) => {
       item.synthesisReadyAt = Date.now()
+      if (item.firstPhrase) {
+        diag.firstPhraseSynthesisMs = Math.max(0, item.synthesisReadyAt - (item.synthesisStartedAt ?? item.queuedAt))
+      }
       if (!source) return null
       // Primed audio can complete after a voice interruption. Do not leak the
       // blob URL or keep streaming a sentence that will never be played.
@@ -879,6 +901,12 @@ export function createSpeaker(
         if (done || cancelled || beganPlaying) return
         beganPlaying = true
         markOutputAudible(true)
+        if (item.firstPhrase) {
+          const beganAt = Date.now()
+          diag.firstPhraseStartedMs = Math.max(0, beganAt - speakerCreatedAt)
+          diag.firstPhrasePlaybackWaitMs = item.synthesisReadyAt == null
+            ? null : Math.max(0, beganAt - item.synthesisReadyAt)
+        }
         notifyFirstAudio()
         notifyPhraseStart(item)
         diag.started++
@@ -939,7 +967,11 @@ export function createSpeaker(
       // word boundaries, ordered playback, interruption and sentence handling.
       // No repeated early cuts: subsequent phrases preserve the old cadence.
       if (!firstChunkQueued) {
-        const earlyCut = findEarlySpeechBoundary(buffer)
+        const localVoice = caps().voice
+        const fastLocal = FAST_LOCAL_FIRST_CHUNK &&
+          localVoice?.requested?.ttsMode === 'local' &&
+          localVoice?.local?.ttsAvailable === true
+        const earlyCut = findEarlySpeechBoundary(buffer, { fastLocal })
         if (earlyCut !== null) {
           enqueue(buffer.slice(0, earlyCut))
           buffer = buffer.slice(earlyCut)

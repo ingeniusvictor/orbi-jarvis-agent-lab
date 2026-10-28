@@ -18,6 +18,8 @@ rem Whisper resident is intentionally OFF: prior household tests reported false 
 set "ORBIA_WHISPER_SERVER_ENABLED=0"
 set "ORBIA_KOKORO_RESIDENT_ENABLED=1"
 set "VITE_LUMIA_TTS_PREFETCH_NEXT=1"
+rem Opt-in ASUS pilot: shorten only the first local Kokoro chunk for measured onset tests.
+set "VITE_LUMIA_FAST_FIRST_CHUNK=1"
 rem Optical face-only horizontal correction in CSS pixels; default canon remains +25.
 set "VITE_LUMIA_FACE_SHIFT_PX=0"
 set "VITE_LUMIA_VISUAL_INPUT_VI01=1"

@@ -49,3 +49,26 @@ for (let count = 1; count <= words.length; count += 1) {
 console.log('LUMIA VL-01 first-audio chunk safety: PASS')
 console.log('First-clause, bounded fallback, Unicode and streamed-delta boundaries: PASS')
 console.log('No shortening of endpointing or Voice Gate authority: VERIFIED BY CHANGE SCOPE')
+
+
+// ASUS opt-in first local-only chunk: word-safe, no text lost, legacy untouched.
+const spanish = 'La Inteligencia Artificial Local es una tecnología que permite ejecutar modelos directamente en computadoras personales sin depender de servicios remotos para cada solicitud.'
+assert.equal(findEarlySpeechBoundary(spanish.slice(0, 80)), null, 'Classic VL-01 still waits for its original threshold.')
+const fastEarly = findEarlySpeechBoundary(spanish.slice(0, 88), { fastLocal: true })
+assert.ok(fastEarly !== null && fastEarly >= 32 && fastEarly <= 88)
+assert.equal(spanish.slice(fastEarly - 1, fastEarly), ' ', 'Fast mode also stops only between whole words.')
+assert.equal(spanish.slice(0, fastEarly) + spanish.slice(fastEarly), spanish)
+assert.equal(findEarlySpeechBoundary(short, { fastLocal: true }), null)
+const shortClause = 'LUMIA puede investigar tus preguntas con cuidado, y ofrecer resultados útiles.'
+const fastClause = findEarlySpeechBoundary(shortClause, { fastLocal: true })
+assert.ok(fastClause !== null && fastClause <= 88)
+assert.equal(shortClause.slice(0, fastClause) + shortClause.slice(fastClause), shortClause)
+for (let length = 1; length <= spanish.length; length++) {
+  const prefix = spanish.slice(0, length)
+  const cut = findEarlySpeechBoundary(prefix, { fastLocal: true })
+  if (cut !== null) {
+    assert.ok(cut <= prefix.length)
+    assert.ok(/[\s\t]$/.test(prefix.slice(0, cut)))
+  }
+}
+console.log('LUMIA VL-07: ASUS opt-in early Kokoro phrase boundary: PASS')

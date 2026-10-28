@@ -12,6 +12,11 @@ const MIN_FIRST_CHARS = 52
 const TARGET_FIRST_CHARS = 96
 const MAX_FIRST_CHARS = 148
 
+// ASUS opt-in, not the default. Short initial WAV for local Kokoro only.
+const FAST_LOCAL_MIN_CHARS = 32
+const FAST_LOCAL_TARGET_CHARS = 56
+const FAST_LOCAL_MAX_CHARS = 88
+
 /**
  * Returns a boundary after a complete word, or null when there is not yet
  * enough safe text. Splitting there and joining the parts reconstructs the
@@ -21,8 +26,14 @@ const MAX_FIRST_CHARS = 148
  * streams a very long unpunctuated clause, make one bounded fallback cut near
  * TARGET_FIRST_CHARS. The rest of the answer still uses sentence boundaries.
  */
-export function findEarlySpeechBoundary(buffer: string): number | null {
-  if (typeof buffer !== 'string' || buffer.length < MIN_FIRST_CHARS) {
+export function findEarlySpeechBoundary(
+  buffer: string,
+  { fastLocal = false }: { fastLocal?: boolean } = {},
+): number | null {
+  const minChars = fastLocal ? FAST_LOCAL_MIN_CHARS : MIN_FIRST_CHARS
+  const targetChars = fastLocal ? FAST_LOCAL_TARGET_CHARS : TARGET_FIRST_CHARS
+  const maxChars = fastLocal ? FAST_LOCAL_MAX_CHARS : MAX_FIRST_CHARS
+  if (typeof buffer !== 'string' || buffer.length < minChars) {
     return null
   }
 
@@ -30,18 +41,18 @@ export function findEarlySpeechBoundary(buffer: string): number | null {
   let match: RegExpExecArray | null
   while ((match = clauseEnd.exec(buffer))) {
     const end = match.index + match[0].length
-    if (end >= MIN_FIRST_CHARS && end <= MAX_FIRST_CHARS) {
+    if (end >= minChars && end <= maxChars) {
       return end
     }
-    if (end > MAX_FIRST_CHARS) break
+    if (end > maxChars) break
   }
 
-  if (buffer.length < MAX_FIRST_CHARS) return null
+  if (buffer.length < maxChars) return null
 
-  const atTarget = buffer.lastIndexOf(' ', TARGET_FIRST_CHARS)
-  if (atTarget >= MIN_FIRST_CHARS) return atTarget + 1
+  const atTarget = buffer.lastIndexOf(' ', targetChars)
+  if (atTarget >= minChars) return atTarget + 1
 
   // Languages with unusually long tokens: do not cut a word in half.
-  const atMax = buffer.lastIndexOf(' ', MAX_FIRST_CHARS)
-  return atMax >= MIN_FIRST_CHARS ? atMax + 1 : null
+  const atMax = buffer.lastIndexOf(' ', maxChars)
+  return atMax >= minChars ? atMax + 1 : null
 }

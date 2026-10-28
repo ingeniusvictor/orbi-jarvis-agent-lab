@@ -66,6 +66,12 @@ type TtsDiag = {
   streamFailures: number
   localSynthesisMs: number | null
   localSynthesisCount: number
+  firstPhraseFastOptIn: boolean
+  firstPhraseChars: number | null
+  firstPhraseQueuedMs: number | null
+  firstPhraseSynthesisMs: number | null
+  firstPhrasePlaybackWaitMs: number | null
+  firstPhraseStartedMs: number | null
   lastInterPhraseSilenceMs: number | null
   maxInterPhraseSilenceMs: number
   lastGapWaitingTextMs: number | null
@@ -176,6 +182,12 @@ export function Diagnostics() {
       <Row k="voice" v={String(t.voice || '—')} />
       <Row k="first model text" v={t.firstTextMs == null ? '—' : `${t.firstTextMs} ms`} />
       <Row k="first audible word" v={t.firstAudioMs == null ? '—' : `${t.firstAudioMs} ms`} />
+      <Row k="fast local first chunk" v={t.firstPhraseFastOptIn ? 'ON · ASUS pilot' : 'OFF · legacy'} />
+      <Row k="first phrase characters" v={t.firstPhraseChars == null ? '—' : String(t.firstPhraseChars)} />
+      <Row k="first phrase queued" v={t.firstPhraseQueuedMs == null ? '—' : `${t.firstPhraseQueuedMs} ms from speaker creation`} />
+      <Row k="first phrase TTS + WAV" v={t.firstPhraseSynthesisMs == null ? '—' : `${t.firstPhraseSynthesisMs} ms`} bad={(t.firstPhraseSynthesisMs ?? 0) > 4000} />
+      <Row k="first phrase browser start" v={t.firstPhrasePlaybackWaitMs == null ? '—' : `${t.firstPhrasePlaybackWaitMs} ms`} bad={(t.firstPhrasePlaybackWaitMs ?? 0) > 1500} />
+      <Row k="first phrase playback total" v={t.firstPhraseStartedMs == null ? '—' : `${t.firstPhraseStartedMs} ms`} />
       <Row k="cloud audio streaming" v={t.streamOptIn ? 'ON · experimental' : 'OFF · legacy'} />
       <Row k="audio transport" v={String(t.transport ?? 'buffered')} />
       <Row k="MP3 stream chunks" v={String(t.streamChunks ?? 0)} />
