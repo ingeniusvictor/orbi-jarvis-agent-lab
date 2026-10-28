@@ -14,6 +14,9 @@ import { createStreamingMp3, type StreamedAudio } from './streaming-mp3'
 
 /** Owner-enabled desktop experiment. Default stays full-file playback. */
 const CLOUD_AUDIO_STREAMING = import.meta.env.VITE_LUMIA_STREAMING_TTS === '1'
+/** Owner-only pilot: pre-generate only the NEXT phrase while this one plays.
+ * Default OFF, so existing synthesizer concurrency remains unchanged. */
+const PREFETCH_NEXT_PHRASE = import.meta.env.VITE_LUMIA_TTS_PREFETCH_NEXT === '1'
 
 type AudioSource = string | StreamedAudio
 
@@ -505,6 +508,11 @@ export function createSpeaker(
       queue.push(item)
     }
     firstChunkQueued = true
+    // pump() is a no-op while an earlier phrase is playing. Without priming
+    // here, a second Kokoro sentence begins synthesizing only AFTER the first
+    // sound finishes, producing the ~10 s "Hola ... [silence] ... sentence"
+    // gap. Only prime the head, never the entire queue.
+    if (pumping && PREFETCH_NEXT_PHRASE) prime(queue[0])
     void pump()
   }
 
