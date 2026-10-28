@@ -52,6 +52,17 @@ export type Blade = {
   hold: 'turn' | 'sticky'
 }
 
+export type SpokenSegment = {
+  text: string
+  at: number
+  gapMs: number | null
+  queuedAt: number
+  synthesizedAt?: number
+  waitingTextMs: number | null
+  waitingAudioMs: number | null
+  waitingPlaybackMs: number | null
+}
+
 export type Turn = {
   id: string
   role: 'user' | 'jarvis'
@@ -64,7 +75,7 @@ export type Turn = {
   status?: 'pending' | 'generating' | 'playing' | 'complete' | 'no-response' | 'error' | 'interrupted'
   errorNote?: string
   /** Timestamps are recorded on actual audio-element/speechSynthesis start. */
-  spokenSegments?: Array<{ text: string; at: number; gapMs: number | null }>
+  spokenSegments?: Array<SpokenSegment>
   /** Tool names invoked while producing this turn, for the HUD readout. */
   tools?: string[]
 }
@@ -297,7 +308,7 @@ type State = {
   appendToLastTurn: (text: string) => void
   appendToTurn: (id: string, delta: string) => void
   updateTurn: (id: string, patch: Partial<Omit<Turn, 'id' | 'role'>>) => void
-  pushSpokenSegment: (id: string, segment: { text: string; at: number; gapMs: number | null }) => void
+  pushSpokenSegment: (id: string, segment: SpokenSegment) => void
 
   applyUi: (patch: UiPatch) => void
   addOrbit: (o: OrbitObject) => void
