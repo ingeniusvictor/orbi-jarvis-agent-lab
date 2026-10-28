@@ -50,6 +50,14 @@ if not exist "node_modules\vite\bin\vite.js" (
   pause
   exit /b 1
 )
+rem Protect against concurrent LUMIA instances: frontend 5173 and bridge 8787.
+rem No processes are killed automatically; inspect PIDs before terminating anything.
+powershell.exe -NoProfile -NonInteractive -Command "$ports = @(5173, 8787); $busy = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $ports -contains $_.LocalPort }); if ($busy.Count -gt 0) { Write-Host 'ERROR: An earlier LUMIA session or another app occupies a required port:' -ForegroundColor Yellow; $busy | Select-Object LocalPort, OwningProcess -Unique | Format-Table -AutoSize; Write-Host 'Stop the old LUMIA terminal with Ctrl+C, inspect PIDs, and retry. Keep Ollama running.'; exit 2 }"
+if errorlevel 1 (
+  echo LUMIA was NOT started. Resolve the port conflict above.
+  pause
+  exit /b 2
+)
 echo Open the URL printed by Vite in a real Chrome/Edge window.
 echo Do not launch a second LUMIA bridge on the same port.
 echo Press CTRL+C to close. For previous voice behavior, use the manual launcher.
