@@ -9,6 +9,10 @@
 
 export type FocusVoiceMode = 'wake' | 'command' | 'guard' | 'deaf'
 
+/** One-shot, opt-in ASUS command transcription grace, measured from listen() start.
+ * Noise cannot renew this window and WAKE/GUARD are never extended. */
+export const ACTIVE_COMMAND_GRACE_MS = 35_000
+
 /**
  * Audio captured while waiting for a command belongs to that command only.
  * Once the app has left command mode, any queued command segment is stale and

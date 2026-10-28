@@ -208,6 +208,7 @@ const BROWSER_MAX_HOLD_MS = 30000
 
 /** Experiment off by default; never changes Voice Gate or action authority. */
 const ADAPTIVE_TURNS_ENABLED = import.meta.env.VITE_LUMIA_ADAPTIVE_TURNS === '1'
+const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_GRACE === '1'
 
 /**
  * How long to keep waiting, given what has been said so far.
@@ -898,6 +899,11 @@ async function startVadBridgeVoice(
       diag.mode = mode
       diag.sessions++
       if (mode === 'deaf') return
+      // Signal real capture only inside an already authorized local COMMAND.
+      // App extends that window once to cover bounded Whisper decoding.
+      if (provider === 'local' && mode === 'command' && ACTIVE_COMMAND_GRACE_ENABLED) {
+        h.onSpeechStart()
+      }
       // Standing down mid-thought throws the thought away with it. Otherwise
       // held text would surface as the opening of the *next* conversation.
       if (mode === 'wake') assemble.cancel()

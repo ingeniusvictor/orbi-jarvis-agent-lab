@@ -17,7 +17,7 @@ import {
   type VoiceMode,
   type VoiceTranscriptEvent,
 } from './lib/voice'
-import { voiceModeForPhase } from './lib/voice-focus'
+import { ACTIVE_COMMAND_GRACE_MS, voiceModeForPhase } from './lib/voice-focus'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { resolveFollowupGuardMs } from './lib/followup-latency'
 import * as sfx from './lib/sfx'
@@ -78,6 +78,7 @@ const FOLLOW_UP_MS = 11000
  * briefly so those delayed echo results are discarded instead of becoming a
  * brand-new user turn that makes L.U.M.I.A. answer herself in a loop. */
 const FAST_LOCAL_FOLLOWUP = import.meta.env.VITE_LUMIA_FAST_LOCAL_FOLLOWUP === '1'
+const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_GRACE === '1'
 
 // Owner-side opt-in only. The browser recognizer remains at the certified hold.
 // Never start listening before the actual synthesized-output echo tail expires.
@@ -118,6 +119,8 @@ export default function App() {
   const activeReply = useRef<string | null>(null)
   const booting = useRef(false)
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const commandWindowStartedAt = useRef(0)
+  const commandGraceUsed = useRef(false)
   const voicePoll = useRef<ReturnType<typeof setInterval> | null>(null)
   const voiceRestart = useRef(0)
   // Exclusive voice-device test ownership: the paid WebRTC trial and the
@@ -153,6 +156,8 @@ export default function App() {
   /** Open the mic and wait. `window` is how long before he gives up. */
   const listen = (window: number) => {
     clearIdle()
+    commandWindowStartedAt.current = Date.now()
+    commandGraceUsed.current = false
     const s = store.getState()
     s.setCaption('')
     s.setPhase('listening')
@@ -368,8 +373,20 @@ export default function App() {
    */
   const onSpeechStart = () => {
     if (experimentOwner.current) return
-    clearIdle()
     const phase = store.getState().phase
+    if (phase === 'listening' && ACTIVE_COMMAND_GRACE_ENABLED && voiceDiag.engine === 'whisper-local') {
+      // One extension only, bounded from the beginning of listen().
+      // Repeated noise/speech cannot renew the timeout indefinitely.
+      if (!commandGraceUsed.current) {
+        commandGraceUsed.current = true
+        clearIdle()
+        const startedAt = commandWindowStartedAt.current || Date.now()
+        const remainingMs = Math.max(1, ACTIVE_COMMAND_GRACE_MS - (Date.now() - startedAt))
+        idleTimer.current = setTimeout(goDormant, remainingMs)
+      }
+      return
+    }
+    clearIdle()
     if (phase === 'offline' || phase === 'boot' || phase === 'dormant') return
 
     const wasBusy =
