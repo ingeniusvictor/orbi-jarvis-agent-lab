@@ -423,6 +423,13 @@ export function Hud() {
                         {' · +'}{elapsedLabel(turn.at, turn.firstAudioAt)}
                       </span>
                     )}
+                    {turn.spokenSegments?.map((segment, index) => (
+                      <span key={index} className="voice-line-stage">
+                        Voz #{index + 1} {timeLabel(segment.at)}
+                        {segment.gapMs !== null ? ` · pausa ${(segment.gapMs / 1000).toFixed(2)} s` : ''}
+                        {' · '}{segment.text.slice(0, 66)}
+                      </span>
+                    ))}
                     {turn.finishedAt && (
                       <span className="voice-line-stage">
                         Fin {timeLabel(turn.finishedAt)}
