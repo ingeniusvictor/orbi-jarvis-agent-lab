@@ -73,6 +73,28 @@ export function shouldInterruptBusyAssistant(
 
 
 /**
+ * A segment can begin while the assistant is finishing its spoken answer
+ * (GUARD), but Whisper can return the transcript only AFTER the assistant
+ * has entered standby (WAKE). Passing that text through onUtterance silently
+ * fails: App.onUtterance deliberately rejects dormant commands.
+ *
+ * Recover only a fresh explicit addressed *request*, not generic speech,
+ * a bare wake word, noise, or a GUARD interrupt without the name. The caller
+ * still applies its self-echo / non-speech filters and wake debounce first.
+ */
+export function shouldRecoverGuardToWake(
+  capturedMode: FocusVoiceMode,
+  currentMode: FocusVoiceMode,
+  text: string,
+  { wake, bareWake }: { wake: RegExp; bareWake: RegExp },
+): boolean {
+  if (capturedMode !== 'guard' || currentMode !== 'wake') return false
+  const said = String(text ?? '').trim()
+  if (!said || bareWake.test(said)) return false
+  return wake.test(said)
+}
+
+/**
  * Whisper sometimes emits bracketed acoustic annotations for music/noise.
  * They are useful evidence in ESCUCHANDO but must never become commands.
  */
