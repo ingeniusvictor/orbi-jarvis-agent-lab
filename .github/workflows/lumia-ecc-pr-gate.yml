@@ -95,6 +95,9 @@ jobs:
       - name: RC-01 IA local STT and opt-in streaming Ollama reply
         run: npx tsx scripts/certify-lumia-voice-rc01.ts
 
+      - name: RA-01 14s phrase gap model vs Kokoro vs playback attribution
+        run: npx tsx scripts/certify-lumia-gap-attribution-ra01.ts
+
       - name: Production build
         run: npm run build
 
