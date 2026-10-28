@@ -249,7 +249,7 @@ export function parseModelControl(prompt, history = []) {
     /\bque modelos? (?:puedo|puedes|puede|podemos) usar\b/.test(text) ||
     /\bque modelos? (?:tienes|hay|estan)\b/.test(text) ||
     /\bmodelos? (?:disponibles|instalados)\b/.test(text) ||
-    /\b(?:lista|listar|muestra|mostrar|dime) (?:los )?modelos\b/.test(text) ||
+    /\b(?:lista|listar|muestra|muestrame|muestranos|mostrar|dime) (?:los )?modelos\b/.test(text) ||
     /\b(?:puedes|podrias|puede|eres capaz de) (?:cambiar|cambiarte|usar) (?:de |a |otro )?modelo\b/.test(text)
 
   if (explicitCount) return { action: 'count' }
