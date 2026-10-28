@@ -15,6 +15,5 @@
   },
   "origin": "User-supplied GLB, verified from prior Windows installation package",
   "geometry": "Original embedded geometry and texture binary chunk preserved",
-  "stagedInRepository": false,
-  "note": "Binary excluded by .gitignore pending owner-side git push. No claim that GLB has been uploaded."
+  "note": "Git blob availability verified by scripts/certify-lumia-avatar-asset.mjs. Do not equate this manifest with the binary."
 }
