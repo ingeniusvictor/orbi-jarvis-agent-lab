@@ -71,3 +71,45 @@ debe confirmar que el modelo visual seleccionado existe en ese equipo.
 - Base encadenada: WR-01 #26, MI-02 #25, RA-01 #24.
   `main` sigue protegido. Resguardar
   `src/scene/LumiaAvatar.tsx` local (rostro calibrado) antes de actualizar.
+
+## Certificación adicional: resolución visual Ryzen (28-oct-2026)
+
+Propietario ejecutó benchmark local en Ryzen 7 4700U con Ollama 0.40.12,
+`qwen3.5:0.8b` en CPU, `think:false`, `num_ctx:4096`,
+`num_predict:250`. Fuente: salida de consola suministrada por el propietario.
+Misma infografía de 2048 × 1152, misma pregunta de lectura de seis encabezados,
+una ejecución por resolución, sin truncamiento reportado.
+
+| Imagen | Dimensiones | Total (s) | Imagen + prompt (s) | Generación (tok/s) | Encabezados exactos |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Original | 2048 × 1152 | 49,03 | 36,43 | 21,92 | 6/6 |
+| 1280 | 1280 × 720 | 19,76 | 11,35 | 24,97 | 6/6 |
+| **1024** | **1024 × 576** | **15,53** | **7,10** | **24,65** | **6/6** |
+| 768 | 768 × 432 | 21,53 | 13,02 | 24,20 | 6/6 |
+
+**Conclusión limitada a esta infografía:** 1024 px redujo tiempo total un
+**68,3 %** (49,03 → 15,53 s, ~3,16×) y procesamiento de imagen+prompt
+**80,5 %** (36,43 → 7,10 s), manteniendo seis encabezados reconocidos.
+768 px fue más lento que 1024 px en esta medición; investigar variación,
+paginación y tokenización, no dar por sentada la monotonicidad por tamaño.
+
+El cliente VI-01 **ya intenta 1024 px como primer tamaño** antes de
+800/640/512 (solo desciende cuando el límite de base64 lo requiere):
+`src/lib/visual-input.ts`. La coincidencia con este óptimo de prueba es
+positiva, **no requiere aumentar resolución ni cambiar código de producción**.
+El navegador recompone la foto a JPEG calidad 0,76 y límites de tamaño;
+ello puede modificar la legibilidad respecto del benchmark. Las pruebas
+locales con API de Ollama **no validan aún la integración en interfaz
+LUMIA, ni el desempeño simultáneo de Whisper/Kokoro/avatar**.
+
+Pendientes de confirmación:
+- Comparar el CSV y TXT completos, no solo 6/6 encabezados, para evaluar
+  transcripción de todos los renglones y posibles errores de texto.
+- Repetir 1024 y 1280 con el mismo prompt, 2–3 veces, registrar RAM/
+  `prompt_eval_count`, `load_duration` y temperaturas.
+- Probar fotografías técnicas con números de serie y capturas largas con
+  letras pequeñas antes de generalizar. Para documentos con texto fino,
+  habilitar recorte explícito o examen de regiones por separado.
+- El Ryzen mantiene `qwen3:1.7b` como candidato de voz rápido y
+  `qwen3.5:0.8b` como candidato visual; el enrutamiento entre ambos NO
+  está certificado en LUMIA ni debe asumirse implementado.
