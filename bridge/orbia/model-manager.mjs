@@ -245,6 +245,19 @@ export function parseModelControl(prompt, history = []) {
   const inventoryFromContext =
     /\b(?:esos|estos|cuales)\s+modelos?\b/.test(text) &&
     recentlyDiscussedLocalModels(history)
+  // Whisper may say "varias IA local ... ¿cuáles son?" instead of
+  // "modelos instalados". Only treat it as a registry request when it also
+  // describes the *interchangeable local* assistants, never when asking
+  // generally how artificial intelligence works.
+  const interchangeableLocalAi =
+    /\b(?:varias|varios|distintas|distintos|diferentes)\s+(?:ias?|inteligencias? artificiales?|modelos?)\b/.test(text) &&
+    /\b(?:intercambiar|cambiar|disponibles?|instaladas?|instalados?|usar)\b/.test(text) &&
+    /\b(?:cuales? son|cuales? tengo|cuales? tienes|dime cuales?)\b/.test(text)
+  // A true pronoun-only follow-up may omit "modelos" entirely.
+  // Require previous inventory context and no new substantive topic.
+  const shortInventoryFollowup =
+    /^(?:(?:lumi|lumia)\s+)?(?:(?:me\s+)?(?:puedes?|podrias?)\s+decir\s+)?(?:cuales?\s+son|cuales?)\s*(?:(?:esos|estos|los)\s+)?$/.test(text) &&
+    recentlyDiscussedLocalModels(history)
   const asksForInventory =
     /\bque modelos? (?:puedo|puedes|puede|podemos) usar\b/.test(text) ||
     /\bque modelos? (?:tienes|hay|estan)\b/.test(text) ||
@@ -253,7 +266,8 @@ export function parseModelControl(prompt, history = []) {
     /\b(?:puedes|podrias|puede|eres capaz de) (?:cambiar|cambiarte|usar) (?:de |a |otro )?modelo\b/.test(text)
 
   if (explicitCount) return { action: 'count' }
-  if (asksForInventory || explicitWhich || shortFollowup || inventoryFromContext) {
+  if (asksForInventory || explicitWhich || shortFollowup || inventoryFromContext ||
+      interchangeableLocalAi || shortInventoryFollowup) {
     return { action: 'list' }
   }
 
