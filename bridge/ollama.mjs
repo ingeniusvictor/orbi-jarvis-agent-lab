@@ -317,6 +317,60 @@ export async function streamOllama({
     },
   ]
 
+  // A multimodal turn uses Ollama's native image field, with an explicit
+  // owner-selected photograph. The normal structured audio-only flow below is
+  // unchanged. Native plain text avoids cutting useful visual analysis inside
+  // the short JSON voice-response contract.
+  if (image) {
+    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt +
+              '\\nEstás examinando una foto proporcionada expresamente por el usuario. ' +
+              'Describe observaciones visuales; distingue claramente hipótesis. ' +
+              'No inventes detalles, y no repitas teléfonos ni identificadores privados. ' +
+              'Responde en español con frases naturales, breves y completas.',
+          },
+          ...history,
+          { role: 'user', content: prompt, images: [image.data] },
+        ],
+        stream: false,
+        think: false,
+        keep_alive: OLLAMA_KEEP_ALIVE,
+        options: { temperature: 0, num_ctx: 4096, num_predict: 256 },
+      }),
+      signal,
+    })
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      throw new Error(
+        `Ollama visual HTTP ${res.status}` +
+        (detail ? `: ${detail.slice(0, 160)}` : ''),
+      )
+    }
+    const packet = await res.json()
+    const answer = sanitizeLumiaVoiceOutput(
+      String(packet?.message?.content ?? '').trim(),
+    )
+    if (!answer) throw new Error('Ollama no entregó una descripción visual.')
+    // No image data in logs, transcript or process-local history.
+    const totalMs = Number(packet?.total_duration ?? 0) / 1_000_000
+    const promptMs = Number(packet?.prompt_eval_duration ?? 0) / 1_000_000
+    const loadMs = Number(packet?.load_duration ?? 0) / 1_000_000
+    console.log(
+      `[lumia] visual local model=${model} total=${totalMs.toFixed(0)}ms` +
+      ` input=${promptMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
+      ` outputTokens=${Number(packet?.eval_count ?? 0)}`,
+    )
+    onText(answer)
+    return answer
+  }
+
   const responseSchema = {
     type: 'object',
     properties: {
@@ -581,6 +635,9 @@ export function attachOllamaSession(socket) {
         // One single local photo; malformed payloads fail before model call.
         // It is never added to chat history, console output or diagnostics.
         const image = parseLocalVisualImage(msg.image)
+        if (image && process.env.ORBIA_LUMIA_VISION_ENABLED !== '1') {
+          throw new Error('Visión experimental deshabilitada en este bridge.')
+        }
         const voiceControl = image ? null : parseVoiceRuntimeControl(prompt)
 
         if (voiceControl) {
