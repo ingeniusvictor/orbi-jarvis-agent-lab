@@ -906,7 +906,10 @@ async function startVadBridgeVoice(
       // A later VAD segment may already be recording while this Whisper
       // transcript finishes. Do not answer the first half of a long question.
       if (LONG_QUESTION_INPUT_ENABLED && capturedMode === 'command' &&
-          h.mode() === 'command' && vad?.meter().speaking) {
+          h.mode() === 'command' &&
+          (vad?.meter().speaking || pendingAudio.some(
+            (item) => item.capturedMode === 'command' && item.epoch === captureEpoch,
+          ))) {
         beginLongQuestion()
       }
 
