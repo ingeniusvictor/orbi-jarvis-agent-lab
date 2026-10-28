@@ -544,7 +544,7 @@ export async function streamOllama({
     }
   }
 
-  let raw = await runStructured(messages)
+  const raw = await runStructured(messages)
   let text = parseAnswer(raw)
 
   // Recover one malformed structured reply using the actual latest question.
