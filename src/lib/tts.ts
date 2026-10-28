@@ -122,6 +122,12 @@ export const diag = {
   transport: 'buffered' as 'buffered' | 'mse-stream',
   streamChunks: 0,
   streamFailures: 0,
+  /** Latest measured end-to-end local Kokoro generation request. */
+  localSynthesisMs: null as number | null,
+  localSynthesisCount: 0,
+  /** Silence from one phrase's audio completion until the next phrase begins. */
+  lastInterPhraseSilenceMs: null as number | null,
+  maxInterPhraseSilenceMs: 0,
 }
 
 if (typeof window !== 'undefined') {
@@ -437,7 +443,10 @@ type Item = {
   audio?: Promise<AudioSource | null> | null
 }
 
-export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
+export function createSpeaker(
+  onFirstAudioStart?: () => void,
+  onPhraseStart?: (event: { text: string; at: number; gapMs: number | null }) => void,
+): Speaker {
   const queue: Item[] = []
   let buffer = ''
   let cancelled = false
@@ -446,6 +455,17 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
   // An explicit first-phrase fast path applies only once per speaker/answer.
   let firstChunkQueued = false
   let firstAudioNotified = false
+  let lastPhraseEndedAt = 0
+  const notifyPhraseStart = (text: string) => {
+    if (cancelled) return
+    const at = Date.now()
+    const gapMs = lastPhraseEndedAt ? Math.max(0, at - lastPhraseEndedAt) : null
+    if (gapMs !== null) {
+      diag.lastInterPhraseSilenceMs = gapMs
+      diag.maxInterPhraseSilenceMs = Math.max(diag.maxInterPhraseSilenceMs, gapMs)
+    }
+    onPhraseStart?.({ text, at, gapMs })
+  }
   const notifyFirstAudio = () => {
     if (cancelled || firstAudioNotified) return
     firstAudioNotified = true
@@ -660,7 +680,10 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
         if (done) return
         done = true
         nativeInFlight = false
-        if (started) markOutputAudible(false)
+        if (started) {
+          markOutputAudible(false)
+          lastPhraseEndedAt = Date.now()
+        }
         if (watchdog) clearTimeout(watchdog)
         if (keepalive) clearInterval(keepalive)
         cancelAnimationFrame(raf)
@@ -676,6 +699,7 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
         started = true
         markOutputAudible(true)
         notifyFirstAudio()
+        notifyPhraseStart(text)
         diag.started++
         diag.lastError = ''
         if (watchdog) clearTimeout(watchdog)
@@ -796,7 +820,10 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
         if (startWatchdog) clearTimeout(startWatchdog)
         cancelAnimationFrame(raf)
         outLevel = 0.12
-        if (beganPlaying) markOutputAudible(false)
+        if (beganPlaying) {
+          markOutputAudible(false)
+          lastPhraseEndedAt = Date.now()
+        }
         releaseSource(source)
         if (currentAudio === audio) currentAudio = null
         resolve(beganPlaying)
@@ -809,6 +836,7 @@ export function createSpeaker(onFirstAudioStart?: () => void): Speaker {
         beganPlaying = true
         markOutputAudible(true)
         notifyFirstAudio()
+        notifyPhraseStart(text)
         diag.started++
         diag.lastError = ''
       }
@@ -939,6 +967,14 @@ async function fetchLocalAudio(
       body: JSON.stringify({ text, speaker }),
     })
     if (!res.ok) return null
+    const header = res.headers.get('x-orbia-tts-synthesis-ms')
+    if (header !== null) {
+      const measured = Number(header)
+      if (Number.isFinite(measured) && measured >= 0) {
+        diag.localSynthesisMs = measured
+        diag.localSynthesisCount++
+      }
+    }
     return URL.createObjectURL(await res.blob())
   } catch {
     return null
