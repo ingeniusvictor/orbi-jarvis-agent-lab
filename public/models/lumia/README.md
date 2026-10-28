@@ -1,23 +1,39 @@
-# L.U.M.I.A. avatar asset
+# L.U.M.I.A. — Avatar facial AV-01B (2026-10-28)
 
-The first hologram prototype expects the avatar at:
+El avatar aprobado es un **rostro/busto 3D** GLB 2.0 del usuario. El componente
+`src/scene/LumiaAvatar.tsx` espera exactamente:
 
 ```text
 public/models/lumia/lumia.glb
 ```
 
-The current source GLB is intentionally kept local during the visual prototype
-instead of being committed as a normal Git blob. It is approximately 17 MB and
-should be moved to Git LFS or another governed asset path once the avatar pass
-is certified.
+**Archivo certificado para incorporar:** 4.128.456 bytes.  
+**SHA-256:**
+`a1d48cb762fb00ecb2e89270ca7755b7ad7ac1e7e384e0cc21a796494418f56f`.
 
-Source asset characteristics used by the prototype:
+Metadatos: `nodes[0].extras.lumiaAvatarProfile = "face-v1"`.
+La calibración visual ya está en código:
+`FACE_HEIGHT_FRACTION=0.47` y `FACE_SHIFT_PX=25`.
 
-- glTF 2.0 binary (GLB)
-- one scene / one mesh
-- Y-up bounds approximately 0..1
-- no embedded animation clips
-- textured PBR material
+## Comprobación de publicación
 
-`src/scene/LumiaAvatar.tsx` scales and centres the model automatically inside
-the holographic reactor and adds only procedural idle motion.
+El GLB no se añade fingiendo un puntero Git LFS sin contenido real. La
+transferencia **se habrá completado** cuando GitHub muestre el archivo binario
+en esta rama y `node scripts/certify-lumia-avatar-asset.mjs` confirme su hash.
+
+El archivo fue suministrado en el paquete de instalación Windows del
+propietario y se distribuye con un script verificador independiente:
+
+```text
+scripts/PUBLICAR_ROSTRO_AV01B_EN_GITHUB.ps1
+```
+
+El script crea **un nuevo clon** de
+`feature/lumia-consolidated-release-20261028`, valida el hash, fuerza
+`git add` únicamente para la ruta GLB (porque está ignorada hasta
+incorporarla) y hace commit/push solo sobre esa rama. No modifica `main`
+ni los modelos GLB de las instalaciones actuales del propietario.
+
+No se incluyen los binarios de Whisper, Kokoro, Ollama ni claves.
+
+**Documentación:** `docs/LUMIA_CONSOLIDADO_2026-10-28.md`.
