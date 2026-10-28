@@ -15,6 +15,7 @@ import {
   isRapidDuplicateTranscript,
   shouldDropStaleVoiceSegment,
   shouldInterruptBusyAssistant,
+  shouldRecoverGuardToWake,
   transcriptSegmentIsStillActive,
   type FocusVoiceMode,
 } from './voice-focus'
@@ -793,12 +794,41 @@ async function startVadBridgeVoice(
           return
         }
 
+        // When this GUARD segment was captured, L.U.M.I.A. was still
+        // finishing a previous turn. If Whisper returns only after the UI has
+        // timed out to WAKE/standby, onUtterance would silently discard the
+        // user's fully recognized request. Re-enter through the actual wake
+        // path, but only for an explicit addressed command (never background
+        // TV, acoustic labels, or generic household speech).
+        const trailing = WAKE.test(said) ? afterWake(said) : ''
+        const currentMode = h.mode()
+        if (shouldRecoverGuardToWake('guard', currentMode, said, {
+          wake: WAKE,
+          bareWake: BARE_WAKE,
+        })) {
+          if (Date.now() - lastWake > WAKE_DEBOUNCE) {
+            lastWake = Date.now()
+            diag.wakes++
+            diag.dropped = ''
+            diag.accepted++
+            h.onWake(trailing)
+          } else {
+            drop('guard-to-wake recovery suppressed by wake debounce')
+          }
+          return
+        }
+
+        // A stale GUARD-only override or bare name must not cancel an idle
+        // assistant or accidentally inject a question into the next session.
+        if (currentMode === 'wake') {
+          drop('guard transcript arrived in standby without a full wake request')
+          return
+        }
+
         h.onSpeechStart()
 
-        // "Lumi, explícame..." is an intentional barge-in and should become a
-        // new command. A bare "Lumi" or "para" only stops the current answer
-        // and leaves the assistant listening for what comes next.
-        const trailing = WAKE.test(said) ? afterWake(said) : ''
+        // "Lumi, explícame..." while still busy is intentional barge-in.
+        // A bare "Lumi" or "para" only stops an active answer.
         if (trailing) h.onUtterance(trailing)
         return
       }
