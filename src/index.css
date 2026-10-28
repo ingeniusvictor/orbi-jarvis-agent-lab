@@ -2443,3 +2443,79 @@ kbd {
   transform: scaleX(-1);
   background: #000;
 }
+
+
+/* VI-01 visual input: opt-in local photo control outside the face viewport.
+ * No scene geometry, avatar calibration, or existing HUD styles are changed. */
+.lumia-visual-input {
+  position: fixed;
+  right: 22px;
+  bottom: 24px;
+  z-index: 20;
+  width: min(330px, calc(100vw - 44px));
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  pointer-events: auto;
+  color: #bceef7;
+  font-family: 'Chakra Petch', sans-serif;
+}
+.lumia-visual-toggle,
+.lumia-visual-submit {
+  border: 1px solid rgba(0, 229, 255, 0.65);
+  color: #d8fbff;
+  background: rgba(0, 20, 36, 0.92);
+  padding: 10px 14px;
+  letter-spacing: .13em;
+  font: inherit;
+  cursor: pointer;
+}
+.lumia-visual-dialog {
+  width: 100%;
+  margin-bottom: 9px;
+  padding: 16px;
+  border: 1px solid rgba(0, 229, 255, 0.6);
+  background: rgba(1, 10, 20, .97);
+  box-shadow: 0 0 18px rgba(0, 229, 255, .12);
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lumia-visual-heading {
+  font-size: 13px;
+  letter-spacing: .12em;
+  font-weight: 600;
+}
+.lumia-visual-help {
+  color: rgba(216, 251, 255, .78);
+  line-height: 1.5;
+}
+.lumia-visual-filename {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.lumia-visual-label {
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+.lumia-visual-dialog textarea {
+  background: #061c2b;
+  border: 1px solid #416576;
+  color: #ecfcff;
+  resize: vertical;
+  width: 100%;
+  min-height: 70px;
+  padding: 8px;
+  font: inherit;
+}
+.lumia-visual-submit:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+.lumia-visual-error {
+  color: #ffb2ac;
+  overflow-wrap: anywhere;
+}
