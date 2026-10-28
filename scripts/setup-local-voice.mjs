@@ -256,9 +256,14 @@ async function installWhisperRuntime() {
   }
 }
 
+// misaki-fork[en], required for Kokoro phonemization, supports Python <3.13.
+// Prefer Python 3.12. Do not choose an installed 3.13 merely because
+// kokoro-onnx itself supports it: that produces an un-installable venv.
+const KOKORO_PYTHON_VERSION_CHECK =
+  'import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] < (3, 13) else 1)'
+
 function pythonLauncher() {
   const candidates = [
-    { command: 'py', args: ['-3.13'] },
     { command: 'py', args: ['-3.12'] },
     { command: 'py', args: ['-3.11'] },
     { command: 'py', args: ['-3.10'] },
@@ -269,18 +274,21 @@ function pythonLauncher() {
   for (const candidate of candidates) {
     const probe = spawnSync(
       candidate.command,
-      [
-        ...candidate.args,
-        '-c',
-        'import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] < (3, 14) else 1)',
-      ],
+      [...candidate.args, '-c', KOKORO_PYTHON_VERSION_CHECK],
       { encoding: 'utf8', windowsHide: true },
     )
-    if (probe.status === 0) {
-      return candidate
-    }
+    if (probe.status === 0) return candidate
   }
   return null
+}
+
+function compatibleKokoroVenv(python) {
+  if (!existsSync(python)) return false
+  const probe = spawnSync(
+    python, ['-c', KOKORO_PYTHON_VERSION_CHECK],
+    { encoding: 'utf8', windowsHide: true },
+  )
+  return probe.status === 0
 }
 
 function run(command, args, options = {}) {
@@ -361,7 +369,8 @@ async function installKokoro() {
   const launcher = pythonLauncher()
   if (!launcher) {
     throw new Error(
-      'Python 3.10-3.13 was not found. Install Python first, then rerun npm run voice:setup:kokoro.',
+      'Kokoro requires Python 3.10-3.12 (misaki-fork does NOT support Python 3.13). ' +
+      'Install Python 3.12 side-by-side, then rerun npm run voice:setup:kokoro.',
     )
   }
 
@@ -369,8 +378,14 @@ async function installKokoro() {
   await mkdir(kokoroModels, { recursive: true })
 
   const venvPython = join(kokoroVenv, 'Scripts', 'python.exe')
-  if (force || !existsSync(venvPython)) {
-    info('creating Kokoro Python virtual environment...')
+  // An earlier failed run may have already created a Python 3.13 venv.
+  // Recreate only this project's Kokoro venv; keep voice models and
+  // Whisper assets intact. Do not modify any system Python installation.
+  const existingVenv = existsSync(venvPython)
+  const reuseVenv = !force && compatibleKokoroVenv(venvPython)
+  if (!reuseVenv) {
+    if (existingVenv) info('replacing incompatible Kokoro Python environment...')
+    else info('creating Kokoro Python virtual environment...')
     await rm(kokoroVenv, { recursive: true, force: true })
     await run(launcher.command, [
       ...launcher.args,
@@ -378,6 +393,8 @@ async function installKokoro() {
       'venv',
       kokoroVenv,
     ])
+  } else {
+    info('reusing compatible Kokoro Python environment')
   }
 
   info('installing/updating Kokoro local Python dependencies...')
