@@ -33,12 +33,12 @@ assert.match(component, /cloneMaterial\(child\.material, reactive, faceOnly\)/)
 assert.match(component, /clone\.emissiveIntensity = faceOnly \? 0\.12 : 0\.34/)
 assert.match(component, /if \(!faceOnly\) \{/)
 
-// The classic 17MB avatar GLB was intentionally kept LOCAL by design:
-// public/models/lumia/README.md documents this. GitHub Actions has no model.
-// Validate it only when the owner has installed it, but never require the
-// private binary in public CI.
+// AV-01B replaces the obsolete 17MB legacy README with a verified face
+// asset manifest and a safe owner-side publication path. The classic fallback
+// remains supported until the owner publishes the actual face GLB.
 const readme = readFileSync(new URL('../public/models/lumia/README.md', import.meta.url), 'utf8')
-assert.match(readme, /intentionally kept local/)
+assert.match(readme, /public\/models\/lumia\/lumia\.glb/)
+assert.match(readme, /4\.128\.456|intentionally kept local/)
 const path = new URL('../public/models/lumia/lumia.glb', import.meta.url)
 if (existsSync(path)) {
   const bytes = readFileSync(path)
