@@ -64,6 +64,9 @@ export function exportConversationTimeline({
       lines.push(`[${timeLabel(t.at)}] LUMIA [${turnStateLabel(t, at)}]: ${t.text || '(sin texto)'}`)
       if (t.firstTextAt) lines.push(`  Primer texto: ${timeLabel(t.firstTextAt)} · espera ${elapsedLabel(t.at, t.firstTextAt)}`)
       if (t.firstAudioAt) lines.push(`  Reproducción iniciada: ${timeLabel(t.firstAudioAt)} · espera ${elapsedLabel(t.at, t.firstAudioAt)}`)
+      for (const [index, segment] of (t.spokenSegments ?? []).entries()) {
+        lines.push(`  Audio #${index + 1}: ${timeLabel(segment.at)}${segment.gapMs !== null ? ` · pausa previa ${segment.gapMs} ms` : ''}: ${segment.text}`)
+      }
       if (t.finishedAt) lines.push(`  Finalizado: ${timeLabel(t.finishedAt)} · total ${elapsedLabel(t.at, t.finishedAt)}`)
       if (t.errorNote) lines.push(`  Error: ${t.errorNote}`)
     }
