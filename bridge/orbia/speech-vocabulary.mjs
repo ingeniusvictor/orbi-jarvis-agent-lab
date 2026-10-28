@@ -50,11 +50,11 @@ export function normalizeTechnicalSpeechText(value) {
     // Observed on ASUS Whisper base/es: the command "Explícame cómo
     // funciona..." came back as "Pícame cómo funciona...". Only repair
     // this exact command-opening context, never arbitrary "pícame" speech.
-    .replace(/^([\\s¿¡]*)p[ií]came(?=\\s+c[oó]mo\\s+funciona\\b)/iu, '$1Explícame')
+    .replace(/^([\s¿¡]*)p[ií]came(?=\s+c[oó]mo\s+funciona\b)/iu, '$1Explícame')
     // Observed local command "4 gigas de VRAM" -> "4 gigas de Virran".
     // Require an explicit memory-size expression so people's names or
     // unrelated uses of the word Virran are not rewritten.
-    .replace(/\\b(\\d{1,3}\\s*(?:gigas?|gb|gigabytes?)\\s+de\\s+)virran\\b/giu, '$1VRAM')
+    .replace(/\b(\d{1,3}\s*(?:gigas?|gb|gigabytes?)\s+de\s+)virran\b/giu, '$1VRAM')
     // Whisper base/es can hear "IA local" as "una y local". Only repair
     // this exact acoustic variant within explicit technical intent. Never
     // rewrite short, contextless "A lo local", "E-A", or ordinary "una".
