@@ -758,7 +758,10 @@ async function startVadBridgeVoice(
         text: said,
         provider: provider === 'local' ? 'whisper-local' : 'elevenlabs',
         kind: selfEcho ? 'self-echo' : nonSpeech ? 'non-speech' : 'speech',
-        wakeMatched: capturedMode === 'wake' && WAKE.test(said),
+        wakeMatched:
+          WAKE.test(said) &&
+          (capturedMode === 'wake' ||
+            (capturedMode === 'guard' && h.mode() === 'wake')),
         capturedMode: capturedMode as VoiceMode,
         at: Date.now(),
         sttMs: Math.max(0, Math.round(performance.now() - t0)),
