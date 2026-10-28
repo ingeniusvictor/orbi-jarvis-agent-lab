@@ -14,7 +14,8 @@ set "ORBIA_LUMIA_STT_MODE=local"
 set "ORBIA_LUMIA_TTS_MODE=local"
 set "ORBIA_LUMIA_VOICE_PROFILE=lumia-kokoro"
 set "VITE_BACKEND=bridge"
-set "ORBIA_WHISPER_SERVER_ENABLED=1"
+rem Whisper resident is intentionally OFF: prior household tests reported false wake/background transcripts.
+set "ORBIA_WHISPER_SERVER_ENABLED=0"
 set "ORBIA_KOKORO_RESIDENT_ENABLED=1"
 set "VITE_LUMIA_TTS_PREFETCH_NEXT=1"
 rem Optical face-only horizontal correction in CSS pixels; default canon remains +25.
@@ -33,7 +34,7 @@ set "VITE_LUMIA_STREAMING_TTS=0"
 echo.
 echo ============================================================
 echo   L.U.M.I.A. / ASUS - local voice low-latency PILOT
-echo   Whisper resident + Kokoro resident + phrase prefetch
+echo   Whisper CLI stable + Kokoro resident + phrase prefetch
 echo   Qwen3.5 2B; face horizontal calibration = 0 CSS px
 echo   Realtime API OFF / writes OFF
 echo ============================================================
