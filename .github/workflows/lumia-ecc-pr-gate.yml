@@ -87,6 +87,11 @@ jobs:
       - name: TL-01 Conversation timeline and 40s no-response diagnostics
         run: npx tsx scripts/certify-lumia-conversation-timeline-tl01.ts
 
+      - name: VA-01 Kokoro resident opt-in, legacy fallback and audible phrase latency
+        run: |
+          npx tsx scripts/certify-lumia-kokoro-resident-va01.ts
+          python3 -m py_compile bridge/runtime/kokoro/resident.py
+
       - name: Production build
         run: npm run build
 
