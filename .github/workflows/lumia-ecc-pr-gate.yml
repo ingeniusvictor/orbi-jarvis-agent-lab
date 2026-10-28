@@ -104,6 +104,9 @@ jobs:
       - name: WR-01 Delayed Whisper guard to standby wake recovery
         run: npx tsx scripts/certify-lumia-guard-to-wake-wr01.ts
 
+      - name: WR-02 Local command capture grace and Voice Focus regressions
+        run: npx tsx scripts/certify-voice-focus.ts
+
       - name: VI-01 Owner-selected photograph in local multimodal Ollama
         run: npx tsx scripts/certify-lumia-visual-input-vi01.ts
 
