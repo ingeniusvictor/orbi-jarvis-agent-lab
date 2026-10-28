@@ -56,7 +56,7 @@ for (const q of [
 ]) {
   assert.equal(parseModelControl(q), null, q)
 }
-assert.deepEqual(parseModelControl('Lumi, cámbiate al modelo rápido'),
+assert.deepEqual(parseModelControl('Lumi, cambia al modelo rápido'),
   { action: 'switch', requested: 'rápido' })
 assert.deepEqual(parseModelControl('Lumi, cambia al modelo qwen3:4b'),
   { action: 'switch', requested: 'qwen3:4b' })
