@@ -65,7 +65,14 @@ export function exportConversationTimeline({
       if (t.firstTextAt) lines.push(`  Primer texto: ${timeLabel(t.firstTextAt)} · espera ${elapsedLabel(t.at, t.firstTextAt)}`)
       if (t.firstAudioAt) lines.push(`  Reproducción iniciada: ${timeLabel(t.firstAudioAt)} · espera ${elapsedLabel(t.at, t.firstAudioAt)}`)
       for (const [index, segment] of (t.spokenSegments ?? []).entries()) {
-        lines.push(`  Audio #${index + 1}: ${timeLabel(segment.at)}${segment.gapMs !== null ? ` · pausa previa ${segment.gapMs} ms` : ''}: ${segment.text}`)
+        const parts = [
+          `  Audio #${index + 1}: ${timeLabel(segment.at)}`,
+          segment.gapMs === null ? null : `pausa previa ${segment.gapMs} ms`,
+          segment.waitingTextMs === null ? null : `esperando texto del modelo ${segment.waitingTextMs} ms`,
+          segment.waitingAudioMs === null ? null : `Kokoro/WAV ${segment.waitingAudioMs} ms`,
+          segment.waitingPlaybackMs === null ? null : `Chrome/reproducción ${segment.waitingPlaybackMs} ms`,
+        ].filter(Boolean)
+        lines.push(`${parts.join(' · ')}: ${segment.text}`)
       }
       if (t.finishedAt) lines.push(`  Finalizado: ${timeLabel(t.finishedAt)} · total ${elapsedLabel(t.at, t.finishedAt)}`)
       if (t.errorNote) lines.push(`  Error: ${t.errorNote}`)
