@@ -6,6 +6,8 @@ import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
 import { RealtimeTrial } from './ui/RealtimeTrial'
 import { AcousticLab } from './ui/AcousticLab'
+import { VisualInput } from './ui/VisualInput'
+import type { LocalVisualImage } from './lib/visual-input'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
 import {
@@ -160,7 +162,7 @@ export default function App() {
 
   // -- one turn -------------------------------------------------------------
 
-  const respond = async (said: string): Promise<void> => {
+  const respond = async (said: string, image?: LocalVisualImage): Promise<void> => {
     const mine = ++turn.current
     const stale = () => mine !== turn.current
     const previousReply = activeReply.current
@@ -244,7 +246,7 @@ export default function App() {
             spk.say(forTool(name))
           }
         },
-      })
+      }, image)
 
       if (stale()) return
 
@@ -919,6 +921,12 @@ export default function App() {
       <Hud />
       <Boot />
       <Diagnostics />
+      {import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' && usingBridge && (
+        <VisualInput
+          available={phase !== 'offline' && phase !== 'boot'}
+          onAnalyze={(prompt, image) => respond(prompt, image)}
+        />
+      )}
       {import.meta.env.VITE_LUMIA_ACOUSTIC_LAB === '1' && (
         <AcousticLab
           available={phase !== 'offline' && phase !== 'boot' &&
