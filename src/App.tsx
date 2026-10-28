@@ -190,14 +190,15 @@ export default function App() {
     ttsDiag.firstTextMs = null
     ttsDiag.firstAudioMs = null
     const spk = createSpeaker(() => {
-      // The callback fires only once, on real OS/audio-element playback, not
-      // on synthesized text, buffering or TTS network completion.
+      // First *actual playback*, not the request to Kokoro or model output.
       if (!stale()) {
         ttsDiag.firstAudioMs = Math.round(performance.now() - responseStartedAt)
         store.getState().updateTurn(turnId, {
           firstAudioAt: Date.now(), status: 'playing',
         })
       }
+    }, (phrase) => {
+      if (!stale()) store.getState().pushSpokenSegment(turnId, phrase)
     })
     speaker.current = spk
     sfx.duck(true)
