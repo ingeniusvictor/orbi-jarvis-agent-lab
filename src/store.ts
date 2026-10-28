@@ -63,6 +63,8 @@ export type Turn = {
   finishedAt?: number
   status?: 'pending' | 'generating' | 'playing' | 'complete' | 'no-response' | 'error' | 'interrupted'
   errorNote?: string
+  /** Timestamps are recorded on actual audio-element/speechSynthesis start. */
+  spokenSegments?: Array<{ text: string; at: number; gapMs: number | null }>
   /** Tool names invoked while producing this turn, for the HUD readout. */
   tools?: string[]
 }
@@ -295,6 +297,7 @@ type State = {
   appendToLastTurn: (text: string) => void
   appendToTurn: (id: string, delta: string) => void
   updateTurn: (id: string, patch: Partial<Omit<Turn, 'id' | 'role'>>) => void
+  pushSpokenSegment: (id: string, segment: { text: string; at: number; gapMs: number | null }) => void
 
   applyUi: (patch: UiPatch) => void
   addOrbit: (o: OrbitObject) => void
@@ -416,6 +419,14 @@ export const useStore = create<State>((set) => ({
   updateTurn: (id, patch) =>
     set((s) => ({
       turns: s.turns.map((entry) => entry.id === id ? { ...entry, ...patch } : entry),
+    })),
+  pushSpokenSegment: (id, segment) =>
+    set((s) => ({
+      turns: s.turns.map((entry) =>
+        entry.id === id && entry.role === 'jarvis'
+          ? { ...entry, spokenSegments: [...(entry.spokenSegments ?? []), segment].slice(-16) }
+          : entry,
+      ),
     })),
 
   // Deep on purpose. "Make the reactor red" arrives as a patch touching only
