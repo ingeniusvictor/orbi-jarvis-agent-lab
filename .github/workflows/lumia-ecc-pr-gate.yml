@@ -95,6 +95,9 @@ jobs:
           npx tsx scripts/certify-lumia-kokoro-resident-va01.ts
           python3 -m py_compile bridge/runtime/kokoro/resident.py
 
+      - name: VA-02 ASUS bounded local WAV recovery and no paid rescue
+        run: npx tsx scripts/certify-lumia-local-playback-recovery-va02.ts
+
       - name: RC-01 IA local STT and opt-in streaming Ollama reply
         run: npx tsx scripts/certify-lumia-voice-rc01.ts
 

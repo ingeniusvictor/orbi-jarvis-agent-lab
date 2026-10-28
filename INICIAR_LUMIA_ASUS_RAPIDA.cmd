@@ -20,6 +20,8 @@ set "ORBIA_KOKORO_RESIDENT_ENABLED=1"
 set "VITE_LUMIA_TTS_PREFETCH_NEXT=1"
 rem Opt-in ASUS pilot: shorten only the first local Kokoro chunk for measured onset tests.
 set "VITE_LUMIA_FAST_FIRST_CHUNK=1"
+rem ASUS opt-in: release stalled Kokoro WAV, with offline Windows voice fallback.
+set "VITE_LUMIA_LOCAL_PLAYBACK_RECOVERY=1"
 rem Optical face-only horizontal correction in CSS pixels; default canon remains +25.
 set "VITE_LUMIA_FACE_SHIFT_PX=0"
 rem ASUS only: 8 percent smaller face bust inside hologram rings; classic avatar unchanged.

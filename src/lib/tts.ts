@@ -670,7 +670,7 @@ export function createSpeaker(
         // If an opted-in MSE stream failed before producing *any* sound, use
         // the existing system-voice recovery. Never repeat words that already
         // became audible, even if the network fails mid-sentence.
-        if (played || cancelled || (typeof source === 'string' && !LOCAL_PLAYBACK_RECOVERY)) return
+        if (played || cancelled || (typeof source === 'string' && !(LOCAL_PLAYBACK_RECOVERY && diag.engine === 'kokoro-local'))) return
         // A local WAV never actually began: do not silently mark it delivered.
         if (typeof source === 'string' && diag.engine === 'kokoro-local') {
           diag.localPlaybackFallbacks++

@@ -64,6 +64,10 @@ type TtsDiag = {
   transport: string
   streamChunks: number
   streamFailures: number
+  localPlaybackRecovery: boolean
+  localPlaybackStartTimeouts: number
+  localPlaybackStalls: number
+  localPlaybackFallbacks: number
   localSynthesisMs: number | null
   localSynthesisCount: number
   firstPhraseFastOptIn: boolean
@@ -192,6 +196,10 @@ export function Diagnostics() {
       <Row k="audio transport" v={String(t.transport ?? 'buffered')} />
       <Row k="MP3 stream chunks" v={String(t.streamChunks ?? 0)} />
       <Row k="MP3 stream failures" v={String(t.streamFailures ?? 0)} bad={(t.streamFailures ?? 0) > 0} />
+      <Row k="local WAV recovery" v={t.localPlaybackRecovery ? 'ON · ASUS pilot' : 'OFF · legacy'} />
+      <Row k="local WAV start timeouts" v={String(t.localPlaybackStartTimeouts ?? 0)} bad={(t.localPlaybackStartTimeouts ?? 0) > 0} />
+      <Row k="local WAV playback stalls" v={String(t.localPlaybackStalls ?? 0)} bad={(t.localPlaybackStalls ?? 0) > 0} />
+      <Row k="offline WAV fallbacks" v={String(t.localPlaybackFallbacks ?? 0)} bad={(t.localPlaybackFallbacks ?? 0) > 0} />
       <Row k="Kokoro last phrase synthesis" v={t.localSynthesisMs == null ? '—' : `${t.localSynthesisMs} ms`} bad={(t.localSynthesisMs ?? 0) > 5000} />
       <Row k="Kokoro phrases synthesized" v={String(t.localSynthesisCount ?? 0)} />
       <Row k="last audible gap between phrases" v={t.lastInterPhraseSilenceMs == null ? '—' : `${t.lastInterPhraseSilenceMs} ms`} bad={(t.lastInterPhraseSilenceMs ?? 0) > 3000} />
