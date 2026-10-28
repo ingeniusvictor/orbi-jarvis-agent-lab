@@ -45,6 +45,53 @@ jobs:
       - name: ECC context budget contract
         run: node scripts/certify-lumia-context-budget.mjs
 
+      - name: First-audio low-latency segmentation
+        run: npx tsx scripts/certify-first-audio-chunk.ts
+
+      - name: VL-02 Voice latency policy certification
+        run: npx tsx scripts/certify-lumia-voice-latency-vl02.ts
+
+      - name: VL-03 Adaptive turn-taking certification
+        run: npx tsx scripts/certify-lumia-adaptive-turns-vl03.ts
+
+      - name: VL-04 Progressive MP3 audio transport certification
+        run: npx tsx scripts/certify-lumia-tts-stream-vl04.ts
+
+      - name: VL-05 Owner-gated WebRTC session contract
+        run: node scripts/certify-lumia-realtime-vl05.mjs
+
+      - name: VL-05B Realtime lifecycle and PIN lockout hardening
+        run: node scripts/certify-lumia-realtime-vl05b.mjs
+
+      - name: VL-06 Privacy-safe Realtime turnaround metrics
+        run: npx tsx scripts/certify-lumia-realtime-metrics-vl06.ts
+
+      - name: VL-06 Local acoustic lab and exclusive microphone contract
+        run: npx tsx scripts/certify-lumia-acoustic-lab-vl06.ts
+
+      - name: VL-06 Shared mic lease and Windows device recovery
+        run: npx tsx scripts/certify-lumia-mic-lease-vl06.ts
+
+      - name: VL-06 Whisper repeated acoustic-label regression
+        run: npx tsx scripts/certify-lumia-whisper-background-vl06.ts
+
+      - name: VL-06 Safe Windows preflight contract
+        run: node scripts/certify-lumia-windows-preflight-vl06.mjs
+
+      - name: VL-06 Offline preflight CLI smoke
+        run: node scripts/lumia-voice-preflight.mjs --json
+
+      - name: AV-01 Face GLB optical profile and classic fallback
+        run: npx tsx scripts/certify-lumia-avatar-face-av01.ts
+
+      - name: TL-01 Conversation timeline and 40s no-response diagnostics
+        run: npx tsx scripts/certify-lumia-conversation-timeline-tl01.ts
+
+      - name: VA-01 Kokoro resident opt-in, legacy fallback and audible phrase latency
+        run: |
+          npx tsx scripts/certify-lumia-kokoro-resident-va01.ts
+          python3 -m py_compile bridge/runtime/kokoro/resident.py
+
       - name: Production build
         run: npm run build
 
