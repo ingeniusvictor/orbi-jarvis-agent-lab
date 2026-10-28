@@ -423,6 +423,7 @@ export async function streamOllama({
 
     console.log(
       `[orbia] LUMIA local latency model=${model}` +
+        ` done_reason=${String(packet?.done_reason ?? 'unknown').slice(0,24)}` +
         ` total=${totalMs.toFixed(0)}ms` +
         ` prompt=${promptMs.toFixed(0)}ms` +
         ` generate=${evalMs.toFixed(0)}ms` +
