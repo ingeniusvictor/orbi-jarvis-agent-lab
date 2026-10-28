@@ -46,7 +46,7 @@ export function normalizeTechnicalSpeechText(value) {
     // this exact acoustic variant within explicit technical intent. Never
     // rewrite short, contextless "A lo local", "E-A", or ordinary "una".
     .replace(
-      /\\b((?:trabajar|trabajo|usar|utilizar|configurar|entrenar|crear|instalar|programar|aprender|consultar|modelo|modelos|asistente|inteligencia artificial)[^.!?]{0,85}?)\\buna\\s+y\\s+local\\b/giu,
+      /\b((?:trabajar|trabajo|usar|utilizar|configurar|entrenar|crear|instalar|programar|aprender|consultar|modelo|modelos|asistente|inteligencia artificial)[^.!?]{0,85}?)\buna\s+y\s+local\b/giu,
       '$1IA local',
     )
     .replace(/\bM\s*P\s*T\s*T\b/giu, 'MPPT')
