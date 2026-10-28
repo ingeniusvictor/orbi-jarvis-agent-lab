@@ -10,6 +10,7 @@ import {
 import * as kokoro from './kokoro'
 import { caps } from './capabilities'
 import { findEarlySpeechBoundary } from './first-audio-chunk'
+import { attributePhraseGap } from './phrase-gap-attribution'
 import { createStreamingMp3, type StreamedAudio } from './streaming-mp3'
 
 /** Owner-enabled desktop experiment. Default stays full-file playback. */
@@ -134,6 +135,7 @@ export const diag = {
   /** Disjoint portions of latest observed silent gap; may not sum to total. */
   lastGapWaitingTextMs: null as number | null,
   lastGapWaitingAudioMs: null as number | null,
+  lastGapPlaybackMs: null as number | null,
 }
 
 if (typeof window !== 'undefined') {
@@ -465,6 +467,7 @@ export function createSpeaker(
     waitingTextMs: number | null
     /** Time after the phrase arrived but before its synthesized WAV was ready. */
     waitingAudioMs: number | null
+    waitingPlaybackMs: number | null
   }) => void,
 ): Speaker {
   const queue: Item[] = []
@@ -479,27 +482,21 @@ export function createSpeaker(
   const notifyPhraseStart = (item: Item) => {
     if (cancelled) return
     const at = Date.now()
-    const gapMs = lastPhraseEndedAt ? Math.max(0, at - lastPhraseEndedAt) : null
-    // Only attribute the pause that occurred AFTER the previous phrase ended.
-    // A speech chunk queued 15 seconds after its predecessor cannot have had
-    // its audio ready in advance, even if Kokoro's own generation was fast.
-    const waitingTextMs = gapMs === null
-      ? null : Math.min(gapMs, Math.max(0, item.queuedAt - lastPhraseEndedAt))
-    const waitingAudioMs = gapMs === null || item.synthesisReadyAt == null
-      ? null
-      : Math.min(gapMs - (waitingTextMs ?? 0), Math.max(
-        0, item.synthesisReadyAt - Math.max(lastPhraseEndedAt, item.queuedAt),
-      ))
+    const { gapMs, waitingTextMs, waitingAudioMs, waitingPlaybackMs } =
+      attributePhraseGap(
+        lastPhraseEndedAt, item.queuedAt, item.synthesisReadyAt, at,
+      )
     if (gapMs !== null) {
       diag.lastInterPhraseSilenceMs = gapMs
       diag.maxInterPhraseSilenceMs = Math.max(diag.maxInterPhraseSilenceMs, gapMs)
       diag.lastGapWaitingTextMs = waitingTextMs
       diag.lastGapWaitingAudioMs = waitingAudioMs
+      diag.lastGapPlaybackMs = waitingPlaybackMs
     }
     onPhraseStart?.({
       text: item.text, at, gapMs,
       queuedAt: item.queuedAt, synthesizedAt: item.synthesisReadyAt,
-      waitingTextMs, waitingAudioMs,
+      waitingTextMs, waitingAudioMs, waitingPlaybackMs,
     })
   }
   const notifyFirstAudio = () => {
