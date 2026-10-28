@@ -68,6 +68,9 @@ type TtsDiag = {
   localSynthesisCount: number
   lastInterPhraseSilenceMs: number | null
   maxInterPhraseSilenceMs: number
+  lastGapWaitingTextMs: number | null
+  lastGapWaitingAudioMs: number | null
+  lastGapPlaybackMs: number | null
 }
 
 const ago = (t: number) => (t ? `${((Date.now() - t) / 1000).toFixed(1)}s ago` : '—')
@@ -181,6 +184,9 @@ export function Diagnostics() {
       <Row k="Kokoro phrases synthesized" v={String(t.localSynthesisCount ?? 0)} />
       <Row k="last audible gap between phrases" v={t.lastInterPhraseSilenceMs == null ? '—' : `${t.lastInterPhraseSilenceMs} ms`} bad={(t.lastInterPhraseSilenceMs ?? 0) > 3000} />
       <Row k="maximum audible phrase gap" v={`${t.maxInterPhraseSilenceMs ?? 0} ms`} bad={(t.maxInterPhraseSilenceMs ?? 0) > 3000} />
+      <Row k="gap — waiting model words" v={t.lastGapWaitingTextMs == null ? '—' : `${t.lastGapWaitingTextMs} ms`} bad={(t.lastGapWaitingTextMs ?? 0) > 2000} />
+      <Row k="gap — Kokoro WAV preparation" v={t.lastGapWaitingAudioMs == null ? '—' : `${t.lastGapWaitingAudioMs} ms`} bad={(t.lastGapWaitingAudioMs ?? 0) > 2000} />
+      <Row k="gap — browser playback" v={t.lastGapPlaybackMs == null ? '—' : `${t.lastGapPlaybackMs} ms`} bad={(t.lastGapPlaybackMs ?? 0) > 2000} />
       <Row k="handed to OS" v={String(t.spoken ?? 0)} />
       <Row k="actually spoke" v={String(t.started ?? 0)} bad={(t.started ?? 0) === 0} />
       <Row k="failures" v={String(t.failures ?? 0)} bad={(t.failures ?? 0) > 0} />
