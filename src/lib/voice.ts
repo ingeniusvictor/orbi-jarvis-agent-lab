@@ -19,6 +19,13 @@ import {
   transcriptSegmentIsStillActive,
   type FocusVoiceMode,
 } from './voice-focus'
+import {
+  isLongCommandSegment,
+  shouldDeferLongQuestion,
+  LONG_QUESTION_ASSEMBLY_CAP_MS,
+  LONG_QUESTION_AFTER_TRANSCRIPT_MS,
+  LONG_QUESTION_POLL_MS,
+} from './long-question'
 
 /**
  * The voice loop.
@@ -70,6 +77,9 @@ export type VoiceHandlers = {
   onWake: (trailing: string) => void
   /** The user has genuinely started talking. This is the barge-in trigger. */
   onSpeechStart: () => void
+  /** Owner-enabled long local command confirmed; extend the existing command
+   * window once, never a standby/wake/guard authorization. */
+  onLongSpeechSegment?: () => void
   /** Live transcript, for the caption under the reactor. */
   onPartial: (text: string) => void
   /** A raw recogniser segment before turn assembly/model submission. */
@@ -209,6 +219,7 @@ const BROWSER_MAX_HOLD_MS = 30000
 /** Experiment off by default; never changes Voice Gate or action authority. */
 const ADAPTIVE_TURNS_ENABLED = import.meta.env.VITE_LUMIA_ADAPTIVE_TURNS === '1'
 const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_GRACE === '1'
+const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INPUT === '1'
 
 /**
  * How long to keep waiting, given what has been said so far.
@@ -251,6 +262,8 @@ function makeAssembler(
     continueMs?: number
     maxHoldMs?: number
     adaptive?: boolean
+    longHold?: () => boolean
+    shouldDefer?: (sinceLastMs: number, heldForMs: number) => boolean
   } = {},
 ): Assembler {
   const settleMs = timing.settleMs ?? SETTLE_MS
@@ -269,6 +282,13 @@ function makeAssembler(
 
   const fire = () => {
     clear()
+    const heldForMs = firstAt ? Math.max(0, Date.now() - firstAt) : 0
+    const sinceLastMs = lastFeedAt ? Math.max(0, performance.now() - lastFeedAt) : 0
+    const cap = timing.longHold?.() ? LONG_QUESTION_ASSEMBLY_CAP_MS : maxHoldMs
+    if (held && heldForMs < cap && timing.shouldDefer?.(sinceLastMs, heldForMs)) {
+      timer = setTimeout(fire, LONG_QUESTION_POLL_MS)
+      return
+    }
     const text = held.trim()
     held = ''
     firstAt = 0
@@ -310,9 +330,13 @@ function makeAssembler(
         segments,
         enabled: timing.adaptive,
       })
+      const longForm = timing.longHold?.() ?? false
+      const hold = longForm
+        ? Math.max(decision.holdMs, LONG_QUESTION_AFTER_TRANSCRIPT_MS)
+        : decision.holdMs
       const wait = Math.min(
-        decision.holdMs,
-        Math.max(0, maxHoldMs - (Date.now() - firstAt)),
+        hold,
+        Math.max(0, (longForm ? LONG_QUESTION_ASSEMBLY_CAP_MS : maxHoldMs) - (Date.now() - firstAt)),
       )
       diag.turnHoldReason = decision.reason
       diag.waitedMs = wait
@@ -484,6 +508,9 @@ export const diag = {
   adaptiveTurnsEnabled: ADAPTIVE_TURNS_ENABLED,
   acousticWindowMs: 650,
   turnHoldReason: 'baseline',
+  longQuestionOptIn: LONG_QUESTION_INPUT_ENABLED,
+  longQuestionActive: false,
+  longQuestionParts: 0,
 }
 
 /** Record why a transcript went nowhere. Silence always has a reason; this is
@@ -579,6 +606,15 @@ async function startVadBridgeVoice(
   let lastTranscript = ''
   let lastTranscriptAt = 0
   let lastTranscriptEpoch = -1
+  let longQuestionActive = false
+
+  const beginLongQuestion = () => {
+    if (!LONG_QUESTION_INPUT_ENABLED || provider !== 'local' ||
+        h.mode() !== 'command' || longQuestionActive) return
+    longQuestionActive = true
+    diag.longQuestionActive = true
+    h.onLongSpeechSegment?.()
+  }
 
   const refreshQueueDiag = () => {
     diag.queueDepth = pendingAudio.length
@@ -643,6 +679,8 @@ async function startVadBridgeVoice(
       // arrived while Whisper was decoding this command belongs to a later
       // speaker/turn and must not be appended just because it is already queued.
       captureEpoch++
+      longQuestionActive = false
+      diag.longQuestionActive = false
       pendingAudio.length = 0
       refreshQueueDiag()
       diag.dropped = ''
@@ -653,6 +691,21 @@ async function startVadBridgeVoice(
     partial: (text) => h.onPartial(text),
   }, {
     adaptive: ADAPTIVE_TURNS_ENABLED,
+    longHold: () => LONG_QUESTION_INPUT_ENABLED && longQuestionActive,
+    shouldDefer: (sinceLastMs, heldForMs) => {
+      if (!LONG_QUESTION_INPUT_ENABLED || h.mode() !== 'command') return false
+      const queuedCommand = pendingAudio.some(
+        (item) => item.capturedMode === 'command' && item.epoch === captureEpoch,
+      ) || draining
+      const recordingCommand = vad?.meter().speaking ?? false
+      return shouldDeferLongQuestion({
+        active: longQuestionActive,
+        elapsedFromFirstMs: heldForMs,
+        elapsedFromLastMs: sinceLastMs,
+        queuedCommand,
+        recordingCommand,
+      })
+    },
   })
 
   /**
@@ -850,6 +903,13 @@ async function startVadBridgeVoice(
         return
       }
 
+      // A later VAD segment may already be recording while this Whisper
+      // transcript finishes. Do not answer the first half of a long question.
+      if (LONG_QUESTION_INPUT_ENABLED && capturedMode === 'command' &&
+          h.mode() === 'command' && vad?.meter().speaking) {
+        beginLongQuestion()
+      }
+
       // Not a turn yet — a piece of one. This segment has already ended before
       // Whisper starts decoding it. Do not look at the microphone's *current*
       // activity here: that may be a child, television or another speaker who
@@ -906,7 +966,11 @@ async function startVadBridgeVoice(
       }
       // Standing down mid-thought throws the thought away with it. Otherwise
       // held text would surface as the opening of the *next* conversation.
-      if (mode === 'wake') assemble.cancel()
+      if (mode === 'wake') {
+        assemble.cancel()
+        longQuestionActive = false
+        diag.longQuestionActive = false
+      }
       // The barge-in. In guard mode the user has started talking over him, and
       // because the guard threshold is high this is a real interruption rather
       // than leaked playback — so cut him off now, do not wait for the words.
@@ -923,12 +987,15 @@ async function startVadBridgeVoice(
         if (provider !== 'local') h.onSpeechStart()
       }
     },
-    onEnd: (blob) => {
-      queueAudio(
-        blob,
-        h.mode() as FocusVoiceMode,
-        captureEpoch,
-      )
+    onEnd: (blob, durationMs) => {
+      const capturedMode = h.mode() as FocusVoiceMode
+      if (isLongCommandSegment(
+        capturedMode, durationMs, LONG_QUESTION_INPUT_ENABLED && provider === 'local',
+      )) beginLongQuestion()
+      if (capturedMode === 'command' && LONG_QUESTION_INPUT_ENABLED) {
+        diag.longQuestionParts++
+      }
+      queueAudio(blob, capturedMode, captureEpoch)
       void drain()
     },
     onLevel: (v) => {
@@ -964,13 +1031,19 @@ async function startVadBridgeVoice(
     // to the wake word. Anything half-said belonged to a conversation that is
     // over, and letting the hold expire later would open the next one with a
     // fragment of the last.
-    if ((mode === 'wake' || mode === 'deaf') && assemble.held()) assemble.cancel()
+    if (mode === 'wake' || mode === 'deaf') {
+      if (assemble.held()) assemble.cancel()
+      longQuestionActive = false
+      diag.longQuestionActive = false
+    }
   }, 200)
 
   return {
     stop: () => {
       clearInterval(guardPoll)
       assemble.cancel()
+      longQuestionActive = false
+      diag.longQuestionActive = false
       vad?.stop()
       diag.running = false
     },

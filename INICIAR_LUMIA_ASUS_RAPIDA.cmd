@@ -36,6 +36,8 @@ rem Keep unrelated voice experiments OFF to isolate improvements.
 set "VITE_LUMIA_ADAPTIVE_TURNS=0"
 rem ASUS pilot: preserve already-started COMMAND audio while Whisper decodes (one bounded grace).
 set "VITE_LUMIA_ACTIVE_COMMAND_GRACE=1"
+rem Long local spoken questions: bounded follow-on VAD segments, not always-on listening.
+set "VITE_LUMIA_LONG_QUESTION_INPUT=1"
 set "VITE_LUMIA_FAST_LOCAL_FOLLOWUP=0"
 set "VITE_LUMIA_STREAMING_TTS=0"
 

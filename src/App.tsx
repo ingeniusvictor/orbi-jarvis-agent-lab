@@ -18,6 +18,7 @@ import {
   type VoiceTranscriptEvent,
 } from './lib/voice'
 import { ACTIVE_COMMAND_GRACE_MS, voiceModeForPhase } from './lib/voice-focus'
+import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { resolveFollowupGuardMs } from './lib/followup-latency'
 import * as sfx from './lib/sfx'
@@ -79,6 +80,7 @@ const FOLLOW_UP_MS = 11000
  * brand-new user turn that makes L.U.M.I.A. answer herself in a loop. */
 const FAST_LOCAL_FOLLOWUP = import.meta.env.VITE_LUMIA_FAST_LOCAL_FOLLOWUP === '1'
 const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_GRACE === '1'
+const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INPUT === '1'
 
 // Owner-side opt-in only. The browser recognizer remains at the certified hold.
 // Never start listening before the actual synthesized-output echo tail expires.
@@ -417,6 +419,20 @@ export default function App() {
     store.getState().setPhase('listening')
   }
 
+  /** Only a confirmed, locally captured long COMMAND extends the 35s pilot
+   * window; noise, WAKE, GUARD and repeated onset events cannot renew it. */
+  const onLongSpeechSegment = () => {
+    if (!LONG_QUESTION_INPUT_ENABLED || !ACTIVE_COMMAND_GRACE_ENABLED ||
+        experimentOwner.current || voiceDiag.engine !== 'whisper-local' ||
+        store.getState().phase !== 'listening' || !commandGraceUsed.current) return
+    const remaining = remainingLongQuestionWindow(
+      commandWindowStartedAt.current, Date.now(),
+    )
+    if (remaining <= 0) return
+    clearIdle()
+    idleTimer.current = setTimeout(goDormant, remaining)
+  }
+
   const onUtterance = (text: string) => {
     if (experimentOwner.current) return
     const phase = store.getState().phase
@@ -474,6 +490,7 @@ export default function App() {
       mode,
       onWake,
       onSpeechStart,
+      onLongSpeechSegment,
       onPartial,
       onTranscript,
       onUtterance,

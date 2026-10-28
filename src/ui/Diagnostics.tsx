@@ -46,6 +46,9 @@ type VoiceDiag = {
   adaptiveTurnsEnabled: boolean
   acousticWindowMs: number
   turnHoldReason: string
+  longQuestionOptIn: boolean
+  longQuestionActive: boolean
+  longQuestionParts: number
 }
 
 type TtsDiag = {
@@ -174,6 +177,9 @@ export function Diagnostics() {
       <Row k="adaptive turn policy" v={v.adaptiveTurnsEnabled ? 'ON · experimental' : 'OFF · legacy'} />
       <Row k="last VAD silence window" v={`${v.acousticWindowMs ?? 650} ms`} />
       <Row k="last turn decision" v={String(v.turnHoldReason ?? 'baseline')} />
+      <Row k="long question reception" v={v.longQuestionOptIn ? 'ON · ASUS pilot' : 'OFF · legacy'} />
+      <Row k="long question assembling" v={v.longQuestionActive ? 'ACTIVE' : 'standby'} />
+      <Row k="local command segments" v={String(v.longQuestionParts ?? 0)} />
       <Row k="mode" v={`${v.mode ?? '—'} (phase ${phase})`} />
       <Row k="accepted" v={String(v.accepted ?? 0)} bad={(v.accepted ?? 0) === 0} />
       <Row k="wakes" v={String(v.wakes ?? 0)} />
