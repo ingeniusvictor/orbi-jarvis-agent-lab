@@ -32,6 +32,7 @@ import { buildVoiceRuntimeStatus } from './orbia/voice-status.mjs'
 import { applyVoiceRuntimeControl } from './orbia/voice-control.mjs'
 import { parseVoiceRuntimeControl } from './orbia/voice-runtime.mjs'
 import { createOllamaReplyGate } from './orbia/ollama-json-stream.mjs'
+import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
@@ -285,6 +286,7 @@ export async function streamOllama({
   systemPrompt,
   knowledgeContext,
   toolContext,
+  image,
   signal,
   onText,
 }) {
@@ -308,7 +310,11 @@ export async function streamOllama({
         'traducciones, explicaciones del idioma ni texto fuera del JSON.',
     },
     ...history,
-    { role: 'user', content: prompt },
+    {
+      role: 'user',
+      content: prompt,
+      ...(image ? { images: [image.data] } : {}),
+    },
   ]
 
   const responseSchema = {
@@ -572,7 +578,10 @@ export function attachOllamaSession(socket) {
       let answer = ''
       try {
         const history = getConversationHistory(conversationId)
-        const voiceControl = parseVoiceRuntimeControl(prompt)
+        // One single local photo; malformed payloads fail before model call.
+        // It is never added to chat history, console output or diagnostics.
+        const image = parseLocalVisualImage(msg.image)
+        const voiceControl = image ? null : parseVoiceRuntimeControl(prompt)
 
         if (voiceControl) {
           send({ type: 'tool', ask, name: 'orbi_voice_runtime_control' })
@@ -599,7 +608,7 @@ export function attachOllamaSession(socket) {
           return
         }
 
-        const modelControl = parseModelControl(prompt, history)
+        const modelControl = image ? null : parseModelControl(prompt, history)
 
         if (modelControl) {
           const toolName =
@@ -655,7 +664,7 @@ export function attachOllamaSession(socket) {
         }
 
         const knowledgeContext = buildKnowledgeContext(prompt)
-        const toolRequest = selectReadOnlyTool(
+        const toolRequest = image ? null : selectReadOnlyTool(
           prompt,
           conversationId,
           `${ask ?? 'turn'}-tool`,
@@ -680,6 +689,7 @@ export function attachOllamaSession(socket) {
           }),
           knowledgeContext,
           toolContext,
+          image,
           signal: controller.signal,
           onText: (delta) => send({ type: 'text', ask, delta }),
         })
