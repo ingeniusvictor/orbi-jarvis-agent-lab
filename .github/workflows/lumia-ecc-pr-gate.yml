@@ -98,6 +98,9 @@ jobs:
       - name: RA-01 14s phrase gap model vs Kokoro vs playback attribution
         run: npx tsx scripts/certify-lumia-gap-attribution-ra01.ts
 
+      - name: MI-02 Local installed-model counting and follow-up questions
+        run: node scripts/certify-lumia-model-inventory-mi02.ts
+
       - name: Production build
         run: npm run build
 
