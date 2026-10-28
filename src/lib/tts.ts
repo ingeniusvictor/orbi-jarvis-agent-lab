@@ -131,6 +131,9 @@ export const diag = {
   /** Silence from one phrase's audio completion until the next phrase begins. */
   lastInterPhraseSilenceMs: null as number | null,
   maxInterPhraseSilenceMs: 0,
+  /** Disjoint portions of latest observed silent gap; may not sum to total. */
+  lastGapWaitingTextMs: null as number | null,
+  lastGapWaitingAudioMs: null as number | null,
 }
 
 if (typeof window !== 'undefined') {
@@ -442,13 +445,27 @@ function shape(text: string): string {
 
 type Item = {
   text: string
+  /** Observed when the model produced a complete phrase, BEFORE TTS. */
+  queuedAt: number
+  synthesisStartedAt?: number
+  synthesisReadyAt?: number
   /** Generation starts one sentence ahead, not all at once. */
   audio?: Promise<AudioSource | null> | null
 }
 
 export function createSpeaker(
   onFirstAudioStart?: () => void,
-  onPhraseStart?: (event: { text: string; at: number; gapMs: number | null }) => void,
+  onPhraseStart?: (event: {
+    text: string
+    at: number
+    gapMs: number | null
+    queuedAt: number
+    synthesizedAt?: number
+    /** Gap before this phrase arrived from the model/stream. */
+    waitingTextMs: number | null
+    /** Time after the phrase arrived but before its synthesized WAV was ready. */
+    waitingAudioMs: number | null
+  }) => void,
 ): Speaker {
   const queue: Item[] = []
   let buffer = ''
@@ -459,15 +476,31 @@ export function createSpeaker(
   let firstChunkQueued = false
   let firstAudioNotified = false
   let lastPhraseEndedAt = 0
-  const notifyPhraseStart = (text: string) => {
+  const notifyPhraseStart = (item: Item) => {
     if (cancelled) return
     const at = Date.now()
     const gapMs = lastPhraseEndedAt ? Math.max(0, at - lastPhraseEndedAt) : null
+    // Only attribute the pause that occurred AFTER the previous phrase ended.
+    // A speech chunk queued 15 seconds after its predecessor cannot have had
+    // its audio ready in advance, even if Kokoro's own generation was fast.
+    const waitingTextMs = gapMs === null
+      ? null : Math.min(gapMs, Math.max(0, item.queuedAt - lastPhraseEndedAt))
+    const waitingAudioMs = gapMs === null || item.synthesisReadyAt == null
+      ? null
+      : Math.min(gapMs - (waitingTextMs ?? 0), Math.max(
+        0, item.synthesisReadyAt - Math.max(lastPhraseEndedAt, item.queuedAt),
+      ))
     if (gapMs !== null) {
       diag.lastInterPhraseSilenceMs = gapMs
       diag.maxInterPhraseSilenceMs = Math.max(diag.maxInterPhraseSilenceMs, gapMs)
+      diag.lastGapWaitingTextMs = waitingTextMs
+      diag.lastGapWaitingAudioMs = waitingAudioMs
     }
-    onPhraseStart?.({ text, at, gapMs })
+    onPhraseStart?.({
+      text: item.text, at, gapMs,
+      queuedAt: item.queuedAt, synthesizedAt: item.synthesisReadyAt,
+      waitingTextMs, waitingAudioMs,
+    })
   }
   const notifyFirstAudio = () => {
     if (cancelled || firstAudioNotified) return
@@ -498,7 +531,7 @@ export function createSpeaker(
     const text = shape(sentence)
     if (!text) return
 
-    const item: Item = { text }
+    const item: Item = { text, queuedAt: Date.now() }
     if (priority) {
       // Genuinely ahead of the queue this time. The old `say()` appended to the
       // same chain and only appeared to preempt because it was called when the
@@ -558,8 +591,10 @@ export function createSpeaker(
   /** Start generating an item's audio if it hasn't begun. */
   const prime = (item: Item | undefined) => {
     if (!item || item.audio !== undefined) return
+    item.synthesisStartedAt = Date.now()
     const pending = synthesise(item.text)
     item.audio = pending ? pending.then((source) => {
+      item.synthesisReadyAt = Date.now()
       if (!source) return null
       // Primed audio can complete after a voice interruption. Do not leak the
       // blob URL or keep streaming a sentence that will never be played.
@@ -603,14 +638,14 @@ export function createSpeaker(
       if (cancelled) return
       // A failed generation is not a failed turn — drop to the system voice.
       if (source) {
-        const played = await playUrl(source, item.text)
+        const played = await playUrl(source, item)
         // If an opted-in MSE stream failed before producing *any* sound, use
         // the existing system-voice recovery. Never repeat words that already
         // became audible, even if the network fails mid-sentence.
         if (played || cancelled || typeof source === 'string') return
       }
 
-      const spoke = await speakNative(item.text)
+      const spoke = await speakNative(item)
       if (spoke || cancelled) return
 
       // The OS voice produced no sound. That is not recoverable by retrying it,
@@ -628,7 +663,7 @@ export function createSpeaker(
       if (rescue && !cancelled) {
         ownedSources.add(rescue)
         diag.rescued++
-        await playUrl(rescue, item.text)
+        await playUrl(rescue, item)
       } else if (rescue) {
         disposeAudioSource(rescue)
       }
@@ -637,8 +672,9 @@ export function createSpeaker(
     }
   }
 
-  const speakNative = (text: string) =>
+  const speakNative = (item: Item) =>
     new Promise<boolean>((resolve) => {
+      const text = item.text
       // Chrome's speechSynthesis wedges after cancel().
       //
       // This is the single most likely reason a whole session goes silent. The
@@ -707,7 +743,7 @@ export function createSpeaker(
         started = true
         markOutputAudible(true)
         notifyFirstAudio()
-        notifyPhraseStart(text)
+        notifyPhraseStart(item)
         diag.started++
         diag.lastError = ''
         if (watchdog) clearTimeout(watchdog)
@@ -767,8 +803,9 @@ export function createSpeaker(
       speechSynthesis.speak(u)
     })
 
-  const playUrl = (source: AudioSource, text: string) =>
+  const playUrl = (source: AudioSource, item: Item) =>
     new Promise<boolean>((resolve) => {
+      const text = item.text
       const url = typeof source === 'string' ? source : source.url
       const audio = new Audio(url)
       diag.transport = typeof source === 'string' ? 'buffered' : 'mse-stream'
@@ -846,7 +883,7 @@ export function createSpeaker(
         beganPlaying = true
         markOutputAudible(true)
         notifyFirstAudio()
-        notifyPhraseStart(text)
+        notifyPhraseStart(item)
         diag.started++
         diag.lastError = ''
       }
