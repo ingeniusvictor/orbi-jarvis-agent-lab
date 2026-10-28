@@ -23,6 +23,10 @@ La nueva implementación proporciona un *piloto opt-in*:
 - Se lanza un único Python local mediante stdio, sin nuevos puertos.
 - Un único objeto `Kokoro` mantiene cargado el modelo ONNX durante
   la sesión; la fonetización española también se inicializa una vez.
+- Un segundo opt-in \`VITE_LUMIA_TTS_PREFETCH_NEXT=1\` adelanta la
+  generación de la siguiente frase mientras suena la primera; antes
+  las frases añadidas durante la reproducción NO se pre-sintetizaban
+  hasta que terminaba el audio anterior. Solo anticipa una frase.
 - Las frases se procesan serializadas en una cola FIFO acotada
   (evita ejecutar dos inferencias sobre un mismo modelo a la vez).
 - El motor comienza a calentarse al iniciar el bridge, en paralelo
