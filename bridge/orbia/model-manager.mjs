@@ -208,11 +208,43 @@ export function resolveModelRequest(requested, installedModels) {
   ])
 }
 
-export function parseModelControl(prompt) {
+/**
+ * Pronoun-only follow-ups ("¿Cuáles son esos modelos?") are ambiguous without
+ * their immediate conversation. Limit the evidence to recent exchanges about
+ * *LUMIA's available/installed local models*; never reinterpret general
+ * questions about AI architectures as requests to inspect local inventory.
+ */
+function recentlyDiscussedLocalModels(history = []) {
+  if (!Array.isArray(history)) return false
+  return history.slice(-6).some((entry) => {
+    if (!entry || !['user', 'assistant'].includes(entry.role)) return false
+    const t = normalize(entry.content)
+    if (!/\bmodelos?\b/.test(t)) return false
+    return /\b(?:tienes|tengo|tenemos|disponibles?|instalados?|puedes|podemos|usar|cambiar|ollama|locales|varios|mis|tus|listado|lista)\b/.test(t)
+  })
+}
+
+export function parseModelControl(prompt, history = []) {
   const raw = String(prompt ?? '').trim()
   const text = normalize(raw)
   if (!text) return null
 
+  // Natural questions about actual installed models should never be sent to a
+  // language model that can invent generic categories instead of real tags.
+  // Restrict "cuántos modelos" to local/available/owner intent, not broad
+  // questions such as "¿cuántos modelos existen en el mundo?".
+  const explicitCount =
+    /\bcuantos?\s+modelos?\b/.test(text) &&
+    /\b(?:tienes|tengo|tenemos|disponibles?|instalados?|puedo|puedes|puede|podemos|cambiar|usar|ollama|locales|mi|tu|ordenador|computadora|equipo)\b/.test(text)
+  const explicitWhich =
+    /\bcuales?\s+(?:son\s+)?(?:los\s+)?modelos?\b/.test(text) &&
+    /\b(?:tienes|tengo|disponibles?|instalados?|ollama|cambiar|usar|locales)\b/.test(text)
+  const shortFollowup =
+    /\bcuales?\s+son\s+(?:(?:esos|estos|los)\s+)?modelos?\b/.test(text) &&
+    recentlyDiscussedLocalModels(history)
+  const inventoryFromContext =
+    /\b(?:esos|estos|cuales)\s+modelos?\b/.test(text) &&
+    recentlyDiscussedLocalModels(history)
   const asksForInventory =
     /\bque modelos? (?:puedo|puedes|puede|podemos) usar\b/.test(text) ||
     /\bque modelos? (?:tienes|hay|estan)\b/.test(text) ||
@@ -220,7 +252,7 @@ export function parseModelControl(prompt) {
     /\b(?:lista|listar|muestra|mostrar|dime) (?:los )?modelos\b/.test(text) ||
     /\b(?:puedes|podrias|puede|eres capaz de) (?:cambiar|cambiarte|usar) (?:de |a |otro )?modelo\b/.test(text)
 
-  if (asksForInventory) {
+  if (asksForInventory || explicitCount || explicitWhich || shortFollowup || inventoryFromContext) {
     return { action: 'list' }
   }
 
