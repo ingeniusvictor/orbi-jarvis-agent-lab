@@ -21,7 +21,7 @@ import { displayServer } from './panels.mjs'
 import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
-import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, probeOllama, warmOllama } from './ollama.mjs'
+import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, getOllamaModel, probeOllama, warmOllama } from './ollama.mjs'
 import { attachOpenAISession, OPENAI_MODEL, openAIConfigured } from './providers/openai.mjs'
 import { attachHybridSession } from './providers/hybrid.mjs'
 import { brainProviderStatus, resolveBrainProvider } from './providers/registry.mjs'
@@ -49,6 +49,7 @@ import {
 } from './orbia/local-tts.mjs'
 import { transcribeMultivoiceLocalWav } from './orbia/multivoice-stt.mjs'
 import { ensureWhisperServer } from './orbia/whisper-server-runtime.mjs'
+import { translateLocalText, validateTranslation } from './orbia/local-translate.mjs'
 import { prewarmResidentKokoro } from './orbia/resident-tts.mjs'
 import { createRealtimeGrantService } from './orbia/realtime-grants.mjs'
 
@@ -741,6 +742,44 @@ const handleRequest = async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, cors)
     return res.end()
+  }
+
+  // LT-01: independent opt-in translation. It never changes Whisper's
+  // Spanish language setting, chat history, Kokoro or microphone permissions.
+  if (req.method === 'POST' && req.url === '/translate/local') {
+    const headers = { ...cors, 'content-type': 'application/json',
+      'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }
+    const reply = (status, payload) => {
+      res.writeHead(status, headers)
+      return res.end(JSON.stringify(payload))
+    }
+    if (process.env.ORBIA_LUMIA_TRANSLATE_ENABLED !== '1' || PROVIDER !== 'ollama')
+      return reply(503, { ok: false, error: 'Traducción local desactivada.' })
+    if (!String(req.headers['content-type'] || '').includes('application/json'))
+      return reply(415, { ok: false, error: 'Se requiere JSON.' })
+    const chunks = []
+    let size = 0
+    for await (const chunk of req) {
+      size += chunk.length
+      if (size > 16_384) return reply(413, { ok: false, error: 'Texto demasiado largo.' })
+      chunks.push(chunk)
+    }
+    let request
+    try {
+      request = validateTranslation(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+    } catch {
+      return reply(400, { ok: false, error: 'Solicitud o idiomas inválidos.' })
+    }
+    try {
+      const result = await translateLocalText(request, {
+        ollamaUrl: OLLAMA_URL,
+        model: getOllamaModel(),
+        signal: AbortSignal.timeout(45_000),
+      })
+      return reply(200, { ok: true, ...result })
+    } catch {
+      return reply(502, { ok: false, error: 'No se pudo completar la traducción local.' })
+    }
   }
 
   if (req.method === 'POST' && req.url === '/voice/realtime/client-secret') {
