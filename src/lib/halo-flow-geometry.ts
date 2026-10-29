@@ -45,8 +45,30 @@ export function computeHaloExclusion(
   const floatLeft = side === 'left' ? rect.right - width : rect.left
   const cx = circle.x - floatLeft
   const cy = circle.y - rect.top
-  const shape = 'circle(' + circle.radius.toFixed(1) + 'px at ' +
-    cx.toFixed(1) + 'px ' + cy.toFixed(1) + 'px)'
+  // Use an explicit sampled circle CONTOUR, not circle() with a negative cx
+  // outside the float box. Browsers clip float shapes to their margin box;
+  // an off-box circle can appear inverted or stop shaping a short reply.
+  // These vertices always stay within the float's physical rectangle.
+  const n = Math.max(20, Math.min(64, Math.ceil(height / 7)))
+  const boundary = []
+  for (let i = 0; i <= n; i++) {
+    const y = height * i / n
+    const dy = y - cy
+    const radiusAtY = Math.abs(dy) >= circle.radius ? 0 :
+      Math.sqrt(circle.radius * circle.radius - dy * dy)
+    // Outside the circle the exclusion shrinks to the INNER border only.
+    const edge = Math.abs(dy) >= circle.radius
+      ? (side === 'left' ? width : 0)
+      : (side === 'left' ? cx - radiusAtY : cx + radiusAtY)
+    const x = Math.max(0, Math.min(width, edge))
+    boundary.push(x.toFixed(1) + 'px ' + y.toFixed(1) + 'px')
+  }
+  // Right text: floated LEFT, solid exclusion from 0 to ring's RIGHT edge.
+  // Left text: floated RIGHT, solid exclusion from ring's LEFT edge to width.
+  const inner = side === 'left' ? width : 0
+  const shape = 'polygon(' + inner.toFixed(1) + 'px 0px, ' +
+    boundary.join(', ') + ', ' +
+    inner.toFixed(1) + 'px ' + height.toFixed(1) + 'px)'
   return { width, height, shape, float: side === 'left' ? 'right' : 'left' }
 }
 
