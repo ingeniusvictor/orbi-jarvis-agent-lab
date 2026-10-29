@@ -71,7 +71,7 @@ export function HaloFlow({ side, children }: { side: 'left' | 'right'; children:
     }
   }, [side])
   return (
-    <div ref={root} className={'voice-halo-flow voice-halo-flow-' + side}>
+    <div ref={root} className={'voice-halo-flow voice-halo-flow-' + side} style={{ display: 'flow-root' }}>
       {ENABLED && <span className="voice-halo-float" aria-hidden="true" />}
       {children}
     </div>
