@@ -31,6 +31,18 @@ const sharedMic = createSharedMic(() =>
   }),
 )
 
+/** Explicit release for text mode / completed push-to-talk. No recordings retained. */
+export function releaseMicrophone(): void {
+  const oldContext = ctx
+  ctx = null
+  analyser = null
+  analyserStream = null
+  buf = null
+  if (oldContext) void oldContext.close().catch(() => {})
+  sharedMic.release()
+  observedAutoGain = null
+}
+
 export async function getMic(): Promise<MediaStream> {
   const stream = await sharedMic()
   const actual = stream.getAudioTracks()[0]?.getSettings?.().autoGainControl

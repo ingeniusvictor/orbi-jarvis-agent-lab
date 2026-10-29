@@ -45,6 +45,11 @@ rem NF-01 can still be tested deliberately by changing 0 to 1.
 set "VITE_LUMIA_NEAR_FIELD_FOCUS=0"
 set "VITE_LUMIA_FAST_LOCAL_FOLLOWUP=0"
 set "VITE_LUMIA_STREAMING_TTS=0"
+rem UX-01 unified native text / tap-to-talk / continuous voice + photo.
+rem Default text does not need always-open microphone; user opts in to voice.
+set "VITE_LUMIA_MULTIMODAL_COMPOSER=1"
+rem Legacy clap ignition would open a microphone before text mode is chosen.
+set "VITE_LUMIA_CLAP_BOOT=0"
 
 echo.
 echo ============================================================
