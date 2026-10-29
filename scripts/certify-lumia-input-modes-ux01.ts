@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { initialLumiaInputMode, shouldRunAlwaysOnVoice, canCapturePushVoice } from '../src/lib/input-mode'
-import { PUSH_CAPTURE_MAX_MS } from '../src/lib/push-to-talk'
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8')
 assert.equal(initialLumiaInputMode(true), 'text')
 assert.equal(initialLumiaInputMode(false), 'continuous')
@@ -9,7 +8,7 @@ for(const mode of ['text','push','continuous'] as const) {
   assert.equal(shouldRunAlwaysOnVoice(mode), mode === 'continuous')
   assert.equal(canCapturePushVoice(mode), mode === 'push')
 }
-assert.equal(PUSH_CAPTURE_MAX_MS, 20000)
+assert.match(read('src/lib/push-to-talk.ts'), /export const PUSH_CAPTURE_MAX_MS = 20_000/)
 const mic = read('src/lib/mic-lease.ts')
 assert.match(mic, /requestedAt !== generation/)
 assert.match(mic, /Object.assign\(getSharedMic, \{ release \}\)/)
