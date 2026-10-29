@@ -1,10 +1,16 @@
 /**
- * UX-01 — One native input dock for text, single-tap local STT,
- * owner-enabled open microphone and optional VI-01 local photo.
- * All paths submit through the existing App.respond and Ollama bridge.
+ * UX-02 — LUMIA premium glass dock.
+ *
+ * A single lightweight bar, inspired by compact messaging composers.
+ * Native text is always present. Icon buttons expose only features that are
+ * actually connected: owner-selected photos (VI-01), tap-to-dictate (Whisper),
+ * and explicitly enabled continuous listening. No new permissions or tools.
  */
 import { useRef, useState, type KeyboardEvent } from 'react'
-import { prepareVisualImage, validateVisualFile, type LocalVisualImage } from '../lib/visual-input'
+import {
+  prepareVisualImage, validateVisualFile,
+  type LocalVisualImage,
+} from '../lib/visual-input'
 import type { LumiaInputMode } from '../lib/input-mode'
 
 type Props = {
@@ -20,11 +26,49 @@ type Props = {
   onCancelRecording: () => void
 }
 
-const modes: { value: LumiaInputMode; label: string; hint: string }[] = [
-  { value: 'text', label: 'ESCRIBIR', hint: 'El micrófono permanece apagado' },
-  { value: 'push', label: 'DICTAR', hint: 'Pulsa para grabar y pulsa para terminar' },
-  { value: 'continuous', label: 'MIC ABIERTO', hint: 'Di «Lumi» para iniciar una conversación' },
-]
+type IconName = 'image' | 'mic' | 'wave' | 'send' | 'stop' | 'close' | 'cancel'
+function DockIcon({ name }: { name: IconName }) {
+  const common = {
+    width: 20, height: 20, viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: 1.7,
+    strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
+    'aria-hidden': true as const, focusable: false as const,
+  }
+  if (name === 'image') return (
+    <svg {...common}>
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <circle cx="8.4" cy="8.6" r="1.3" />
+      <path d="m3.8 17.5 5.3-5.4 3.4 3.5 2.9-3.1 4.8 5.5" />
+    </svg>
+  )
+  if (name === 'mic') return (
+    <svg {...common}>
+      <rect x="9" y="3" width="6" height="12" rx="3" />
+      <path d="M6 11a6 6 0 0 0 12 0M12 17v4m-4 0h8" />
+    </svg>
+  )
+  if (name === 'wave') return (
+    <svg {...common}>
+      <path d="M2 10v4m4-7v10m4-14v18m4-12v6m4-10v14m4-9v4" />
+    </svg>
+  )
+  if (name === 'send') return (
+    <svg {...common} fill="currentColor" stroke="none">
+      <path d="M21.4 2.7a.9.9 0 0 0-.95-.16L2.7 10.1a1 1 0 0 0 .08 1.87l7.15 2.24 2.24 7.15a1 1 0 0 0 1.87.08l7.52-17.76a.9.9 0 0 0-.16-.98ZM11.3 12.7 6 11l11.2-5.1-5.9 6.8Z" />
+    </svg>
+  )
+  if (name === 'stop') return (
+    <svg {...common} fill="currentColor" stroke="none">
+      <rect x="7" y="7" width="10" height="10" rx="1.5" />
+    </svg>
+  )
+  if (name === 'cancel') return (
+    <svg {...common}><path d="M5 5l14 14M19 5 5 19" /></svg>
+  )
+  return (
+    <svg {...common}><path d="M6 6l12 12M18 6 6 18" /></svg>
+  )
+}
 
 export function LumiaComposer({
   available, mode, recording, busy, visionAvailable,
@@ -35,13 +79,18 @@ export function LumiaComposer({
   const [preparing, setPreparing] = useState(false)
   const [error, setError] = useState('')
   const photoInput = useRef<HTMLInputElement>(null)
-
+  const textarea = useRef<HTMLTextAreaElement>(null)
   if (!available) return null
 
+  const adjustHeight = () => {
+    const el = textarea.current
+    if (!el) return
+    el.style.height = '26px'
+    el.style.height = Math.min(116, Math.max(26, el.scrollHeight)) + 'px'
+  }
   const send = async () => {
     const text = draft.trim()
-    if (!text && !photo) return
-    if (preparing) return
+    if ((!text && !photo) || preparing || busy || recording) return
     setPreparing(true)
     setError('')
     try {
@@ -50,124 +99,132 @@ export function LumiaComposer({
       setDraft('')
       setPhoto(null)
       if (photoInput.current) photoInput.current.value = ''
+      if (textarea.current) textarea.current.style.height = '26px'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo enviar la imagen.')
     } finally {
       setPreparing(false)
     }
   }
-
   const handleKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
     event.preventDefault()
     void send()
   }
+  const toggleDictation = () => {
+    if (recording) {
+      onStopRecording()
+      return
+    }
+    if (mode !== 'push') onModeChange('push')
+    onStartRecording()
+  }
+  const toggleContinuous = () => {
+    onModeChange(mode === 'continuous' ? 'text' : 'continuous')
+  }
 
   return (
     <section className="lumia-composer" aria-label="Conversación con LUMIA">
-      <div className="lumia-composer-top">
-        <span className="lumia-composer-name">L.U.M.I.A. · CONVERSACIÓN</span>
-        <span className="lumia-composer-privacy">
-          {recording ? '● GRABANDO LOCALMENTE'
-            : mode === 'continuous' ? '● MICRÓFONO ABIERTO'
-              : '○ MICRÓFONO EN REPOSO'}
-        </span>
-      </div>
-      <div className="lumia-composer-modes" role="group" aria-label="Modo de entrada">
-        {modes.map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            className={mode === item.value ? 'lumia-composer-mode is-active' : 'lumia-composer-mode'}
-            aria-pressed={mode === item.value}
-            title={item.hint}
-            disabled={busy || recording || preparing}
-            onClick={() => { setError(''); onModeChange(item.value) }}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      <div className="lumia-composer-entry">
+      <div className="lumia-composer-dock" data-mode={mode} data-recording={recording}>
+        <input
+          ref={photoInput}
+          type="file"
+          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+          className="lumia-composer-file-input"
+          aria-label="Seleccionar una fotografía para Qwen local"
+          onChange={(event) => {
+            const chosen = event.currentTarget.files?.[0] ?? null
+            setError('')
+            if (!chosen) { setPhoto(null); return }
+            try {
+              validateVisualFile(chosen)
+              setPhoto(chosen)
+            } catch (err) {
+              setPhoto(null)
+              setError(err instanceof Error ? err.message : 'Archivo no válido.')
+              event.currentTarget.value = ''
+            }
+          }}
+        />
+        <button
+          type="button"
+          className={'lumia-composer-icon-button lumia-composer-attach' + (photo ? ' is-attached' : '')}
+          aria-label={photo ? 'Cambiar fotografía adjunta' : 'Adjuntar imagen para LUMIA'}
+          title={visionAvailable ? 'Adjuntar foto JPG, PNG o WebP · análisis local' : 'Visión local no disponible'}
+          disabled={!visionAvailable || preparing || recording}
+          onClick={() => photoInput.current?.click()}
+        ><DockIcon name="image" /></button>
+
         <textarea
+          ref={textarea}
+          className="lumia-composer-text"
           aria-label="Escribe tu mensaje a LUMIA"
-          placeholder="Escribe tu pregunta o instrucciones a Lumi…"
-          rows={2}
+          placeholder="Pregunta algo a Lumi…"
+          rows={1}
           maxLength={6000}
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => { setDraft(event.target.value); adjustHeight() }}
           onKeyDown={handleKey}
+          onFocus={() => { if (mode === 'continuous') onModeChange('text') }}
         />
-        <div className="lumia-composer-actions">
-          <input
-            ref={photoInput}
-            type="file"
-            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-            className="lumia-composer-file-input"
-            aria-label="Adjuntar fotografía para Qwen local"
-            onChange={(event) => {
-              const chosen = event.currentTarget.files?.[0] ?? null
-              setError('')
-              if (!chosen) { setPhoto(null); return }
-              try {
-                validateVisualFile(chosen)
-                setPhoto(chosen)
-              } catch (err) {
-                setPhoto(null)
-                setError(err instanceof Error ? err.message : 'Archivo no válido.')
-              }
-            }}
-          />
+
+        {recording && (
           <button
             type="button"
-            className="lumia-composer-action"
-            disabled={!visionAvailable || preparing}
-            onClick={() => photoInput.current?.click()}
-            title={visionAvailable ? 'Adjuntar imagen JPG, PNG o WebP para Qwen local' : 'Visión local no disponible'}
-          >
-            + IMAGEN
-          </button>
-          {mode === 'push' && (
-            <button
-              type="button"
-              className={recording ? 'lumia-composer-action is-recording' : 'lumia-composer-action'}
-              aria-pressed={recording}
-              disabled={busy || preparing}
-              onClick={() => recording ? onStopRecording() : onStartRecording()}
-            >
-              {recording ? '■ TERMINAR AUDIO' : '● GRABAR AUDIO'}
-            </button>
-          )}
-          {mode === 'push' && recording && (
-            <button type="button" className="lumia-composer-action"
-              onClick={onCancelRecording}>CANCELAR</button>
-          )}
-          <span className="lumia-composer-spacer" />
-          <button
-            type="button"
-            className="lumia-composer-send"
-            disabled={preparing || (!draft.trim() && !photo)}
-            onClick={() => void send()}
-          >
-            {preparing ? 'PREPARANDO…' : 'ENVIAR ↗'}
-          </button>
-        </div>
+            className="lumia-composer-icon-button lumia-composer-cancel"
+            aria-label="Cancelar dictado sin enviar"
+            title="Cancelar dictado"
+            onClick={onCancelRecording}
+          ><DockIcon name="cancel" /></button>
+        )}
+
+        <button
+          type="button"
+          className={'lumia-composer-icon-button lumia-composer-dictate' + (recording ? ' is-recording' : '')}
+          aria-label={recording ? 'Detener y transcribir dictado' : 'Dictar mensaje por micrófono'}
+          aria-pressed={recording}
+          title={recording ? 'Detener grabación y transcribir' : 'Dictar una vez · pulsa para comenzar y terminar'}
+          disabled={busy || preparing}
+          onClick={toggleDictation}
+        ><DockIcon name={recording ? 'stop' : 'mic'} /></button>
+
+        <button
+          type="button"
+          className={'lumia-composer-icon-button lumia-composer-continuous' + (mode === 'continuous' ? ' is-active' : '')}
+          aria-label={mode === 'continuous' ? 'Desactivar micrófono abierto' : 'Activar micrófono abierto'}
+          aria-pressed={mode === 'continuous'}
+          title={mode === 'continuous' ? 'Desactivar escucha continua' : 'Escucha continua · di Lumi para hablar'}
+          disabled={busy || recording || preparing}
+          onClick={toggleContinuous}
+        ><DockIcon name="wave" /></button>
+
+        <button
+          type="button"
+          className="lumia-composer-send"
+          aria-label="Enviar mensaje"
+          title="Enviar · Enter"
+          disabled={preparing || busy || recording || (!draft.trim() && !photo)}
+          onClick={() => void send()}
+        ><DockIcon name="send" /></button>
       </div>
-      {photo && (
-        <div className="lumia-composer-attachment">
-          <span>IMAGEN ADJUNTA · {photo.name}</span>
-          <button type="button" aria-label="Quitar imagen" onClick={() => {
-            setPhoto(null)
-            if (photoInput.current) photoInput.current.value = ''
-          }}>×</button>
+
+      {(photo || error || recording || busy) && (
+        <div className="lumia-composer-feedback" aria-live="polite">
+          {photo && (
+            <span className="lumia-composer-photo">
+              <DockIcon name="image" />
+              <span title={photo.name}>{photo.name}</span>
+              <button type="button" aria-label="Quitar fotografía adjunta" onClick={() => {
+                setPhoto(null)
+                if (photoInput.current) photoInput.current.value = ''
+              }}><DockIcon name="close" /></button>
+            </span>
+          )}
+          {recording && <span className="lumia-composer-mic-state">● GRABANDO · pulsa detener</span>}
+          {!recording && busy && <span className="lumia-composer-mic-state">TRANSCRIBIENDO LOCALMENTE…</span>}
+          {error && <span className="lumia-composer-error" role="alert">{error}</span>}
         </div>
       )}
-      <p className="lumia-composer-hint">
-        {mode === 'text' ? 'Enter envía · Shift+Enter cambia de línea · Adjunta imágenes locales'
-          : mode === 'push' ? (recording ? 'Habla naturalmente; pulsa TERMINAR para transcribir hasta 20 s.' : 'Graba solo al pulsar. Whisper transcribe localmente al terminar.')
-            : 'Escucha continua activada por ti. Di «Lumi»; también puedes escribir o adjuntar una foto.'}
-      </p>
-      {error && <div className="lumia-composer-error" role="alert">{error}</div>}
     </section>
   )
 }

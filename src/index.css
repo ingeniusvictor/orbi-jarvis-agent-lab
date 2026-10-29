@@ -2521,121 +2521,194 @@ kbd {
 }
 
 
-/* UX-01: premium multimodal chat dock. Deliberately outside the hologram scene. */
+/* UX-02: one-row holographic glass dock, user-approved compact reference.
+ * Existing avatar, rings, instrument layers and HUD remain untouched. */
 .lumia-composer {
   position: fixed;
-  bottom: 16px;
   left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
   transform: translateX(-50%);
+  width: min(740px, calc(100vw - 32px));
   z-index: 24;
-  width: min(620px, calc(100vw - 32px));
-  padding: 12px 14px 10px;
-  border: 1px solid rgba(0, 226, 255, .46);
-  border-radius: 17px;
-  background: linear-gradient(160deg, rgba(4, 21, 36, .97), rgba(1, 9, 23, .97));
-  box-shadow: 0 8px 38px rgba(0, 0, 0, .58), 0 0 26px rgba(0, 200, 255, .08);
-  color: #ddfaff;
-  font-family: 'Chakra Petch', sans-serif;
   pointer-events: auto;
+  color: rgba(222, 252, 255, .94);
+  font-family: 'Chakra Petch', sans-serif;
 }
-.lumia-composer-top, .lumia-composer-actions, .lumia-composer-attachment {
+.lumia-composer-dock {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.lumia-composer-top {
-  margin-bottom: 9px;
-  font-size: 10px;
-  letter-spacing: .1em;
-}
-.lumia-composer-name { color: #82dbeb; font-weight: 700; }
-.lumia-composer-privacy { color: #96d6c9; font-size: 9px; }
-.lumia-composer-modes {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
-  margin-bottom: 8px;
-}
-.lumia-composer-mode, .lumia-composer-action, .lumia-composer-send {
-  min-height: 32px;
-  border-radius: 7px;
-  padding: 7px 9px;
-  font: inherit;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .055em;
-  cursor: pointer;
-  color: #b8e9f0;
-  border: 1px solid rgba(102, 207, 231, .32);
-  background: rgba(10, 36, 54, .68);
-}
-.lumia-composer-mode.is-active {
-  color: white;
-  border-color: #50e1ff;
-  background: rgba(0, 152, 196, .3);
-  box-shadow: inset 0 0 15px rgba(0, 195, 245, .11);
-}
-.lumia-composer-mode:disabled, .lumia-composer-action:disabled,
-.lumia-composer-send:disabled { opacity: .45; cursor: not-allowed; }
-.lumia-composer-entry {
-  padding: 7px;
-  border: 1px solid rgba(72, 170, 190, .38);
-  border-radius: 10px;
-  background: rgba(1, 12, 23, .9);
-}
-.lumia-composer-entry textarea {
+  gap: 8px;
   width: 100%;
-  display: block;
-  resize: vertical;
-  min-height: 48px;
-  max-height: 170px;
-  outline: none;
-  font: 13px/1.45 system-ui, sans-serif;
-  color: #ecfdff;
-  border: none;
-  background: transparent;
+  min-height: 56px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(111, 231, 254, .43);
+  background: linear-gradient(110deg, rgba(3, 23, 36, .38), rgba(2, 13, 28, .24));
+  box-shadow: 0 3px 25px rgba(1, 5, 17, .26),
+    inset 0 1px rgba(193, 253, 255, .12),
+    0 0 12px rgba(0, 215, 255, .11);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+  backdrop-filter: blur(16px) saturate(125%);
+  transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
 }
-.lumia-composer-entry textarea::placeholder { color: #79a4b2; }
-.lumia-composer-entry textarea:focus-visible { outline: 1px solid #52d9ed; outline-offset: 3px; }
-.lumia-composer-file-input { display: none; }
-.lumia-composer-action { min-height: 31px; }
-.lumia-composer-action.is-recording {
-  color: #fff1e9;
-  background: rgba(170, 39, 28, .55);
-  border-color: #ff937f;
+.lumia-composer-dock:focus-within {
+  border-color: rgba(137, 247, 255, .83);
+  background: linear-gradient(110deg, rgba(3, 23, 36, .56), rgba(2, 13, 28, .38));
+  box-shadow: 0 4px 28px rgba(1, 5, 17, .3), 0 0 17px rgba(0, 215, 255, .22);
+}
+.lumia-composer-icon-button, .lumia-composer-send {
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: rgba(167, 229, 241, .85);
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.lumia-composer-icon-button:hover:not(:disabled),
+.lumia-composer-icon-button:focus-visible {
+  background: rgba(70, 215, 247, .15);
+  color: #f4ffff;
+}
+.lumia-composer-icon-button:disabled, .lumia-composer-send:disabled {
+  opacity: .40;
+  cursor: not-allowed;
+}
+.lumia-composer-icon-button:focus-visible, .lumia-composer-send:focus-visible,
+.lumia-composer-feedback button:focus-visible {
+  outline: 2px solid #a9faff;
+  outline-offset: 2px;
+}
+.lumia-composer-attach {
+  border-color: rgba(122, 225, 247, .20);
+  background: rgba(0, 36, 52, .27);
+}
+.lumia-composer-attach.is-attached {
+  color: #8fffdc;
+  border-color: rgba(95, 247, 190, .58);
+}
+.lumia-composer-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.lumia-composer-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: block;
+  box-sizing: border-box;
+  height: 26px;
+  min-height: 26px;
+  max-height: 116px;
+  padding: 2px 8px;
+  border: 0;
+  border-right: 1px solid rgba(118, 219, 239, .17);
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  background: transparent;
+  color: #ecfdff;
+  font: 14px/22px system-ui, sans-serif;
+}
+.lumia-composer-text::placeholder { color: rgba(156, 205, 223, .75); }
+.lumia-composer-dictate.is-recording {
+  color: #ffd9d3;
+  border-color: rgba(255, 128, 117, .60);
+  background: rgba(190, 55, 56, .30);
+  animation: lumia-dock-recording 1.3s ease-in-out infinite;
+}
+.lumia-composer-continuous.is-active {
+  color: #8af9ff;
+  background: rgba(9, 156, 188, .22);
+  box-shadow: 0 0 12px rgba(14, 219, 255, .18);
+}
+.lumia-composer-continuous.is-active::after {
+  content: '';
+  position: absolute;
+  margin: -27px -23px 0 0;
+  width: 5px;
+  height: 5px;
+  background: #64f8d8;
+  border-radius: 50%;
+  box-shadow: 0 0 7px #64f8d8;
 }
 .lumia-composer-send {
-  color: #061921;
-  background: linear-gradient(130deg, #5bebff, #a3f9fa);
-  border-color: #9af8ff;
+  width: 42px;
+  height: 42px;
+  color: #001a27;
+  border: 1px solid rgba(172, 252, 255, .75);
+  background: linear-gradient(140deg, #38d8f3, #89ebf5);
+  box-shadow: 0 0 13px rgba(0, 216, 255, .31);
 }
-.lumia-composer-spacer { flex: 1; }
-.lumia-composer-attachment {
-  margin-top: 7px;
-  padding: 6px 10px;
-  color: #a7e7f1;
-  border-radius: 6px;
-  background: rgba(16, 82, 94, .25);
+.lumia-composer-send:hover:not(:disabled) {
+  background: #a5f8ff;
+  box-shadow: 0 0 19px rgba(0, 238, 255, .45);
+}
+.lumia-composer-send:disabled { opacity: .64; }
+.lumia-composer-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 7px 18px 0;
   font-size: 11px;
-  overflow-wrap: anywhere;
+  letter-spacing: .02em;
 }
-.lumia-composer-attachment button {
-  color: white;
-  border: 0;
+.lumia-composer-photo,
+.lumia-composer-mic-state,
+.lumia-composer-error {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid rgba(102, 216, 233, .31);
+  border-radius: 14px;
+  background: rgba(1, 20, 32, .75);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.lumia-composer-photo span {
+  max-width: min(340px, 48vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lumia-composer-photo svg { width: 14px; height: 14px; }
+.lumia-composer-photo button {
+  display: inline-flex;
+  border: none;
+  color: inherit;
   background: transparent;
   cursor: pointer;
-  font-size: 17px;
 }
-.lumia-composer-hint {
-  font-size: 10px;
-  line-height: 1.35;
-  color: #87b7c3;
-  margin: 8px 1px 0;
+.lumia-composer-mic-state { color: #b5f5ff; }
+.lumia-composer-error { color: #ffb4ac; border-color: rgba(255, 132, 117, .47); }
+@keyframes lumia-dock-recording {
+  50% { box-shadow: 0 0 12px rgba(255, 107, 98, .45); }
 }
-.lumia-composer-error { margin-top: 7px; font-size: 11px; color: #ffa6a0; }
 @media (max-width: 650px) {
-  .lumia-composer { bottom: 8px; padding: 9px; }
-  .lumia-composer-top { flex-wrap: wrap; }
-  .lumia-composer-mode { letter-spacing: 0; font-size: 9px; padding-inline: 4px; }
+  .lumia-composer {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100vw - 16px);
+  }
+  .lumia-composer-dock { min-height: 50px; gap: 3px; padding: 4px 6px; }
+  .lumia-composer-icon-button { width: 33px; height: 33px; }
+  .lumia-composer-send { width: 38px; height: 38px; }
+  .lumia-composer-text { font-size: 13px; padding-inline: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lumia-composer-dictate.is-recording { animation: none; }
+  .lumia-composer-dock,
+  .lumia-composer-icon-button,
+  .lumia-composer-send { transition: none; }
 }

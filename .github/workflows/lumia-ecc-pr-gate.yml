@@ -128,6 +128,9 @@ jobs:
       - name: UX-01 Native typing, image attachment, push and continuous input modes
         run: npx tsx scripts/certify-lumia-input-modes-ux01.ts
 
+      - name: UX-02 One-row translucent glass dock and original input wiring
+        run: npx tsx scripts/certify-lumia-glass-dock-ux02.ts
+
       - name: STT-02 Offline Spanish WER comparison contract
         run: node scripts/certify-stt02-benchmark.mjs
 

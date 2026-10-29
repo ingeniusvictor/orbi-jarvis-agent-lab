@@ -1030,6 +1030,8 @@ export default function App() {
         kind: 'speech', wakeMatched: false, mode: 'command', at: Date.now(),
       })
       submitWritten(said)
+      // A single dictated message returns to the compact text dock.
+      switchInputMode('text')
     } catch (err) {
       if (generation === pushGeneration.current) {
         store.getState().setError(err instanceof Error ? err.message : 'Falló el dictado local.')
