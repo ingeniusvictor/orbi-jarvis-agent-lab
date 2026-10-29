@@ -18,13 +18,20 @@ assert.equal(left.float,'right')
 assert.equal(right.float,'left')
 assert.equal(left.width,right.width) // mirror symmetry
 assert.equal(left.height,right.height)
-assert.match(left.shape,/^circle\(/)
-assert.match(right.shape,/^circle\(/)
-const parseX=(shape:string)=>Number(shape.match(/at (-?[\d.]+)px/)?.[1])
-// The response circle centre is deliberately LEFT of its float's left edge;
-// the input circle centre is to the RIGHT of its float's left edge.
-assert.ok(parseX(left.shape)>0)
-assert.ok(parseX(right.shape)<0)
+assert.match(left.shape,/^polygon\(/)
+assert.match(right.shape,/^polygon\(/)
+// Polygon coordinates are always constrained to the float's margin box.
+// Mirror directions, not letter orientation: output must flow to the RIGHT.
+const points=(shape:string): Array<{x:number;y:number}> =>
+  Array.from(shape.matchAll(/(-?[\d.]+)px (-?[\d.]+)px/g),
+    m=>({x:Number(m[1]),y:Number(m[2])}))
+const leftPoints=points(left.shape), rightPoints=points(right.shape)
+assert.equal(leftPoints[0].x,left.width)
+assert.equal(rightPoints[0].x,0)
+assert.ok(leftPoints.some(p=>p.x<left.width-80))
+assert.ok(rightPoints.some(p=>p.x>80))
+assert.ok(leftPoints.every(p=>p.x>=0 && p.x<=left.width))
+assert.ok(rightPoints.every(p=>p.x>=0 && p.x<=right.width))
 assert.ok(left.width<=paneLeft.width-175)
 assert.ok(right.width<=paneRight.width-175)
 const leftOutside=computeHaloExclusion('left',
