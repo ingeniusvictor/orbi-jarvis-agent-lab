@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { computeHaloExclusion, haloCircleForCanvas } from '../lib/halo-flow-geometry'
 
 /** UX-04: native CSS shape-outside circle for readable hologram-adjacent text. */
 const ENABLED = import.meta.env.VITE_LUMIA_CURVED_TEXT === '1'
@@ -10,8 +11,12 @@ export function HaloFlow({ side, children }: { side: 'left' | 'right'; children:
     const spacer = element?.querySelector<HTMLElement>('.voice-halo-float')
     const pane = element?.closest<HTMLElement>('.voice-pane')
     if (!element || !spacer || !pane) return
-    pane.style.background = matchMedia('(min-width: 1201px)').matches ? 'none' : ''
-    pane.style.backdropFilter = matchMedia('(min-width: 1201px)').matches ? 'none' : ''
+    const formerBackground = pane.style.background
+    const formerBackdrop = pane.style.backdropFilter
+    const setPaneFinish = (wide: boolean) => {
+      pane.style.background = wide ? 'none' : formerBackground
+      pane.style.backdropFilter = wide ? 'none' : formerBackdrop
+    }
     let frame = 0
     let disposed = false
     let previous = ''
@@ -19,19 +24,20 @@ export function HaloFlow({ side, children }: { side: 'left' | 'right'; children:
       frame = 0
       if (disposed) return
       const rect = element.getBoundingClientRect()
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const radius = Math.min(vh * 0.355, vw * 0.245) + 16
-      const centerX = vw / 2
-      const centerY = vh * 0.49
-      const edge = side === 'left' ? rect.right : rect.left
-      const overlap = side === 'left'
-        ? Math.max(0, edge - (centerX - radius))
-        : Math.max(0, centerX + radius - edge)
-      const width = Math.min(overlap, Math.max(0, rect.width - 175))
-      const visible = vw >= 1201 && rect.width >= 190 &&
-        rect.top < centerY + radius && rect.bottom > centerY - radius && width > 0
-      if (!visible) {
+      const wide = window.innerWidth >= 1201
+      setPaneFinish(wide)
+      const canvas = document.querySelector<HTMLCanvasElement>('canvas.scene')
+      const screenRect = canvas?.getBoundingClientRect() ?? {
+        left: 0, top: 0, width: window.innerWidth, height: window.innerHeight,
+      }
+      const circle = haloCircleForCanvas(screenRect)
+      const childEnds = Array.from(element.children)
+        .filter(child => child !== spacer)
+        .map(child => child.getBoundingClientRect().bottom - rect.top)
+      const exclusion = wide ? computeHaloExclusion(
+        side, rect, circle, Math.max(28, ...childEnds),
+      ) : null
+      if (!exclusion) {
         if (previous !== 'off') {
           spacer.style.width = '0px'
           spacer.style.height = '0px'
@@ -40,16 +46,7 @@ export function HaloFlow({ side, children }: { side: 'left' | 'right'; children:
         }
         return
       }
-      const childEnds = Array.from(element.children)
-        .filter(child => child !== spacer)
-        .map(child => child.getBoundingClientRect().bottom - rect.top)
-      const height = Math.max(0, Math.min(
-        centerY + radius - rect.top, Math.max(28, ...childEnds) + 5, 2 * radius,
-      ))
-      const cx = side === 'left' ? centerX - (rect.right - width) : centerX - rect.left
-      const cy = centerY - rect.top
-      const shape = 'circle(' + radius.toFixed(1) + 'px at ' +
-        cx.toFixed(1) + 'px ' + cy.toFixed(1) + 'px)'
+      const { width, height, shape } = exclusion
       const fingerprint = [width.toFixed(1), height.toFixed(1), shape].join('|')
       if (fingerprint === previous) return
       spacer.style.width = width.toFixed(1) + 'px'
@@ -70,6 +67,8 @@ export function HaloFlow({ side, children }: { side: 'left' | 'right'; children:
       observer.disconnect()
       pane.removeEventListener('scroll', schedule)
       window.removeEventListener('resize', schedule)
+      pane.style.background = formerBackground
+      pane.style.backdropFilter = formerBackdrop
     }
   }, [side])
   return (
