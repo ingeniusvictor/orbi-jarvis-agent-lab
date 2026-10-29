@@ -902,6 +902,16 @@ export default function App() {
       // no key for at all.
       if (e.key === 'Escape') {
         e.preventDefault()
+        if (pushCapture.current) {
+          pushGeneration.current++
+          pushCapture.current.cancel()
+          pushCapture.current = null
+          if (pushTimer.current) clearTimeout(pushTimer.current)
+          pushTimer.current = null
+          setPushRecording(false)
+          setPushBusy(false)
+          releaseMicrophone()
+        }
         if (store.getState().phase !== 'offline') goDormant()
         return
       }
@@ -1001,7 +1011,9 @@ export default function App() {
     setPushBusy(true)
     try {
       const blob = await capture.stop()
-      releaseMicrophone()
+      if (generation === pushGeneration.current && inputModeRef.current === 'push') {
+        releaseMicrophone()
+      }
       const wav = await audioBlobToPcmWav(blob)
       const res = await fetch(`${BRIDGE_HTTP_URL}/stt/local`, {
         method: 'POST',
@@ -1023,7 +1035,10 @@ export default function App() {
         store.getState().setError(err instanceof Error ? err.message : 'Falló el dictado local.')
       }
     } finally {
-      if (generation === pushGeneration.current) setPushBusy(false)
+      if (generation === pushGeneration.current && inputModeRef.current === 'push') {
+        releaseMicrophone()
+        setPushBusy(false)
+      }
     }
   }
 
@@ -1035,18 +1050,33 @@ export default function App() {
     try {
       const capture = await startPushCapture()
       if (inputModeRef.current !== 'push' || generation !== pushGeneration.current) {
+        // Mode switching already released the old microphone lease. Never
+        // tear down a newer CONTINUOUS lease from a stale permission callback.
         capture.cancel()
-        releaseMicrophone()
         return
       }
       pushCapture.current = capture
       setPushRecording(true)
       pushTimer.current = setTimeout(() => { void stopPush() }, PUSH_CAPTURE_MAX_MS)
     } catch (err) {
-      store.getState().setError(err instanceof Error ? err.message : 'No se pudo abrir el micrófono.')
+      if (generation === pushGeneration.current && inputModeRef.current === 'push') {
+        releaseMicrophone()
+        store.getState().setError(err instanceof Error ? err.message : 'No se pudo abrir el micrófono.')
+      }
     } finally {
       if (generation === pushGeneration.current) setPushBusy(false)
     }
+  }
+
+  const cancelPush = () => {
+    pushGeneration.current++
+    if (pushTimer.current) clearTimeout(pushTimer.current)
+    pushTimer.current = null
+    pushCapture.current?.cancel()
+    pushCapture.current = null
+    setPushRecording(false)
+    setPushBusy(false)
+    if (inputModeRef.current === 'push') releaseMicrophone()
   }
 
   const suspendForExperiment = (owner: 'realtime' | 'acoustic'): boolean => {
@@ -1098,6 +1128,7 @@ export default function App() {
           onSend={submitWritten}
           onStartRecording={() => { void startPush() }}
           onStopRecording={() => { void stopPush() }}
+          onCancelRecording={cancelPush}
         />
       ) : import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' && usingBridge && (
         <VisualInput

@@ -17,6 +17,7 @@ type Props = {
   onSend: (text: string, image?: LocalVisualImage) => void
   onStartRecording: () => void
   onStopRecording: () => void
+  onCancelRecording: () => void
 }
 
 const modes: { value: LumiaInputMode; label: string; hint: string }[] = [
@@ -27,7 +28,7 @@ const modes: { value: LumiaInputMode; label: string; hint: string }[] = [
 
 export function LumiaComposer({
   available, mode, recording, busy, visionAvailable,
-  onModeChange, onSend, onStartRecording, onStopRecording,
+  onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
@@ -136,6 +137,10 @@ export function LumiaComposer({
             >
               {recording ? '■ TERMINAR AUDIO' : '● GRABAR AUDIO'}
             </button>
+          )}
+          {mode === 'push' && recording && (
+            <button type="button" className="lumia-composer-action"
+              onClick={onCancelRecording}>CANCELAR</button>
           )}
           <span className="lumia-composer-spacer" />
           <button
