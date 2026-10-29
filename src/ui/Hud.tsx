@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useStore, accentFor, type Phase } from '../store'
 import { Suggestions } from './Suggestions'
+import { HaloFlow } from './HaloFlow'
 import { BladeSweep, Blades } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
@@ -163,6 +164,7 @@ function DecodeText({ text }: { text: string }) {
 
 export function Hud() {
   const phase = useStore((s) => s.phase)
+  const curved = import.meta.env.VITE_LUMIA_CURVED_TEXT === '1'
   const caption = useStore((s) => s.caption)
   const heardLines = useStore((s) => s.heardLines)
   const multiSpeakerLines = useStore((s) => s.multiSpeakerLines)
@@ -323,7 +325,7 @@ export function Hud() {
           thing as a command or an assistant response. */}
       {ui.chrome.transcript && (
         <>
-          <section ref={heardScroll} className="voice-pane voice-pane-heard">
+          <section ref={heardScroll} className={`voice-pane voice-pane-heard${curved ? ' voice-pane-curved' : ''}`}>
             <div className="voice-pane-head">
               <span>ESCUCHANDO</span>
               <span className="voice-pane-sub">
@@ -352,10 +354,12 @@ export function Hud() {
                     {heardLaneLabel(line.kind, line.mode, line.wakeMatched)}
                   </span>
                   <div className="voice-line-body">
-                    <span className="voice-line-time">{timeLabel(line.at)}
-                      {line.sttMs != null ? ` · STT ${line.sttMs} ms` : ''}
-                    </span>
-                    <span className="voice-line-text">{line.text}</span>
+                    <HaloFlow side="left">
+                      <span className="voice-line-time">{timeLabel(line.at)}
+                        {line.sttMs != null ? ` · STT ${line.sttMs} ms` : ''}
+                      </span>
+                      <span className="voice-line-text">{line.text}</span>
+                    </HaloFlow>
                   </div>
                 </motion.div>
               ))}
@@ -365,8 +369,10 @@ export function Hud() {
               <div className="voice-command-final">
                 <span className="voice-command-label">COMANDO A O.R.B.I.A.</span>
                 <span className="voice-command-text">
-                  <span className="voice-line-time">{timeLabel(latestUserTurn.at)}</span>
-                  {latestUserTurn.text}
+                  <HaloFlow side="left">
+                    <span className="voice-line-time">{timeLabel(latestUserTurn.at)}</span>
+                    {latestUserTurn.text}
+                  </HaloFlow>
                 </span>
               </div>
             )}
@@ -386,7 +392,7 @@ export function Hud() {
             </AnimatePresence>
           </section>
 
-          <section ref={replyScroll} className="voice-pane voice-pane-lumi">
+          <section ref={replyScroll} className={`voice-pane voice-pane-lumi${curved ? ' voice-pane-curved' : ''}`}>
             <div className="voice-pane-head">
               <span>RESPUESTA</span>
               <span className="voice-pane-sub">L.U.M.I.A.</span>
@@ -404,6 +410,7 @@ export function Hud() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0 }}
                   >
+                    <HaloFlow side="right">
                     <span className="voice-line-time">{timeLabel(turn.at)} · {turnStateLabel(turn, now)}
                       {turn.at && turn.status === 'pending'
                         ? ` · +${elapsedLabel(turn.at, now)}` : ''}
@@ -443,6 +450,7 @@ export function Hud() {
                       </span>
                     )}
                     {turn.errorNote && <span className="voice-line-error">ERROR: {turn.errorNote}</span>}
+                    </HaloFlow>
                   </motion.div>
                 ))}
             </AnimatePresence>
