@@ -125,6 +125,9 @@ jobs:
       - name: SR-01 ASUS natural voices restoration and Spanish everyday ASR regression
         run: npx tsx scripts/certify-lumia-spanish-reception-sr01.ts
 
+      - name: UX-01 Native typing, image attachment, push and continuous input modes
+        run: npx tsx scripts/certify-lumia-input-modes-ux01.ts
+
       - name: VI-01 Owner-selected photograph in local multimodal Ollama
         run: npx tsx scripts/certify-lumia-visual-input-vi01.ts
 

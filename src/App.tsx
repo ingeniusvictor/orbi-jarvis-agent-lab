@@ -7,6 +7,7 @@ import { Diagnostics } from './ui/Diagnostics'
 import { RealtimeTrial } from './ui/RealtimeTrial'
 import { AcousticLab } from './ui/AcousticLab'
 import { VisualInput } from './ui/VisualInput'
+import { LumiaComposer } from './ui/LumiaComposer'
 import type { LocalVisualImage } from './lib/visual-input'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -44,7 +45,11 @@ import {
   usingBridge,
   type Msg,
 } from './lib/brain'
-import { startAnalyser, micLevel } from './lib/audio'
+import { startAnalyser, micLevel, releaseMicrophone } from './lib/audio'
+import { audioBlobToPcmWav } from './lib/wav'
+import { startPushCapture, PUSH_CAPTURE_MAX_MS, type PushCapture } from './lib/push-to-talk'
+import { initialLumiaInputMode, shouldRunAlwaysOnVoice, type LumiaInputMode } from './lib/input-mode'
+import { BRIDGE_HTTP_URL } from './config'
 import {
   applyVoiceRuntimeSnapshot,
   caps,
@@ -81,6 +86,7 @@ const FOLLOW_UP_MS = 11000
 const FAST_LOCAL_FOLLOWUP = import.meta.env.VITE_LUMIA_FAST_LOCAL_FOLLOWUP === '1'
 const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_GRACE === '1'
 const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INPUT === '1'
+const MULTIMODAL_COMPOSER = import.meta.env.VITE_LUMIA_MULTIMODAL_COMPOSER === '1'
 
 // Owner-side opt-in only. The browser recognizer remains at the certified hold.
 // Never start listening before the actual synthesized-output echo tail expires.
@@ -109,6 +115,15 @@ export default function App() {
   const store = useStore
   const phase = useStore((s) => s.phase)
   const history = useRef<Msg[]>([])
+  const [inputMode, setInputMode] = useState<LumiaInputMode>(
+    initialLumiaInputMode(MULTIMODAL_COMPOSER),
+  )
+  const inputModeRef = useRef<LumiaInputMode>(initialLumiaInputMode(MULTIMODAL_COMPOSER))
+  const [pushRecording, setPushRecording] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
+  const pushCapture = useRef<PushCapture | null>(null)
+  const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pushGeneration = useRef(0)
   const speaker = useRef<ReturnType<typeof createSpeaker> | null>(null)
   const voice = useRef<Voice | null>(null)
 
@@ -318,8 +333,12 @@ export default function App() {
       voiceDiag.postSpeechGuardMs = guardMs
       await new Promise((r) => setTimeout(r, guardMs))
 
-        // Stay open for a natural follow-up once the echo tail is safely gone.
-        if (!stale()) listen(FOLLOW_UP_MS)
+        // Continuous mode keeps the microphone open for conversational
+        // follow-ups. Text and tap-to-talk return to standby without a mic.
+        if (!stale()) {
+          if (shouldRunAlwaysOnVoice(inputModeRef.current)) listen(FOLLOW_UP_MS)
+          else store.getState().setPhase('dormant')
+        }
       }
     }
   }
@@ -328,7 +347,8 @@ export default function App() {
 
   /** What the voice loop should do with what it hears, derived from phase. */
   const mode = (): VoiceMode =>
-    experimentOwner.current ? 'deaf' : voiceModeForPhase(store.getState().phase)
+    experimentOwner.current || !shouldRunAlwaysOnVoice(inputModeRef.current)
+      ? 'deaf' : voiceModeForPhase(store.getState().phase)
 
   const onWake = (trailing: string) => {
     if (experimentOwner.current) return
@@ -484,7 +504,7 @@ export default function App() {
     const generation = ++voiceRestart.current
     voice.current?.stop()
     voice.current = null
-    if (experimentOwner.current) return
+    if (experimentOwner.current || !shouldRunAlwaysOnVoice(inputModeRef.current)) return
 
     const next = await startVoice({
       mode,
@@ -497,7 +517,8 @@ export default function App() {
       onError: onVoiceError,
     })
 
-    if (generation !== voiceRestart.current || experimentOwner.current) {
+    if (generation !== voiceRestart.current || experimentOwner.current ||
+        !shouldRunAlwaysOnVoice(inputModeRef.current)) {
       next.stop()
       return
     }
@@ -710,13 +731,12 @@ export default function App() {
     // getUserMedia stream; speech recognition does not, and gets its own. So a
     // failure here costs the animation and nothing else — saying "voice input
     // is unavailable" was both alarming and untrue.
-    try {
-      await startAnalyser()
-    } catch {
-      console.warn(
-        '[jarvis] no microphone stream — the reactor will not pulse with your ' +
-          'voice. Speech recognition is unaffected.',
-      )
+    if (shouldRunAlwaysOnVoice(inputModeRef.current)) {
+      try {
+        await startAnalyser()
+      } catch {
+        console.warn('[lumia] microphone analyser unavailable; text remains usable.')
+      }
     }
 
     // Ask the bridge which speech engines exist before the loop starts, so the
@@ -740,9 +760,9 @@ export default function App() {
     await intro.end()
     speaker.current = null
 
-    // One voice loop at a time. VRM may replace it later if the user switches
-    // between browser recognition and local Whisper.
-    await restartVoice()
+    // Only the explicitly selected continuous mode opens local STT.
+    // Native text mode boots without requiring getUserMedia permission.
+    if (shouldRunAlwaysOnVoice(inputModeRef.current)) await restartVoice()
 
     store.getState().setPhase('dormant')
   }
@@ -763,6 +783,7 @@ export default function App() {
    */
   useEffect(() => {
     if (phase !== 'offline') return
+    if (MULTIMODAL_COMPOSER && import.meta.env.VITE_LUMIA_CLAP_BOOT !== '1') return
     let live: { stop: () => void } | null = null
     let gone = false
     void listenForClap(() => {
@@ -888,6 +909,8 @@ export default function App() {
       // Space starts a turn without the wake word. Worth using while filming so
       // a missed wake word doesn't cost a take.
       if (e.code !== 'Space' || e.repeat) return
+      if (MULTIMODAL_COMPOSER && inputModeRef.current !== 'continuous' &&
+          store.getState().phase !== 'offline') return
       e.preventDefault()
 
       const phase = store.getState().phase
@@ -915,12 +938,116 @@ export default function App() {
       if (voicePoll.current) clearInterval(voicePoll.current)
       invalidateVoiceRestart()
       voice.current?.stop()
+      pushGeneration.current++
+      if (pushTimer.current) clearTimeout(pushTimer.current)
+      pushCapture.current?.cancel()
+      pushCapture.current = null
+      releaseMicrophone()
       speaker.current?.cancel()
       // The camera must not outlive the page that turned it on.
       hands.disableHands()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /** Input modes are independent of LUMIA's response voice; typing works
+   * even while CONTINUOUS is selected. Only a user gesture opens PUSH audio. */
+  const switchInputMode = (next: LumiaInputMode) => {
+    if (experimentOwner.current || store.getState().phase === 'boot' ||
+        store.getState().phase === 'offline') return
+    if (inputModeRef.current === next) return
+    inputModeRef.current = next
+    setInputMode(next)
+    pushGeneration.current++
+    if (pushTimer.current) clearTimeout(pushTimer.current)
+    pushTimer.current = null
+    pushCapture.current?.cancel()
+    pushCapture.current = null
+    setPushRecording(false)
+    setPushBusy(false)
+    clearIdle()
+    invalidateVoiceRestart()
+    voice.current?.stop()
+    voice.current = null
+    releaseMicrophone()
+    if (store.getState().phase === 'listening') goDormant()
+    if (next === 'continuous') {
+      void startAnalyser().catch(() => {})
+      void restartVoice().catch((err: unknown) => {
+        store.getState().setError(
+          err instanceof Error ? err.message : 'No se pudo iniciar la escucha continua.',
+        )
+      })
+    }
+  }
+
+  const submitWritten = (text: string, image?: LocalVisualImage) => {
+    if (experimentOwner.current) return
+    const phase = store.getState().phase
+    if (phase === 'offline' || phase === 'boot') return
+    silence()
+    interrupt()
+    void respond(text, image)
+  }
+
+  const stopPush = async () => {
+    const capture = pushCapture.current
+    if (!capture || inputModeRef.current !== 'push') return
+    const generation = pushGeneration.current
+    pushCapture.current = null
+    if (pushTimer.current) clearTimeout(pushTimer.current)
+    pushTimer.current = null
+    setPushRecording(false)
+    setPushBusy(true)
+    try {
+      const blob = await capture.stop()
+      releaseMicrophone()
+      const wav = await audioBlobToPcmWav(blob)
+      const res = await fetch(`${BRIDGE_HTTP_URL}/stt/local`, {
+        method: 'POST',
+        headers: { 'content-type': 'audio/wav', 'x-orbia-voice-mode': 'command' },
+        body: wav,
+      })
+      if (!res.ok) throw new Error(`Whisper local no respondió (HTTP ${res.status}).`)
+      const result = await res.json() as { text?: string }
+      if (pushGeneration.current !== generation || inputModeRef.current !== 'push') return
+      const said = (result.text ?? '').trim()
+      if (!said) throw new Error('Whisper no identificó palabras. Prueba de nuevo.')
+      store.getState().pushHeardLine({
+        id: newId(), text: said, provider: 'whisper-local',
+        kind: 'speech', wakeMatched: false, mode: 'command', at: Date.now(),
+      })
+      submitWritten(said)
+    } catch (err) {
+      if (generation === pushGeneration.current) {
+        store.getState().setError(err instanceof Error ? err.message : 'Falló el dictado local.')
+      }
+    } finally {
+      if (generation === pushGeneration.current) setPushBusy(false)
+    }
+  }
+
+  const startPush = async () => {
+    if (inputModeRef.current !== 'push' || experimentOwner.current ||
+        pushCapture.current || pushBusy) return
+    const generation = ++pushGeneration.current
+    setPushBusy(true)
+    try {
+      const capture = await startPushCapture()
+      if (inputModeRef.current !== 'push' || generation !== pushGeneration.current) {
+        capture.cancel()
+        releaseMicrophone()
+        return
+      }
+      pushCapture.current = capture
+      setPushRecording(true)
+      pushTimer.current = setTimeout(() => { void stopPush() }, PUSH_CAPTURE_MAX_MS)
+    } catch (err) {
+      store.getState().setError(err instanceof Error ? err.message : 'No se pudo abrir el micrófono.')
+    } finally {
+      if (generation === pushGeneration.current) setPushBusy(false)
+    }
+  }
 
   const suspendForExperiment = (owner: 'realtime' | 'acoustic'): boolean => {
     if (experimentOwner.current) return false
@@ -960,7 +1087,19 @@ export default function App() {
       <Hud />
       <Boot />
       <Diagnostics />
-      {import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' && usingBridge && (
+      {MULTIMODAL_COMPOSER ? (
+        <LumiaComposer
+          available={phase !== 'offline' && phase !== 'boot' && !activeExperiment}
+          mode={inputMode}
+          recording={pushRecording}
+          busy={pushBusy}
+          visionAvailable={usingBridge && import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1'}
+          onModeChange={switchInputMode}
+          onSend={submitWritten}
+          onStartRecording={() => { void startPush() }}
+          onStopRecording={() => { void stopPush() }}
+        />
+      ) : import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' && usingBridge && (
         <VisualInput
           available={phase !== 'offline' && phase !== 'boot'}
           onAnalyze={(prompt, image) => respond(prompt, image)}

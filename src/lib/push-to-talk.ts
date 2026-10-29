@@ -48,7 +48,7 @@ export async function startPushCapture(): Promise<PushCapture> {
       closed = true
       recorder.onstop = null
       if (recorder.state === 'recording') recorder.stop()
-      rejectResult(new Error('Grabación cancelada.'))
+      resolveResult(new Blob([]))
     },
   }
 }
