@@ -393,7 +393,7 @@ export function Hud() {
             </AnimatePresence>
           </section>
 
-          <section ref={replyScroll} className={`voice-pane voice-pane-lumi${curved ? ' voice-pane-curved' : ''}`}>
+          <section ref={replyScroll} className={`voice-pane voice-pane-lumi${curved ? ' voice-pane-curved' : ''}`} style={curvePaneStyle}>
             <div className="voice-pane-head">
               <span>RESPUESTA</span>
               <span className="voice-pane-sub">L.U.M.I.A.</span>
