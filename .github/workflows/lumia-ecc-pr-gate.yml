@@ -131,6 +131,9 @@ jobs:
       - name: UX-02 One-row translucent glass dock and original input wiring
         run: npx tsx scripts/certify-lumia-glass-dock-ux02.ts
 
+      - name: LT-01 Explicit local multilingual translation and isolation
+        run: node scripts/certify-lumia-translate-lt01.mjs
+
       - name: STT-02 Offline Spanish WER comparison contract
         run: node scripts/certify-stt02-benchmark.mjs
 
