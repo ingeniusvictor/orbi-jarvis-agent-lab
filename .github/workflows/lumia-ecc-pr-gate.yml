@@ -128,6 +128,9 @@ jobs:
       - name: UX-01 Native typing, image attachment, push and continuous input modes
         run: npx tsx scripts/certify-lumia-input-modes-ux01.ts
 
+      - name: STT-02 Offline Spanish WER comparison contract
+        run: node scripts/certify-stt02-benchmark.mjs
+
       - name: VI-01 Owner-selected photograph in local multimodal Ollama
         run: npx tsx scripts/certify-lumia-visual-input-vi01.ts
 
