@@ -10,6 +10,7 @@ export function HaloFlow({ side, children }: { side: 'left' | 'right'; children:
     const spacer = element?.querySelector<HTMLElement>('.voice-halo-float')
     const pane = element?.closest<HTMLElement>('.voice-pane')
     if (!element || !spacer || !pane) return
+    pane.style.background = 'none'
     let frame = 0
     let disposed = false
     let previous = ''
