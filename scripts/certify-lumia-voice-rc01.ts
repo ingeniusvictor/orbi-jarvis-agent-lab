@@ -14,6 +14,8 @@ assert.equal(normalizeContextualEverydaySpeechText('Quiero preparar una repa.'),
 assert.equal(normalizeContextualEverydaySpeechText('Pon una arriba de otra.'), 'Pon una arriba de otra.')
 assert.equal(normalizeContextualEverydaySpeechText('La que está arriba es roja.'), 'La que está arriba es roja.')
 assert.equal(normalizeContextualEverydaySpeechText('Y la comable.'), 'Y la comable.')
+assert.equal(normalizeContextualEverydaySpeechText('Lumi, te pregunte que quiero saber cómo se hacer una haripa.'), 'Lumi, te pregunte que quiero saber cómo se hacer una arepa.')
+assert.equal(normalizeContextualEverydaySpeechText('Lumidime 5 formas de trabajar con IA.'), 'Lumi, dime 5 formas de trabajar con IA.')
 assert.equal(normalizeContextualEverydaySpeechText('[Música]'), '[Música]')
 assert.match(ORBI_SPEECH_INITIAL_PROMPT, /inteligencia artificial local/)
 assert.equal(normalizeTechnicalSpeechText('Lumi, necesito saber cómo trabajar en una y local.'),

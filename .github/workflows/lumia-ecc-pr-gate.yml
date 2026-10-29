@@ -134,6 +134,9 @@ jobs:
       - name: STT-02 Offline Spanish WER comparison contract
         run: node scripts/certify-stt02-benchmark.mjs
 
+      - name: UX-03 Ring-clear response rail and mobile readable fallback
+        run: npx tsx scripts/certify-lumia-halo-ux03.ts
+
       - name: VI-01 Owner-selected photograph in local multimodal Ollama
         run: npx tsx scripts/certify-lumia-visual-input-vi01.ts
 

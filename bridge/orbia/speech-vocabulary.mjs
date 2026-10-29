@@ -48,11 +48,24 @@ export function normalizeContextualEverydaySpeechText(value) {
   return String(value ?? '')
     // "Vamos a hacer una arriba" is an ASR acoustic substitution in the
     // culinary phrase "hacer una arepa"; never alter "ponla arriba".
-    .replace(/\b((?:hacer|preparar|cocinar)\s+una\s+)(?:arriba|repa)\b/giu,
+    .replace(/\b((?:hacer|preparar|cocinar)\s+una\s+)(?:agarriba|arriba|repa|haripa|aripa|arripa)\b/giu,
       '$1arepa')
-    // "¿Cómo hacer una repa venezolana?" omits the leading 'a'.
-    // Require a strong national/regional context for an isolated "repa".
-    .replace(/\brepa\s+(venezolan[ao]|llaner[ao])\b/giu, 'arepa $1')
+    // Regional dish context is strong; isolated names and similar-sounding
+    // terms remain untouched. Command mode only receives vocabulary hints.
+    .replace(/\b(?:repa|haripa|aripa|arripa)\s+(venezolan[ao]|llaner[ao])\b/giu,
+      'arepa $1')
+    // In the owner's transcript "tipos de rellenos ... en la ARIPA" had no
+    // adjacent "venezolana". Require a food cue within the same short clause.
+    .replace(
+      /\b((?:rellenos?|rellen[ao]s?|harina|ma[ií]z|masa|queso|pollo|carne)\b[^.!?]{0,100}?\b(?:una|la|de|en|para)\s+)(?:haripa|aripa|repa|arripa|agarriba)\b/giu,
+      '$1arepa',
+    )
+    // Whisper joins the wake name and an imperative: "Lumidime 5 formas".
+    // Only correct a clause-opening vocative followed by a clear request.
+    .replace(
+      /^(\s*[¿¡]?)lumidime(?=\s+(?:\d+|qu[eé]|c[oó]mo|cu[aá]les|cu[aá]ntos|formas?\b))/iu,
+      '$1Lumi, dime',
+    )
 }
 
 /**

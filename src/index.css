@@ -2712,3 +2712,56 @@ kbd {
   .lumia-composer-icon-button,
   .lumia-composer-send { transition: none; }
 }
+
+
+/* UX-03 — Halo-aware response rail (ASUS reference 1761×831).
+ * The avatar and orbit camera remain unchanged. Reserve the circle plus a
+ * safety gutter in viewport units instead of clipping unreadable glyphs.
+ *
+ * For desktop: right pane's inner edge stays outside the visible outer ring.
+ * On compact screens use an opaque, lower-height readable card rather than
+ * allowing narrow columns to hide letters behind the 3D halo. */
+@media (min-width: 1201px) {
+  .voice-pane-lumi {
+    --lumia-orbit-safe-radius: min(42vh, 31vw);
+    --lumia-orbit-safe-gap: 16px;
+    right: max(72px, 5.5vw);
+    width: min(
+      34vw,
+      520px,
+      calc(
+        50vw - max(72px, 5.5vw)
+        - var(--lumia-orbit-safe-radius) - var(--lumia-orbit-safe-gap)
+      )
+    );
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+/* Use a legible protected reply card when there is no room for a full side
+ * column beside the circle; preserve scroll access and the text itself. */
+@media (max-width: 1200px) {
+  .voice-pane-lumi {
+    right: 18px;
+    left: auto;
+    bottom: 94px;
+    width: min(42vw, 410px);
+    height: min(32vh, 240px);
+    max-height: min(32vh, 240px);
+    box-sizing: border-box;
+    background: rgba(2, 13, 22, .89);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(103, 228, 239, .24);
+    border-radius: 10px;
+  }
+}
+@media (max-width: 650px) {
+  .voice-pane-lumi {
+    right: 9px;
+    bottom: 82px;
+    width: min(54vw, 275px);
+    height: min(25vh, 175px);
+    max-height: min(25vh, 175px);
+    font-size: 11px;
+  }
+}
