@@ -368,12 +368,12 @@ export function Hud() {
             {latestUserTurn && (
               <div className="voice-command-final">
                 <span className="voice-command-label">COMANDO A O.R.B.I.A.</span>
-                <span className="voice-command-text">
+                <div className="voice-command-text">
                   <HaloFlow side="left">
                     <span className="voice-line-time">{timeLabel(latestUserTurn.at)}</span>
                     {latestUserTurn.text}
                   </HaloFlow>
-                </span>
+                </div>
               </div>
             )}
 
