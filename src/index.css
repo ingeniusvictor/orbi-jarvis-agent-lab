@@ -2765,3 +2765,60 @@ kbd {
     font-size: 11px;
   }
 }
+
+
+/* LT-01: one compact language icon; controls appear only while active.
+ * The single-row UX-02 glass dock remains unchanged in size and position. */
+.lumia-composer-translate.is-active {
+  color: #8cffe6;
+  background: rgba(15, 165, 158, .2);
+  border-color: rgba(128, 255, 223, .34);
+  box-shadow: 0 0 13px rgba(72, 239, 211, .14);
+}
+.lumia-translator-options {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 7px;
+  max-width: calc(100vw - 24px);
+  padding: 7px 10px;
+  background: rgba(1, 17, 28, .84);
+  border: 1px solid rgba(99, 224, 225, .40);
+  border-radius: 14px;
+  box-shadow: 0 5px 24px rgba(0, 0, 0, .25);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  font: 11px 'Chakra Petch', sans-serif;
+}
+.lumia-translator-title { color: #9cece5; font-size: 10px; letter-spacing: .05em; }
+.lumia-translator-options select {
+  max-width: 148px;
+  color: #e8ffff;
+  background: #093344;
+  border: 1px solid rgba(120, 220, 230, .4);
+  border-radius: 7px;
+  padding: 6px;
+  font: inherit;
+}
+.lumia-translator-swap {
+  color: #b5ffff;
+  border: 0;
+  border-radius: 50%;
+  padding: 5px 8px;
+  background: rgba(0, 130, 164, .15);
+  cursor: pointer;
+}
+.lumia-translator-options select:focus-visible, .lumia-translator-swap:focus-visible {
+  outline: 2px solid #9ef4ef;
+  outline-offset: 2px;
+}
+@media (max-width: 650px) {
+  .lumia-translator-options { gap: 4px; padding: 6px; right: 0; }
+  .lumia-translator-title { width: 100%; text-align: right; }
+  .lumia-translator-options select { max-width: 126px; font-size: 10px; }
+  .lumia-composer-translate { width: 30px; }
+}
