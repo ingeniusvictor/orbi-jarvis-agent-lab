@@ -52,6 +52,9 @@ rem Legacy clap ignition would open a microphone before text mode is chosen.
 set "VITE_LUMIA_CLAP_BOOT=0"
 rem UX-04 opt-in: circular transcript flow on desktop, reversible to UX-03.
 set "VITE_LUMIA_CURVED_TEXT=1"
+rem LT-01 explicit icon, text-only local translation: no automatic language detection.
+set "VITE_LUMIA_TRANSLATE_LT01=1"
+set "ORBIA_LUMIA_TRANSLATE_ENABLED=1"
 
 echo.
 echo ============================================================
