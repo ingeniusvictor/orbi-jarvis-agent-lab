@@ -10,13 +10,13 @@ export function validateTranslation(input) {
   const text = String(input?.text ?? '').trim()
   if (!Object.hasOwn(LANGUAGES, source) || !Object.hasOwn(LANGUAGES, target) || source === target)
     throw new Error('Selecciona dos idiomas diferentes.')
-  if (!text || text.length > 4000 || /[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/.test(text))
+  if (!text || text.length > 4000 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(text))
     throw new Error('El texto debe tener entre 1 y 4000 caracteres.')
   return Object.freeze({ source, target, text })
 }
 export async function translateLocalText(request, { ollamaUrl, model, signal } = {}) {
   const { source, target, text } = validateTranslation(request)
-  if (!ollamaUrl || !/^https?:\\/\\/(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::\\d+)?$/i.test(ollamaUrl))
+  if (!ollamaUrl || !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(ollamaUrl))
     throw new Error('La traducción requiere Ollama local.')
   if (!model || typeof model !== 'string') throw new Error('No hay modelo local seleccionado.')
   const res = await fetch(ollamaUrl + '/api/chat', {
