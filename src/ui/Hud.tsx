@@ -164,7 +164,7 @@ function DecodeText({ text }: { text: string }) {
 
 export function Hud() {
   const phase = useStore((s) => s.phase)
-  const curved = import.meta.env.VITE_LUMIA_CURVED_TEXT === '1'
+  const curved = import.meta.env.VITE_LUMIA_CURVED_TEXT === '1' && window.innerWidth > 1200
   const curvePaneStyle = curved ? { width: 'min(44vw, 760px)' } : undefined
   const caption = useStore((s) => s.caption)
   const heardLines = useStore((s) => s.heardLines)
