@@ -50,6 +50,8 @@ rem Default text does not need always-open microphone; user opts in to voice.
 set "VITE_LUMIA_MULTIMODAL_COMPOSER=1"
 rem Legacy clap ignition would open a microphone before text mode is chosen.
 set "VITE_LUMIA_CLAP_BOOT=0"
+rem UX-04 opt-in: circular transcript flow on desktop, reversible to UX-03.
+set "VITE_LUMIA_CURVED_TEXT=1"
 
 echo.
 echo ============================================================
