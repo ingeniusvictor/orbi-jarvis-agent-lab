@@ -74,7 +74,7 @@ assert.match(lab, /document\.addEventListener\('visibilitychange', closeOnHidden
 assert.match(lab, /if \(!activeRef\.current \|\| disposedRef\.current\) return/)
 assert.match(lab, /disposedRef\.current = true/)
 assert.match(app, /VITE_LUMIA_ACOUSTIC_LAB === '1'/)
-assert.match(app, /experimentOwner\.current \? 'deaf'/)
+assert.match(app, /experimentOwner\.current \|\| !shouldRunAlwaysOnVoice\(inputModeRef\.current\)/)
 assert.match(app, /if \(experimentOwner\.current\) return/)
 assert.match(app, /suspendForExperiment\('realtime'\)/)
 assert.match(app, /suspendForExperiment\('acoustic'\)/)
