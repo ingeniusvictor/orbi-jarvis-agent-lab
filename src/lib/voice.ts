@@ -1,5 +1,5 @@
 import { BRIDGE_HTTP_URL, SPEECH_LANG } from '../config'
-import { getMic } from './audio'
+import { getMic, microphoneAutoGainObserved } from './audio'
 import {
   speakerOutputActive,
   speakingEchoReference,
@@ -219,6 +219,7 @@ const BROWSER_MAX_HOLD_MS = 30000
 /** Experiment off by default; never changes Voice Gate or action authority. */
 const ADAPTIVE_TURNS_ENABLED = import.meta.env.VITE_LUMIA_ADAPTIVE_TURNS === '1'
 const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_GRACE === '1'
+const NEAR_FIELD_FOCUS_ENABLED = import.meta.env.VITE_LUMIA_NEAR_FIELD_FOCUS === '1'
 const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INPUT === '1'
 
 /**
@@ -511,6 +512,11 @@ export const diag = {
   longQuestionOptIn: LONG_QUESTION_INPUT_ENABLED,
   longQuestionActive: false,
   longQuestionParts: 0,
+  nearFieldFocus: NEAR_FIELD_FOCUS_ENABLED,
+  microphoneAgcActual: null as boolean | null,
+  microphoneRms: 0,
+  noiseFloorRms: 0,
+  triggerRms: 0,
 }
 
 /** Record why a transcript went nowhere. Silence always has a reason; this is
@@ -950,6 +956,8 @@ async function startVadBridgeVoice(
   }
 
   vad = await startVad({
+    captureMode: () => h.mode(),
+    nearFieldFocus: NEAR_FIELD_FOCUS_ENABLED && provider === 'local',
     adaptiveEndpointing: () =>
       ADAPTIVE_TURNS_ENABLED && provider === 'local' && h.mode() === 'command',
     onEndpointWindow: (windowMs) => { diag.acousticWindowMs = windowMs },
@@ -1019,6 +1027,7 @@ async function startVadBridgeVoice(
     },
   })
   diag.running = vad.live()
+  diag.microphoneAgcActual = microphoneAutoGainObserved()
 
   // Raise the trigger bar exactly while he speaks. The mode is polled rather
   // than pushed because nothing in the app pushes phase changes here, and a
@@ -1030,6 +1039,12 @@ async function startVadBridgeVoice(
       mode === 'guard' &&
       (speakerOutputActive() || Boolean(speakingNow()))
     vad?.setGuard(mode === 'guard')
+    const acoustic = vad?.meter()
+    if (acoustic) {
+      diag.microphoneRms = Math.round(acoustic.energy * 10000) / 10000
+      diag.noiseFloorRms = Math.round(acoustic.floor * 10000) / 10000
+      diag.triggerRms = Math.round(acoustic.threshold * 10000) / 10000
+    }
     // He has stood down — by Escape, by the idle timeout, or by dropping back
     // to the wake word. Anything half-said belonged to a conversation that is
     // over, and letting the hold expire later would open the next one with a

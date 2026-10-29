@@ -6,6 +6,12 @@
 
 import { createSharedMic } from './mic-lease'
 
+// ASUS-only experiment. Chrome's AGC can raise distant speech as if it were
+// close to the laptop. Keep noise suppression and echo cancellation enabled.
+const NEAR_FIELD_FOCUS = import.meta.env.VITE_LUMIA_NEAR_FIELD_FOCUS === '1'
+let observedAutoGain: boolean | null = null
+export const microphoneAutoGainObserved = () => observedAutoGain
+
 let ctx: AudioContext | null = null
 let analyser: AnalyserNode | null = null
 let analyserStream: MediaStream | null = null
@@ -20,13 +26,16 @@ const sharedMic = createSharedMic(() =>
     audio: {
       echoCancellation: true,
       noiseSuppression: true,
-      autoGainControl: true,
+      autoGainControl: !NEAR_FIELD_FOCUS,
     },
   }),
 )
 
 export async function getMic(): Promise<MediaStream> {
-  return sharedMic()
+  const stream = await sharedMic()
+  const actual = stream.getAudioTracks()[0]?.getSettings?.().autoGainControl
+  observedAutoGain = typeof actual === 'boolean' ? actual : null
+  return stream
 }
 
 export function startAnalyser(): Promise<void> {

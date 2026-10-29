@@ -1,4 +1,5 @@
 import { getMic } from './audio'
+import { focusedVadThreshold, focusedVadOnsetMs, type FocusMode } from './near-field-focus'
 import { BASELINE_VAD_SILENCE_MS, chooseAcousticSilenceMs } from './adaptive-turn'
 
 /**
@@ -32,6 +33,9 @@ export type VadHandlers = {
   /** Optional upstream mute gate. When true no segment is recorded at all.
    * Used by local Whisper while L.U.M.I.A.'s loudspeaker output is audible. */
   suppress?: () => boolean
+  /** Acoustic mode snapshot. Does not grant wake/command permissions. */
+  captureMode?: () => FocusMode
+  nearFieldFocus?: boolean
   /** Owner-enabled experiment; only active for locally captured command audio. */
   adaptiveEndpointing?: () => boolean
   /** Observe the final silence window without exposing any captured audio. */
@@ -238,7 +242,14 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
       floor = Math.max(floor, 0.0015)
     }
 
-    threshold = floor * TRIGGER_OVER_FLOOR * (guard ? GUARD_BOOST : 1)
+    const baseline = floor * TRIGGER_OVER_FLOOR * (guard ? GUARD_BOOST : 1)
+    const acousticMode = h.captureMode?.() ?? 'guard'
+    threshold = focusedVadThreshold(
+      baseline, acousticMode, h.nearFieldFocus === true, guard,
+    )
+    const onsetMs = focusedVadOnsetMs(
+      START_MS, acousticMode, h.nearFieldFocus === true, guard,
+    )
     const release = threshold * RELEASE_RATIO
     const now = performance.now()
 
@@ -250,7 +261,7 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
           // a blip, the recorder is discarded and nothing was lost.
           armedAt = now
           startRecorder()
-        } else if (now - armedAt >= START_MS) {
+        } else if (now - armedAt >= onsetMs) {
           // Confirmed. This is the moment barge-in fires.
           speaking = true
           speechStartedAt = armedAt

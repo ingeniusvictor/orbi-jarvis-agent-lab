@@ -119,6 +119,9 @@ jobs:
       - name: LC-01 ASUS long local question capture and turn assembly
         run: npx tsx scripts/certify-lumia-long-question-lc01.ts
 
+      - name: NF-01 Local near-field acoustic focus and legacy isolation
+        run: npx tsx scripts/certify-lumia-near-field-focus-nf01.ts
+
       - name: VI-01 Owner-selected photograph in local multimodal Ollama
         run: npx tsx scripts/certify-lumia-visual-input-vi01.ts
 

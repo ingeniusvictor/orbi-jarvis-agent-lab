@@ -38,6 +38,8 @@ rem ASUS pilot: preserve already-started COMMAND audio while Whisper decodes (on
 set "VITE_LUMIA_ACTIVE_COMMAND_GRACE=1"
 rem Long local spoken questions: bounded follow-on VAD segments, not always-on listening.
 set "VITE_LUMIA_LONG_QUESTION_INPUT=1"
+rem ASUS opt-in near-field mic focus: AGC request OFF, conservative wake VAD.
+set "VITE_LUMIA_NEAR_FIELD_FOCUS=1"
 set "VITE_LUMIA_FAST_LOCAL_FOLLOWUP=0"
 set "VITE_LUMIA_STREAMING_TTS=0"
 

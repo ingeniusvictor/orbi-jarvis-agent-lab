@@ -49,6 +49,11 @@ type VoiceDiag = {
   longQuestionOptIn: boolean
   longQuestionActive: boolean
   longQuestionParts: number
+  nearFieldFocus: boolean
+  microphoneAgcActual: boolean | null
+  microphoneRms: number
+  noiseFloorRms: number
+  triggerRms: number
 }
 
 type TtsDiag = {
@@ -158,6 +163,10 @@ export function Diagnostics() {
       <Row k="household ignored" v={String(v.householdIgnored ?? 0)} />
       <Row k="LUMIA self-echo" v={String(v.selfEchoes ?? 0)} />
       <Row k="speaker shield" v={v.speakerShield ? 'ACTIVE' : 'standby'} />
+      <Row k="near-field mic focus" v={v.nearFieldFocus ? 'ON · ASUS pilot' : 'OFF · legacy'} />
+      <Row k="mic auto gain (actual)" v={v.microphoneAgcActual == null ? 'not exposed by browser' : v.microphoneAgcActual ? 'ON' : 'OFF'} />
+      <Row k="mic RMS / ambient / trigger"
+        v={`${(v.microphoneRms ?? 0).toFixed(4)} / ${(v.noiseFloorRms ?? 0).toFixed(4)} / ${(v.triggerRms ?? 0).toFixed(4)}`} />
       <Row k="non-speech ignored" v={String(v.nonSpeech ?? 0)} />
       <Row k="duplicate STT" v={String(v.duplicates ?? 0)} />
       <Row k="STT queue" v={`${v.queueDepth ?? 0} (max ${v.maxQueueDepth ?? 0})`} bad={(v.queueDepth ?? 0) > 2} />
