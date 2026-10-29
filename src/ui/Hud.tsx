@@ -326,7 +326,7 @@ export function Hud() {
           thing as a command or an assistant response. */}
       {ui.chrome.transcript && (
         <>
-          <section ref={heardScroll} className={`voice-pane voice-pane-heard${curved ? ' voice-pane-curved' : ''}`}>
+          <section ref={heardScroll} className={`voice-pane voice-pane-heard${curved ? ' voice-pane-curved' : ''}`} style={curvePaneStyle}>
             <div className="voice-pane-head">
               <span>ESCUCHANDO</span>
               <span className="voice-pane-sub">
