@@ -13,6 +13,7 @@ import { promisify } from 'node:util'
 import { localVoicePaths, probeLocalVoiceCapabilities } from './local-voice-probe.mjs'
 import {
   normalizeTechnicalSpeechText,
+  normalizeContextualEverydaySpeechText,
   ORBI_SPEECH_INITIAL_PROMPT,
 } from './speech-vocabulary.mjs'
 import { transcribeWithWhisperServer } from './whisper-server-runtime.mjs'
@@ -84,7 +85,9 @@ export async function transcribeLocalWav(
     }).catch(() => null)
 
     if (persistent?.text) {
-      const text = normalizeTechnicalSpeechText(persistent.text)
+      const text = normalizeContextualEverydaySpeechText(
+        normalizeTechnicalSpeechText(persistent.text),
+      )
       if (!text) {
         fail('VOICE_STT_EMPTY_RESULT', 'Local Whisper produced an empty transcription.')
       }
@@ -148,7 +151,7 @@ export async function transcribeLocalWav(
       fail('VOICE_STT_FAILED', 'Local Whisper transcription failed.')
     }
 
-    const text = normalizeTechnicalSpeechText(
+    const text = normalizeContextualEverydaySpeechText(normalizeTechnicalSpeechText(
       String(
         await readFile(`${outputPrefix}.txt`, 'utf8').catch(() =>
           fail('VOICE_STT_FAILED', 'Local Whisper transcription output was unavailable.'),
@@ -156,7 +159,7 @@ export async function transcribeLocalWav(
       )
         .replace(/\s+/g, ' ')
         .trim(),
-    )
+    ))
 
     if (!text) {
       fail('VOICE_STT_EMPTY_RESULT', 'Local Whisper produced an empty transcription.')

@@ -122,6 +122,9 @@ jobs:
       - name: NF-01 Local near-field acoustic focus and legacy isolation
         run: npx tsx scripts/certify-lumia-near-field-focus-nf01.ts
 
+      - name: SR-01 ASUS natural voices restoration and Spanish everyday ASR regression
+        run: npx tsx scripts/certify-lumia-spanish-reception-sr01.ts
+
       - name: VI-01 Owner-selected photograph in local multimodal Ollama
         run: npx tsx scripts/certify-lumia-visual-input-vi01.ts
 

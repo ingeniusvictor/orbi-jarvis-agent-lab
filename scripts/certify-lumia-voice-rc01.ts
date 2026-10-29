@@ -3,10 +3,18 @@ import { readFileSync } from 'node:fs'
 import { createOllamaReplyGate } from '../bridge/orbia/ollama-json-stream.mjs'
 import {
   normalizeTechnicalSpeechText,
+  normalizeContextualEverydaySpeechText,
   ORBI_SPEECH_INITIAL_PROMPT,
 } from '../bridge/orbia/speech-vocabulary.mjs'
 
 assert.match(ORBI_SPEECH_INITIAL_PROMPT, /IA local/)
+assert.equal(normalizeContextualEverydaySpeechText('Vamos a hacer una arriba.'), 'Vamos a hacer una arepa.')
+assert.equal(normalizeContextualEverydaySpeechText('¿Cómo hacer una repa venezolana?'), '¿Cómo hacer una arepa venezolana?')
+assert.equal(normalizeContextualEverydaySpeechText('Quiero preparar una repa.'), 'Quiero preparar una arepa.')
+assert.equal(normalizeContextualEverydaySpeechText('Pon una arriba de otra.'), 'Pon una arriba de otra.')
+assert.equal(normalizeContextualEverydaySpeechText('La que está arriba es roja.'), 'La que está arriba es roja.')
+assert.equal(normalizeContextualEverydaySpeechText('Y la comable.'), 'Y la comable.')
+assert.equal(normalizeContextualEverydaySpeechText('[Música]'), '[Música]')
 assert.match(ORBI_SPEECH_INITIAL_PROMPT, /inteligencia artificial local/)
 assert.equal(normalizeTechnicalSpeechText('Lumi, necesito saber cómo trabajar en una y local.'),
   'Lumi, necesito saber cómo trabajar en IA local.')

@@ -38,8 +38,11 @@ rem ASUS pilot: preserve already-started COMMAND audio while Whisper decodes (on
 set "VITE_LUMIA_ACTIVE_COMMAND_GRACE=1"
 rem Long local spoken questions: bounded follow-on VAD segments, not always-on listening.
 set "VITE_LUMIA_LONG_QUESTION_INPUT=1"
-rem ASUS opt-in near-field mic focus: AGC request OFF, conservative wake VAD.
-set "VITE_LUMIA_NEAR_FIELD_FOCUS=1"
+rem SR-01 rollback: NF-01 was too strict for normal voices, especially a second
+rem person nearby. Restore Chrome automatic mic gain + baseline VAD; preserve
+rem wake-word/household guard and LC-01 long-question reception.
+rem NF-01 can still be tested deliberately by changing 0 to 1.
+set "VITE_LUMIA_NEAR_FIELD_FOCUS=0"
 set "VITE_LUMIA_FAST_LOCAL_FOLLOWUP=0"
 set "VITE_LUMIA_STREAMING_TTS=0"
 

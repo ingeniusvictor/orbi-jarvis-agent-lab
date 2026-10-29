@@ -39,6 +39,23 @@ export const ORBI_SPEECH_INITIAL_PROMPT =
 
 
 /**
+ * SR-01: very narrow corrections for everyday Spanish phrases observed in the
+ * owner's local Whisper logs. This is NOT general spellcheck and must not
+ * replace spatial "arriba", a person's name or unrelated conversation.
+ * Intentionally does not change the wake word or create a new request.
+ */
+export function normalizeContextualEverydaySpeechText(value) {
+  return String(value ?? '')
+    // "Vamos a hacer una arriba" is an ASR acoustic substitution in the
+    // culinary phrase "hacer una arepa"; never alter "ponla arriba".
+    .replace(/\b((?:hacer|preparar|cocinar)\s+una\s+)(?:arriba|repa)\b/giu,
+      '$1arepa')
+    // "¿Cómo hacer una repa venezolana?" omits the leading 'a'.
+    // Require a strong national/regional context for an isolated "repa".
+    .replace(/\brepa\s+(venezolan[ao]|llaner[ao])\b/giu, 'arepa $1')
+}
+
+/**
  * Conservative post-ASR cleanup for high-confidence technical acronym errors.
  *
  * This is intentionally tiny. We only normalize variants observed in local
