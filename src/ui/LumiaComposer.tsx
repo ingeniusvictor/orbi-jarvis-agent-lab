@@ -12,6 +12,7 @@ import {
   type LocalVisualImage,
 } from '../lib/visual-input'
 import type { LumiaInputMode } from '../lib/input-mode'
+import { TRANSLATION_CHOICES, type TranslationLanguage } from '../lib/translate'
 
 type Props = {
   available: boolean
@@ -19,6 +20,8 @@ type Props = {
   recording: boolean
   busy: boolean
   visionAvailable: boolean
+  translationAvailable: boolean
+  onTranslate: (text: string, source: TranslationLanguage, target: TranslationLanguage) => void
   onModeChange: (mode: LumiaInputMode) => void
   onSend: (text: string, image?: LocalVisualImage) => void
   onStartRecording: () => void
@@ -26,7 +29,7 @@ type Props = {
   onCancelRecording: () => void
 }
 
-type IconName = 'image' | 'mic' | 'wave' | 'send' | 'stop' | 'close' | 'cancel'
+type IconName = 'image' | 'mic' | 'wave' | 'send' | 'stop' | 'close' | 'cancel' | 'translate'
 function DockIcon({ name }: { name: IconName }) {
   const common = {
     width: 20, height: 20, viewBox: '0 0 24 24',
@@ -34,6 +37,12 @@ function DockIcon({ name }: { name: IconName }) {
     strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
     'aria-hidden': true as const, focusable: false as const,
   }
+  if (name === 'translate') return (
+    <svg {...common}>
+      <path d="M3 6h12M9 3v3M5 10c2 3 5 5 9 6M13 10c-2 4-5 7-9 8" />
+      <path d="M15 21l3-8 3 8M16.1 18h3.8" />
+    </svg>
+  )
   if (name === 'image') return (
     <svg {...common}>
       <rect x="3" y="3" width="18" height="18" rx="3" />
@@ -71,13 +80,16 @@ function DockIcon({ name }: { name: IconName }) {
 }
 
 export function LumiaComposer({
-  available, mode, recording, busy, visionAvailable,
+  available, mode, recording, busy, visionAvailable, translationAvailable, onTranslate,
   onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
   const [preparing, setPreparing] = useState(false)
   const [error, setError] = useState('')
+  const [translateEnabled, setTranslateEnabled] = useState(false)
+  const [sourceLanguage, setSourceLanguage] = useState<TranslationLanguage>('zh')
+  const [targetLanguage, setTargetLanguage] = useState<TranslationLanguage>('es')
   const photoInput = useRef<HTMLInputElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   if (!available) return null
@@ -91,11 +103,15 @@ export function LumiaComposer({
   const send = async () => {
     const text = draft.trim()
     if ((!text && !photo) || preparing || busy || recording) return
+    if (translateEnabled && (!text || photo || sourceLanguage === targetLanguage)) {
+      setError('Escribe un texto y selecciona dos idiomas diferentes.'); return
+    }
     setPreparing(true)
     setError('')
     try {
       const image = photo ? await prepareVisualImage(photo) : undefined
-      onSend(text || 'Describe esta imagen en español y señala lo que no se pueda comprobar.', image)
+      if (translateEnabled) onTranslate(text, sourceLanguage, targetLanguage)
+      else onSend(text || 'Describe esta imagen en español y señala lo que no se pueda comprobar.', image)
       setDraft('')
       setPhoto(null)
       if (photoInput.current) photoInput.current.value = ''
@@ -151,7 +167,7 @@ export function LumiaComposer({
           className={'lumia-composer-icon-button lumia-composer-attach' + (photo ? ' is-attached' : '')}
           aria-label={photo ? 'Cambiar fotografía adjunta' : 'Adjuntar imagen para LUMIA'}
           title={visionAvailable ? 'Adjuntar foto JPG, PNG o WebP · análisis local' : 'Visión local no disponible'}
-          disabled={!visionAvailable || preparing || recording}
+          disabled={!visionAvailable || preparing || recording || translateEnabled}
           onClick={() => photoInput.current?.click()}
         ><DockIcon name="image" /></button>
 
@@ -159,7 +175,7 @@ export function LumiaComposer({
           ref={textarea}
           className="lumia-composer-text"
           aria-label="Escribe tu mensaje a LUMIA"
-          placeholder="Pregunta algo a Lumi…"
+          placeholder={translateEnabled ? 'Escribe el texto que deseas traducir…' : 'Pregunta algo a Lumi…'}
           rows={1}
           maxLength={6000}
           value={draft}
@@ -184,7 +200,7 @@ export function LumiaComposer({
           aria-label={recording ? 'Detener y transcribir dictado' : 'Dictar mensaje por micrófono'}
           aria-pressed={recording}
           title={recording ? 'Detener grabación y transcribir' : 'Dictar una vez · pulsa para comenzar y terminar'}
-          disabled={busy || preparing}
+          disabled={busy || preparing || translateEnabled}
           onClick={toggleDictation}
         ><DockIcon name={recording ? 'stop' : 'mic'} /></button>
 
@@ -194,20 +210,59 @@ export function LumiaComposer({
           aria-label={mode === 'continuous' ? 'Desactivar micrófono abierto' : 'Activar micrófono abierto'}
           aria-pressed={mode === 'continuous'}
           title={mode === 'continuous' ? 'Desactivar escucha continua' : 'Escucha continua · di Lumi para hablar'}
-          disabled={busy || recording || preparing}
+          disabled={busy || recording || preparing || translateEnabled}
           onClick={toggleContinuous}
         ><DockIcon name="wave" /></button>
+
+        <button
+          type="button"
+          className={'lumia-composer-icon-button lumia-composer-translate' + (translateEnabled ? ' is-active' : '')}
+          aria-label={translateEnabled ? 'Desactivar LUMIA Translate' : 'Activar LUMIA Translate'}
+          aria-pressed={translateEnabled}
+          title={translateEnabled ? 'Volver al chat normal en español' : 'Activar traducción local por texto'}
+          disabled={!translationAvailable || recording || busy || preparing}
+          onClick={() => {
+            setError('')
+            if (!translateEnabled) {
+              if (mode !== 'text') onModeChange('text')
+              setPhoto(null)
+              if (photoInput.current) photoInput.current.value = ''
+            }
+            setTranslateEnabled(!translateEnabled)
+          }}
+        ><DockIcon name="translate" /></button>
 
         <button
           type="button"
           className="lumia-composer-send"
           aria-label="Enviar mensaje"
           title="Enviar · Enter"
-          disabled={preparing || busy || recording || (!draft.trim() && !photo)}
+          disabled={preparing || busy || recording || (!draft.trim() && !photo) ||
+            (translateEnabled && (!draft.trim() || sourceLanguage === targetLanguage))}
           onClick={() => void send()}
         ><DockIcon name="send" /></button>
       </div>
 
+      {translateEnabled && (
+        <div className="lumia-translator-options" role="group" aria-label="Idiomas de LUMIA Translate">
+          <span className="lumia-translator-title">TRADUCCIÓN LOCAL · TEXTO</span>
+          <select aria-label="Idioma de origen" value={sourceLanguage}
+            onChange={(event) => setSourceLanguage(event.target.value as TranslationLanguage)}>
+            {TRANSLATION_CHOICES.map((language) => (
+              <option key={language.value} value={language.value}>{language.label}</option>
+            ))}
+          </select>
+          <button type="button" className="lumia-translator-swap" aria-label="Intercambiar idiomas"
+            title="Intercambiar idiomas"
+            onClick={() => { setSourceLanguage(targetLanguage); setTargetLanguage(sourceLanguage) }}>⇄</button>
+          <select aria-label="Idioma de destino" value={targetLanguage}
+            onChange={(event) => setTargetLanguage(event.target.value as TranslationLanguage)}>
+            {TRANSLATION_CHOICES.map((language) => (
+              <option key={language.value} value={language.value}>{language.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {(photo || error || recording || busy) && (
         <div className="lumia-composer-feedback" aria-live="polite">
           {photo && (
