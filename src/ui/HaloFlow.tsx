@@ -11,6 +11,7 @@ export function HaloFlow({ side, children }: { side: 'left' | 'right'; children:
     const pane = element?.closest<HTMLElement>('.voice-pane')
     if (!element || !spacer || !pane) return
     pane.style.background = matchMedia('(min-width: 1201px)').matches ? 'none' : ''
+    pane.style.backdropFilter = matchMedia('(min-width: 1201px)').matches ? 'none' : ''
     let frame = 0
     let disposed = false
     let previous = ''
