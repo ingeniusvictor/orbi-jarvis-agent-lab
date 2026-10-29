@@ -2519,3 +2519,123 @@ kbd {
   color: #ffb2ac;
   overflow-wrap: anywhere;
 }
+
+
+/* UX-01: premium multimodal chat dock. Deliberately outside the hologram scene. */
+.lumia-composer {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 24;
+  width: min(620px, calc(100vw - 32px));
+  padding: 12px 14px 10px;
+  border: 1px solid rgba(0, 226, 255, .46);
+  border-radius: 17px;
+  background: linear-gradient(160deg, rgba(4, 21, 36, .97), rgba(1, 9, 23, .97));
+  box-shadow: 0 8px 38px rgba(0, 0, 0, .58), 0 0 26px rgba(0, 200, 255, .08);
+  color: #ddfaff;
+  font-family: 'Chakra Petch', sans-serif;
+  pointer-events: auto;
+}
+.lumia-composer-top, .lumia-composer-actions, .lumia-composer-attachment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.lumia-composer-top {
+  margin-bottom: 9px;
+  font-size: 10px;
+  letter-spacing: .1em;
+}
+.lumia-composer-name { color: #82dbeb; font-weight: 700; }
+.lumia-composer-privacy { color: #96d6c9; font-size: 9px; }
+.lumia-composer-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.lumia-composer-mode, .lumia-composer-action, .lumia-composer-send {
+  min-height: 32px;
+  border-radius: 7px;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .055em;
+  cursor: pointer;
+  color: #b8e9f0;
+  border: 1px solid rgba(102, 207, 231, .32);
+  background: rgba(10, 36, 54, .68);
+}
+.lumia-composer-mode.is-active {
+  color: white;
+  border-color: #50e1ff;
+  background: rgba(0, 152, 196, .3);
+  box-shadow: inset 0 0 15px rgba(0, 195, 245, .11);
+}
+.lumia-composer-mode:disabled, .lumia-composer-action:disabled,
+.lumia-composer-send:disabled { opacity: .45; cursor: not-allowed; }
+.lumia-composer-entry {
+  padding: 7px;
+  border: 1px solid rgba(72, 170, 190, .38);
+  border-radius: 10px;
+  background: rgba(1, 12, 23, .9);
+}
+.lumia-composer-entry textarea {
+  width: 100%;
+  display: block;
+  resize: vertical;
+  min-height: 48px;
+  max-height: 170px;
+  outline: none;
+  font: 13px/1.45 system-ui, sans-serif;
+  color: #ecfdff;
+  border: none;
+  background: transparent;
+}
+.lumia-composer-entry textarea::placeholder { color: #79a4b2; }
+.lumia-composer-entry textarea:focus-visible { outline: 1px solid #52d9ed; outline-offset: 3px; }
+.lumia-composer-file-input { display: none; }
+.lumia-composer-action { min-height: 31px; }
+.lumia-composer-action.is-recording {
+  color: #fff1e9;
+  background: rgba(170, 39, 28, .55);
+  border-color: #ff937f;
+}
+.lumia-composer-send {
+  color: #061921;
+  background: linear-gradient(130deg, #5bebff, #a3f9fa);
+  border-color: #9af8ff;
+}
+.lumia-composer-spacer { flex: 1; }
+.lumia-composer-attachment {
+  margin-top: 7px;
+  padding: 6px 10px;
+  color: #a7e7f1;
+  border-radius: 6px;
+  background: rgba(16, 82, 94, .25);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.lumia-composer-attachment button {
+  color: white;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 17px;
+}
+.lumia-composer-hint {
+  font-size: 10px;
+  line-height: 1.35;
+  color: #87b7c3;
+  margin: 8px 1px 0;
+}
+.lumia-composer-error { margin-top: 7px; font-size: 11px; color: #ffa6a0; }
+@media (max-width: 650px) {
+  .lumia-composer { bottom: 8px; padding: 9px; }
+  .lumia-composer-top { flex-wrap: wrap; }
+  .lumia-composer-mode { letter-spacing: 0; font-size: 9px; padding-inline: 4px; }
+}
