@@ -137,6 +137,9 @@ jobs:
       - name: LT-02Q Translation quality guard for wrong-language and mixed output
         run: node scripts/certify-lumia-translation-quality-lt02q.mjs
 
+      - name: LT-03 Translation semantic fidelity, negation, ordinals and equipment
+        run: node scripts/certify-lumia-translation-fidelity-lt03.mjs
+
       - name: STT-02 Offline Spanish WER comparison contract
         run: node scripts/certify-stt02-benchmark.mjs
 
@@ -144,6 +147,9 @@ jobs:
         run: npx tsx scripts/certify-lumia-halo-ux03.ts
       - name: UX-04 Holographic circular transcript layout
         run: npx tsx scripts/certify-lumia-halo-ux04.ts
+
+      - name: UX-04B Mirrored circle geometry and visible-text layout regressions
+        run: npx tsx scripts/certify-lumia-halo-ux04b.ts
 
       - name: VI-01 Owner-selected photograph in local multimodal Ollama
         run: npx tsx scripts/certify-lumia-visual-input-vi01.ts
