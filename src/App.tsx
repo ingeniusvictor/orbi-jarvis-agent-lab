@@ -50,6 +50,7 @@ import { audioBlobToPcmWav } from './lib/wav'
 import { startPushCapture, PUSH_CAPTURE_MAX_MS, type PushCapture } from './lib/push-to-talk'
 import { initialLumiaInputMode, shouldRunAlwaysOnVoice, type LumiaInputMode } from './lib/input-mode'
 import { BRIDGE_HTTP_URL } from './config'
+import { translateLocalText, type TranslationLanguage } from './lib/translate'
 import {
   applyVoiceRuntimeSnapshot,
   caps,
@@ -991,6 +992,55 @@ export default function App() {
     }
   }
 
+  /** LT-01 uses a separate Ollama-only endpoint and never changes Whisper,
+   * chat history or Spanish Kokoro. Audio translation is a later pilot. */
+  const translateWritten = (text: string, source: TranslationLanguage, target: TranslationLanguage) => {
+    if (experimentOwner.current || !usingBridge) return
+    const phase = store.getState().phase
+    if (phase === 'offline' || phase === 'boot') return
+    clearIdle()
+    silence()
+    interrupt()
+    const mine = ++turn.current
+    const previous = activeReply.current
+    if (previous) store.getState().updateTurn(previous, {
+      status: 'interrupted', finishedAt: Date.now(),
+    })
+    const s = store.getState()
+    s.setError(null)
+    const acceptedAt = Date.now()
+    s.pushTurn({ id: newId(), role: 'user', text, at: acceptedAt })
+    const responseId = newId()
+    activeReply.current = responseId
+    s.pushTurn({
+      id: responseId, role: 'jarvis', text: '', at: acceptedAt, status: 'pending',
+    })
+    s.setPhase('thinking')
+    void (async () => {
+      try {
+        const translation = await translateLocalText(text, source, target)
+        if (turn.current !== mine) return
+        const targetName = target === 'es' ? 'español' : target === 'en' ? 'inglés' : 'chino mandarín'
+        s.updateTurn(responseId, {
+          text: 'Traducción al ' + targetName + ': ' + translation,
+          status: 'complete', firstTextAt: Date.now(), finishedAt: Date.now(),
+        })
+      } catch (err) {
+        if (turn.current !== mine) return
+        const message = err instanceof Error ? err.message : 'Falló la traducción local.'
+        s.updateTurn(responseId, {
+          status: 'error', errorNote: message, finishedAt: Date.now(),
+        })
+        s.setError(message)
+      } finally {
+        if (turn.current === mine) {
+          activeReply.current = null
+          s.setPhase('dormant')
+        }
+      }
+    })()
+  }
+
   const submitWritten = (text: string, image?: LocalVisualImage) => {
     if (experimentOwner.current) return
     const phase = store.getState().phase
@@ -1126,6 +1176,8 @@ export default function App() {
           recording={pushRecording}
           busy={pushBusy}
           visionAvailable={usingBridge && import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1'}
+          translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
+          onTranslate={translateWritten}
           onModeChange={switchInputMode}
           onSend={submitWritten}
           onStartRecording={() => { void startPush() }}
