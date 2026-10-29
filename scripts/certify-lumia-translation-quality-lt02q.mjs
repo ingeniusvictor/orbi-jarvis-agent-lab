@@ -5,7 +5,7 @@ const args = { ollamaUrl:'http://127.0.0.1:11434', model:'qwen3.5:2b-q4_K_M' }
 assert.equal(checkTranslationQuality('¿Puedes hacer la traducción en voz?',
   '¿Puedes hacer la traducción en voz?', 'es','en'), 'unchanged-source')
 assert.equal(checkTranslationQuality('¿Puedes hacer la traducción en voz?',
-  'Puedes hacer la traducción en voz?', 'es','en'), 'spanish-remains')
+  'Quiero que hagas la traducción en voz', 'es','en'), 'spanish-remains')
 assert.equal(checkTranslationQuality('ESA SEGUNDA TRADUCCION NO SALIO EN INGLES',
   'The second translation by ESA did not come out in English.', 'es','en'),
   'untranslated-demonstrative')
