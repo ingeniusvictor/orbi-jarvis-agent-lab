@@ -119,6 +119,9 @@ jobs:
       - name: LC-01 ASUS long local question capture and turn assembly
         run: npx tsx scripts/certify-lumia-long-question-lc01.ts
 
+      - name: VQ-01 Rapid multipart Spanish speech and authorized Whisper turn retention
+        run: npx tsx scripts/certify-lumia-complex-voice-vq01.ts
+
       - name: NF-01 Local near-field acoustic focus and legacy isolation
         run: npx tsx scripts/certify-lumia-near-field-focus-nf01.ts
 
