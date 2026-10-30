@@ -23,10 +23,10 @@ export function parseAudioTranslationReview(text:string):AudioReviewData|null {
   if (typeof text!=='string' || !text.startsWith('Transcripción original (')) return null
   const match=/^Transcripción original \((español|inglés|mandarín)\):\n([\s\S]+?)(?:\n\nTranscripción corregida \((español|inglés|mandarín)\):\n([\s\S]+?))?(?:\n\nTraducción al (español|inglés|mandarín):\n([\s\S]+))?$/u.exec(text)
   if (!match) return null
-  const source=languageByLabel[match[1]]
+  const source=languageByLabel[match[1]??'']
   const rawTranscript=match[2]?.trim()
   const correctedTranscript=match[4]?.trim()||null
-  const target=languageByLabel[match[5]]
+  const target=languageByLabel[match[5]??'']
   const translation=match[6]?.trim()||null
   if (!source || !rawTranscript || rawTranscript.length>4000 ||
       (correctedTranscript && correctedTranscript.length>4000) ||
