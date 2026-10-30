@@ -67,7 +67,7 @@ assert.match(api,/translateAudioActive=false/)
 assert.match(api,/originalText:transcript\.text/)
 assert.match(api,/stage:'stt'/)
 assert.match(api,/stage:'translation'/)
-assert.match(api,/source:url\.searchParams\.get/) // check explicit language via parsing
+assert.match(api,/source=url\.searchParams\.get\('source'\)/) // check explicit language via parsing
 assert.match(uiBridge,/audioBlobToPcmWav\(file,16_000,MAX_TRANSLATION_AUDIO_SECONDS\)/)
 assert.match(uiBridge,/MAX_TRANSLATION_AUDIO_FILE_BYTES = 12 \* 1024 \* 1024/)
 assert.match(composer,/onTranslateAudio\(audioFile, sourceLanguage, targetLanguage\)/)
