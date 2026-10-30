@@ -168,7 +168,13 @@ export async function translateLocalText(request, { ollamaUrl, model, signal } =
         options: { temperature: 0, num_ctx: 4096, num_predict: plain ? 256 : 640 },
         ...(plain ? {} : { format: schema }),
         messages: [
-          { role: 'system', content:
+          { role: 'system', content: plain ?
+            'Translate literally from ' + LANGUAGES[source] + ' to ' + LANGUAGES[target] + '. ' +
+            'Return ONLY the translated sentence, no JSON, no quotation marks or explanations. ' +
+            'Preserve negations, quantities, named languages, and all BESS technical acronyms. ' +
+            (source === 'es' && target === 'en' ?
+              'Example: Esa segunda traducción no salió en inglés. => That second translation did not come out in English. ' : '')
+            :
             'Eres exclusivamente un traductor profesional. Traduce fielmente del ' +
             LANGUAGES[source] + ' al ' + LANGUAGES[target] + '. ' +
             'Cada palabra natural del resultado debe estar en el idioma de destino. ' +
@@ -187,13 +193,32 @@ export async function translateLocalText(request, { ollamaUrl, model, signal } =
     if (!res.ok) throw new Error('Ollama local no pudo traducir (HTTP ' + res.status + ').')
     const packet = await res.json()
     let output
-    try { output = JSON.parse(String(packet?.message?.content ?? ''))?.translation } catch {}
+    const raw = String(packet?.message?.content ?? '').trim()
+    try { output = JSON.parse(raw)?.translation } catch {}
+    if (plain && typeof output !== 'string') {
+      output = raw.replace(/^translation\s*:\s*/i, '').replace(/^traducción\s*:\s*/i, '')
+    }
     previous = typeof output === 'string' ? output.trim() : ''
     const failure = checkTranslationQuality(text, previous, source, target)
     if (!failure) return Object.freeze({ translation: previous, source, target })
+    lastQualityIssue = failure
   }
-  throw new Error(
-    'Qwen no consiguió traducir de forma fiable al idioma solicitado. ' +
-    'No mostraré como válida una traducción sin verificar. Prueba reformulando el texto.',
-  )
+  const issues = {
+    'invalid': 'respuesta vacía o formato inválido',
+    'unchanged-source': 'Qwen repitió el texto original',
+    'spanish-remains': 'persisten palabras en español',
+    'english-remains': 'persisten palabras en inglés',
+    'missing-negation': 'falta una negación',
+    'missing-named-language': 'falta el idioma mencionado',
+    'missing-ordinal': 'falta el ordinal',
+    'missing-number': 'falta una cifra',
+    'missing-technical-acronym': 'falta una sigla BESS',
+    'missing-mandarin-script': 'no se generaron caracteres chinos',
+    'source-script-remains': 'persistió el texto chino de origen',
+    'untranslated-demonstrative': 'quedó una palabra española sin traducir',
+  }
+  const detail = issues[lastQualityIssue] || 'la traducción no pasó la validación'
+  throw new LocalTranslationError('QUALITY_REJECTED',
+    'Qwen respondió, pero no se pudo validar la traducción: ' + detail +
+    '. Puedes reformular el texto o cambiar de dirección de idioma.')
 }
