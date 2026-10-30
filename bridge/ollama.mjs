@@ -33,6 +33,7 @@ import { applyVoiceRuntimeControl } from './orbia/voice-control.mjs'
 import { parseVoiceRuntimeControl } from './orbia/voice-runtime.mjs'
 import { createOllamaReplyGate } from './orbia/ollama-json-stream.mjs'
 import { isStaleModelReply } from './orbia/stale-answer-guard.mjs'
+import { isComplexVoicePrompt, COMPLEX_VOICE_INSTRUCTION } from './orbia/complex-voice-intent.mjs'
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
@@ -292,6 +293,7 @@ export async function streamOllama({
   onText,
 }) {
   const model = getActiveModel()
+  const complexVoice = process.env.ORBIA_LUMIA_COMPLEX_VOICE_VQ01 === '1' && isComplexVoicePrompt(prompt) && !image
 
   // Reuse the warm-up for the model selected at the start of this turn.
   await warmOllama(model)
@@ -304,6 +306,7 @@ export async function streamOllama({
           ? '\n' + knowledgeContextToPrompt(knowledgeContext)
           : '') +
         (toolContext ? '\n' + toolContext : '') +
+        (complexVoice ? COMPLEX_VOICE_INSTRUCTION : '') +
         '\nDevuelve exclusivamente un objeto JSON válido con esta forma exacta: ' +
         '{"respuesta":"texto final para pronunciar"}. ' +
         'El valor de respuesta debe estar completamente en español latinoamericano, ' +
@@ -544,7 +547,9 @@ export async function streamOllama({
     }
   }
 
-  const raw = await runStructured(messages)
+  // Ordinary voice stays at the fast 120-token budget. Complex interventions
+  // get room to answer each understood question instead of one stock sentence.
+  const raw = await runStructured(messages, complexVoice ? 320 : OLLAMA_VOICE_NUM_PREDICT)
   let text = parseAnswer(raw)
 
   // Recover one malformed structured reply using the actual latest question.
