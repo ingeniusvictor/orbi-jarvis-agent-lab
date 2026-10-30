@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { translateLocalText } from '../lib/translate'
 import { formatAudioTranslationReview, parseAudioTranslationReview } from '../lib/audio-translation-review'
@@ -10,6 +10,17 @@ export function AudioTranslationReview({turnId,text}: {turnId:string;text:string
   const [draft,setDraft]=useState('')
   const [busy,setBusy]=useState(false)
   const [failure,setFailure]=useState('')
+  const editorRef=useRef<HTMLTextAreaElement>(null)
+  useEffect(()=>{
+    if(!editing) return
+    const frame=requestAnimationFrame(()=>{
+      const editor=editorRef.current
+      if(!editor) return
+      editor.focus({preventScroll:true})
+      editor.scrollIntoView({block:'nearest',behavior:'smooth'})
+    })
+    return ()=>cancelAnimationFrame(frame)
+  },[editing])
   if (!data?.translation) return null
 
   const open=()=>{
@@ -62,7 +73,7 @@ export function AudioTranslationReview({turnId,text}: {turnId:string;text:string
           </button>
         : <div className="lumia-audio-review-editor">
             <label htmlFor={'lumia-review-'+turnId}>Corregir texto reconocido · no modifica el audio original</label>
-            <textarea id={'lumia-review-'+turnId} rows={3} maxLength={4000}
+            <textarea ref={editorRef} id={'lumia-review-'+turnId} rows={3} maxLength={4000}
               value={draft} disabled={busy}
               onChange={event=>setDraft(event.target.value)}
               aria-label="Transcripción corregida"/>
