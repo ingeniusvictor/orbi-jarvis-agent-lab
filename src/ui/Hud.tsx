@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useStore, accentFor, type Phase } from '../store'
 import { Suggestions } from './Suggestions'
 import { HaloFlow } from './HaloFlow'
+import { AudioTranslationReview } from './AudioTranslationReview'
 import { BladeSweep, Blades } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
@@ -452,6 +453,7 @@ export function Hud() {
                       </span>
                     )}
                     {turn.errorNote && <span className="voice-line-error">ERROR: {turn.errorNote}</span>}
+                    {turn.status === 'complete' && <AudioTranslationReview turnId={turn.id} text={turn.text} />}
                     </HaloFlow>
                   </motion.div>
                 ))}
