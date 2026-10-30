@@ -38,6 +38,10 @@ rem ASUS pilot: preserve already-started COMMAND audio while Whisper decodes (on
 set "VITE_LUMIA_ACTIVE_COMMAND_GRACE=1"
 rem Long local spoken questions: bounded follow-on VAD segments, not always-on listening.
 set "VITE_LUMIA_LONG_QUESTION_INPUT=1"
+rem VQ-01: save already-authorized fast multipart questions while Whisper decodes.
+rem Does NOT enable responding to unattended household speech; no model/voice change.
+set "VITE_LUMIA_COMPLEX_VOICE_VQ01=1"
+set "ORBIA_LUMIA_COMPLEX_VOICE_VQ01=1"
 rem SR-01 rollback: NF-01 was too strict for normal voices, especially a second
 rem person nearby. Restore Chrome automatic mic gain + baseline VAD; preserve
 rem wake-word/household guard and LC-01 long-question reception.
