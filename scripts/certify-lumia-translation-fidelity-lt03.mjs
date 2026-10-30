@@ -50,8 +50,8 @@ try {
   await assert.rejects(()=>translateLocalText(
     {text:sentence,source:'es',target:'en'},
     {ollamaUrl:'http://127.0.0.1:11434',model:'qwen3.5:2b-q4_K_M'}),
-  /No mostraré como válida una traducción/)
-  assert.equal(attempts,2)
+  /no se pudo validar la traducción/)
+  assert.equal(attempts,3)
 } finally {
   globalThis.fetch=originalFetch
 }
