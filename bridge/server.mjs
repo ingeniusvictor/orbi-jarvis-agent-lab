@@ -50,6 +50,7 @@ import {
 import { transcribeMultivoiceLocalWav } from './orbia/multivoice-stt.mjs'
 import { ensureWhisperServer } from './orbia/whisper-server-runtime.mjs'
 import { translateLocalText, validateTranslation } from './orbia/local-translate.mjs'
+import { transcribeTranslationAudio, AUDIO_TRANSLATE_MAX_WAV_BYTES } from './orbia/translation-audio-stt.mjs'
 import { prewarmResidentKokoro } from './orbia/resident-tts.mjs'
 import { createRealtimeGrantService } from './orbia/realtime-grants.mjs'
 
@@ -730,6 +731,9 @@ async function readSpeakerWav(req) {
   return Buffer.concat(chunks)
 }
 
+// At most one imported audio at a time on the owner's local ASUS CPU.
+let translateAudioActive = false
+
 const handleRequest = async (req, res) => {
   const origin = req.headers.origin
   if (origin && !originAllowed(origin)) {
@@ -742,6 +746,91 @@ const handleRequest = async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, cors)
     return res.end()
+  }
+
+  // LT-05: a deliberately chosen voice-note FILE, not a live microphone.
+  // The browser decodes an original audio attachment to bounded PCM WAV.
+  // Whisper CLI uses the manually chosen language, no wake detector/prompt,
+  // no Spanish vocabulary correction and no cloud transfer.
+  if (req.method === 'POST' && req.url?.startsWith('/translate/audio?')) {
+    const headers = { ...cors, 'content-type': 'application/json',
+      'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }
+    const reply = (status, body) => {
+      res.writeHead(status, headers)
+      return res.end(JSON.stringify(body))
+    }
+    if (process.env.ORBIA_LUMIA_TRANSLATE_ENABLED !== '1' ||
+        process.env.ORBIA_LUMIA_TRANSLATE_AUDIO_ENABLED !== '1' ||
+        PROVIDER !== 'ollama') {
+      return reply(503,{ok:false,error:'LT-05 no está habilitado en este perfil local.'})
+    }
+    const url=new URL(req.url,'http://localhost')
+    const source=url.searchParams.get('source')
+    const target=url.searchParams.get('target')
+    if (!['es','en','zh'].includes(source) || !['es','en','zh'].includes(target) ||
+        source === target) {
+      return reply(400,{ok:false,error:'Selecciona dos idiomas diferentes.'})
+    }
+    if (!['audio/wav','audio/x-wav','audio/wave'].includes(
+      String(req.headers['content-type'] || '').split(';')[0].toLowerCase().trim())) {
+      return reply(415,{ok:false,error:'Se requiere WAV PCM convertido localmente.'})
+    }
+    if (translateAudioActive)
+      return reply(429,{ok:false,error:'Hay un audio en traducción. Termina el anterior.'})
+    translateAudioActive=true
+    try {
+      let size=0
+      const chunks=[]
+      for await(const chunk of req) {
+        size+=chunk.length
+        if(size>AUDIO_TRANSLATE_MAX_WAV_BYTES)
+          return reply(413,{ok:false,error:'El audio supera los 90 segundos permitidos.'})
+        chunks.push(chunk)
+      }
+      let transcript
+      try {
+        transcript=await transcribeTranslationAudio(Buffer.concat(chunks),{language:source})
+      } catch(e) {
+        const code=String(e?.code || '')
+        const status=code==='STT_NOT_INSTALLED' || code==='MULTILINGUAL_MODEL_REQUIRED' ? 503
+          : code==='STT_TIMEOUT' ? 504 : code==='STT_EMPTY' ? 422
+            : code==='INVALID_AUDIO' || code==='INVALID_LANGUAGE' ? 400 : 502
+        // Only predefined local error messages. No raw audio or text in logs.
+        return reply(status,{ok:false,stage:'stt',code,
+          error:e?.message || 'No se pudo reconocer el audio localmente.'})
+      }
+      try {
+        const started=performance.now()
+        const result=await translateLocalText({
+          text:transcript.text,source,target,
+        },{
+          ollamaUrl:OLLAMA_URL,model:getOllamaModel(),
+          signal:AbortSignal.timeout(65_000),
+        })
+        return reply(200,{ok:true,source,target,
+          originalText:transcript.text,translation:result.translation,
+          durationSeconds:transcript.durationSeconds,
+          sttMs:transcript.sttMs,
+          translationMs:Math.round(performance.now()-started)})
+      } catch(e) {
+        if(e?.code==='QUALITY_REJECTED') {
+          // A useful transcript must survive even when translation fails:
+          // the owner can inspect it and retry with another language.
+          return reply(422,{ok:false,stage:'translation',code:'QUALITY_REJECTED',
+            originalText:transcript.text,error:e.message})
+        }
+        if(e?.name==='TimeoutError' || e?.name==='AbortError') {
+          return reply(504,{ok:false,stage:'translation',code:'OLLAMA_TIMEOUT',
+            originalText:transcript.text,
+            error:'Ollama tardó demasiado en traducir el audio.'})
+        }
+        return reply(502,{ok:false,stage:'translation',code:'OLLAMA_FAILURE',
+          originalText:transcript.text,
+          error:'Ollama no pudo traducir el audio transcrito.'})
+      }
+    } finally {
+      translateAudioActive=false
+    }
   }
 
   // LT-01: independent opt-in translation. It never changes Whisper's
