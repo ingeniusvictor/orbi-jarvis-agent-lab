@@ -777,8 +777,19 @@ const handleRequest = async (req, res) => {
         signal: AbortSignal.timeout(45_000),
       })
       return reply(200, { ok: true, ...result })
-    } catch {
-      return reply(502, { ok: false, error: 'No se pudo completar la traducción local.' })
+    } catch (err) {
+      // Keep data private: return only the validated, non-sensitive reason
+      // for model quality rejection; never raw prompt or model output.
+      if (err?.code === 'QUALITY_REJECTED') {
+        return reply(422, { ok: false, code: 'QUALITY_REJECTED',
+          error: err.message })
+      }
+      if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        return reply(504, { ok: false, code: 'OLLAMA_TIMEOUT',
+          error: 'Ollama excedió el tiempo permitido para esta traducción.' })
+      }
+      return reply(502, { ok: false, code: 'OLLAMA_FAILURE',
+        error: 'Ollama local no respondió correctamente. Revisa que esté activo.' })
     }
   }
 
