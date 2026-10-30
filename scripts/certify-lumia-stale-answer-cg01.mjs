@@ -30,5 +30,6 @@ const brain = readFileSync(new URL('../bridge/ollama.mjs', import.meta.url), 'ut
 assert.match(brain, /isStaleModelReply\(\{ answer: text, prompt, history \}\)/)
 assert.match(brain, /await runStructured\(correctionMessages\)/)
 assert.match(brain, /if \(signal\?\.aborted\) throw error/)
-assert.match(brain, /No conseguí responder correctamente a tu última pregunta/)
+assert.match(brain, /safeClarificationForQuestion\(prompt\)/)
+assert.match(brain, /!isStaleModelReply\(\{ answer: retryText, prompt, history \}\)/)
 console.log('LUMIA CG-01: repeated long answer detected and one bounded local retry wired: PASS')
