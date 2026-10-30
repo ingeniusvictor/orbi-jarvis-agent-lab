@@ -49,7 +49,7 @@ try {
   const result = await translateLocalText(
     {text:'¿Puedes hacer la traducción en voz?',source:'es',target:'en'},args)
   assert.equal(result.translation,'Can you translate it out loud?')
-  assert.equal(calls,3)
+  assert.equal(calls,2) // valid after retry: third fallback must not run
 
   calls = 0
   globalThis.fetch = async () => {
@@ -61,7 +61,7 @@ try {
   await assert.rejects(()=>translateLocalText(
     {text:'¿Puedes hacer la traducción en voz?',source:'es',target:'en'},args),
   /no se pudo validar la traducción/)
-  assert.equal(calls,2)
+  assert.equal(calls,3) // rejected both JSON attempts and plain fallback
 
   calls = 0
   globalThis.fetch = async () => {
