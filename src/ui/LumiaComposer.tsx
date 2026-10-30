@@ -12,7 +12,7 @@ import {
   type LocalVisualImage,
 } from '../lib/visual-input'
 import type { LumiaInputMode } from '../lib/input-mode'
-import { TRANSLATION_CHOICES, type TranslationLanguage } from '../lib/translate'
+import { TRANSLATION_CHOICES, validateTranslationAudioFile, type TranslationLanguage } from '../lib/translate'
 
 type Props = {
   available: boolean
@@ -22,6 +22,7 @@ type Props = {
   visionAvailable: boolean
   translationAvailable: boolean
   onTranslate: (text: string, source: TranslationLanguage, target: TranslationLanguage) => void
+  onTranslateAudio: (file: File, source: TranslationLanguage, target: TranslationLanguage) => Promise<void>
   onModeChange: (mode: LumiaInputMode) => void
   onSend: (text: string, image?: LocalVisualImage) => void
   onStartRecording: () => void
@@ -29,7 +30,7 @@ type Props = {
   onCancelRecording: () => void
 }
 
-type IconName = 'image' | 'mic' | 'wave' | 'send' | 'stop' | 'close' | 'cancel' | 'translate'
+type IconName = 'image' | 'audio' | 'mic' | 'wave' | 'send' | 'stop' | 'close' | 'cancel' | 'translate'
 function DockIcon({ name }: { name: IconName }) {
   const common = {
     width: 20, height: 20, viewBox: '0 0 24 24',
@@ -42,6 +43,9 @@ function DockIcon({ name }: { name: IconName }) {
       <path d="M3 6h12M9 3v3M5 10c2 3 5 5 9 6M13 10c-2 4-5 7-9 8" />
       <path d="M15 21l3-8 3 8M16.1 18h3.8" />
     </svg>
+  )
+  if (name === 'audio') return (
+    <svg {...common}><path d="M3 12v3m4-8v10m4-15v20m4-15v10m4-8v8m4-6v4" /></svg>
   )
   if (name === 'image') return (
     <svg {...common}>
@@ -80,17 +84,19 @@ function DockIcon({ name }: { name: IconName }) {
 }
 
 export function LumiaComposer({
-  available, mode, recording, busy, visionAvailable, translationAvailable, onTranslate,
+  available, mode, recording, busy, visionAvailable, translationAvailable, onTranslate, onTranslateAudio,
   onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
+  const [audioFile, setAudioFile] = useState<File | null>(null)
   const [preparing, setPreparing] = useState(false)
   const [error, setError] = useState('')
   const [translateEnabled, setTranslateEnabled] = useState(false)
   const [sourceLanguage, setSourceLanguage] = useState<TranslationLanguage>('zh')
   const [targetLanguage, setTargetLanguage] = useState<TranslationLanguage>('es')
   const photoInput = useRef<HTMLInputElement>(null)
+  const audioInput = useRef<HTMLInputElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   if (!available) return null
 
@@ -102,22 +108,25 @@ export function LumiaComposer({
   }
   const send = async () => {
     const text = draft.trim()
-    if ((!text && !photo) || preparing || busy || recording) return
-    if (translateEnabled && (!text || photo || sourceLanguage === targetLanguage)) {
-      setError('Escribe un texto y selecciona dos idiomas diferentes.'); return
+    if ((!text && !photo && !audioFile) || preparing || busy || recording) return
+    if (translateEnabled && (photo || sourceLanguage === targetLanguage || (audioFile && text))) {
+      setError('Selecciona idiomas diferentes y envía el audio separado del texto.'); return
     }
     setPreparing(true)
     setError('')
     try {
       const image = photo ? await prepareVisualImage(photo) : undefined
-      if (translateEnabled) onTranslate(text, sourceLanguage, targetLanguage)
+      if (translateEnabled && audioFile) await onTranslateAudio(audioFile, sourceLanguage, targetLanguage)
+      else if (translateEnabled) onTranslate(text, sourceLanguage, targetLanguage)
       else onSend(text || 'Describe esta imagen en español y señala lo que no se pueda comprobar.', image)
       setDraft('')
       setPhoto(null)
+      setAudioFile(null)
       if (photoInput.current) photoInput.current.value = ''
+      if (audioInput.current) audioInput.current.value = ''
       if (textarea.current) textarea.current.style.height = '26px'
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo enviar la imagen.')
+      setError(err instanceof Error ? err.message : 'No se pudo procesar el mensaje.')
     } finally {
       setPreparing(false)
     }
