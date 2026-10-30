@@ -668,8 +668,11 @@ async function startVadBridgeVoice(
 
     pendingAudio.push({ blob, capturedMode, epoch })
 
-    // Hard ceiling: local voice must stay interactive even in a noisy room.
-    while (pendingAudio.length > 4) {
+    // Hard ceiling remains. Only an already-authorized complex COMMAND can
+    // queue two extra VAD parts; standby and guard remain at four and cannot
+    // flood Whisper with unattended household speech.
+    const queueLimit = COMPLEX_VOICE_ENABLED && capturedMode === 'command' ? 6 : 4
+    while (pendingAudio.length > queueLimit) {
       const backgroundIndex = pendingAudio.findIndex(
         (pending) => pending.capturedMode !== 'command',
       )
