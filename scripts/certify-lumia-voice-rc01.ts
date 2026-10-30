@@ -74,7 +74,7 @@ assert.match(brain, /const STREAM_VOICE = process\.env\.ORBIA_OLLAMA_VOICE_STREA
 assert.match(brain, /stream: true, think: false/)
 assert.match(brain, /format: responseSchema/)
 assert.match(brain, /if \(gate\.startedSpeaking\) throw error/)
-assert.match(brain, /const raw = await runStructured\(messages\)/)
+assert.match(brain, /const raw = await runStructured\(messages, complexVoice \? 320 : OLLAMA_VOICE_NUM_PREDICT\)/)
 assert.match(brain, /const recent = Array\.isArray\(history\) \? history\.slice\(-2\) : \[\]/)
 assert.match(brain, /\{ role: 'user', content: prompt \}/)
 assert.match(brain, /runStructured\(retryMessages, 256\)/)
