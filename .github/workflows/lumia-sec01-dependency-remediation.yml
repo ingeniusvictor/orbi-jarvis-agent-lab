@@ -1,0 +1,61 @@
+name: LUMIA SEC-01 isolated dependency remediation
+on:
+  push:
+    branches:
+      - security/lumia-sec01-dependency-remediation-20261030
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  remediate:
+    if: github.ref == 'refs/heads/security/lumia-sec01-dependency-remediation-20261030'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Check current lockfile
+        run: npm ci --ignore-scripts
+      - name: Upgrade compatible vulnerable locked dependencies (no force)
+        shell: bash
+        run: |
+          set +e
+          npm audit fix --package-lock-only --ignore-scripts > sec01-fix.log 2>&1
+          result=$?
+          set -e
+          cat sec01-fix.log
+          if [ "$result" -gt 1 ]; then
+            echo "npm audit fix failed unexpectedly ($result)"
+            exit "$result"
+          fi
+          if git diff --quiet -- package-lock.json; then
+            echo "No lockfile changes resulted"
+          fi
+      - name: Reinstall locked versions and verify app contracts
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          npm run lint
+          npx tsx scripts/certify-lumia-complex-voice-vq01.ts
+      - name: Record remaining advisories
+        shell: bash
+        run: |
+          npm audit --json > sec01-audit.json || true
+          node --input-type=module -e "import fs from 'node:fs';const a=JSON.parse(fs.readFileSync('sec01-audit.json','utf8')); console.log('SEC-01 remaining:',JSON.stringify(a.metadata?.vulnerabilities??{})); const v=a.vulnerabilities??{}; const other=Object.keys(v).filter(k=>!['sharp','@huggingface/transformers','kokoro-js'].includes(k)); if(other.length){ console.error('Unexpected remaining vulnerable dependencies:',other.join(', '));process.exit(1) }"
+      - name: Commit repaired lockfile only to SEC-01 branch
+        shell: bash
+        run: |
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "fix(security): SEC-01 compatible npm audit lockfile upgrades"
+            git push origin HEAD:security/lumia-sec01-dependency-remediation-20261030
+          else
+            echo "No lockfile changes to commit"
+          fi
