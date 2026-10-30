@@ -267,7 +267,7 @@ export function LumiaComposer({
           aria-label="Enviar mensaje"
           title="Enviar · Enter"
           disabled={preparing || busy || recording || (!draft.trim() && !photo && !audioFile) ||
-            (translateEnabled && (sourceLanguage === targetLanguage || (audioFile && !!draft.trim())))}
+            (translateEnabled && (sourceLanguage === targetLanguage || (!!audioFile && !!draft.trim())))}
           onClick={() => void send()}
         ><DockIcon name="send" /></button>
       </div>
