@@ -148,5 +148,6 @@ assert.match(localVoiceSource, /provider === 'local' && mode === 'command' && AC
 assert.match(appSource, /if \(!commandGraceUsed\.current\)/)
 assert.match(appSource, /commandGraceUsed\.current = true/)
 assert.match(appSource, /ACTIVE_COMMAND_GRACE_MS - \(Date\.now\(\) - startedAt\)/)
-assert.match(appSource, /idleTimer\.current = setTimeout\(goDormant, remainingMs\)/)
+assert.match(appSource, /scheduleCommandExpiry\(remainingMs\)/)
+assert.match(appSource, /setTimeout\(expireListening, 400\)/)
 console.log('ASUS one-shot command/STT grace opt-in wiring: PASS')
