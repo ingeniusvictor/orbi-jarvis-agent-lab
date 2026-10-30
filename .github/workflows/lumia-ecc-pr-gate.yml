@@ -143,6 +143,9 @@ jobs:
       - name: LT-04Q Third local plain translation retry and specific error classes
         run: node scripts/certify-lumia-translation-rescue-lt04q.mjs
 
+      - name: LT-05 Offline WhatsApp voice-note import, multilingual Whisper and translation
+        run: node scripts/certify-lumia-translate-audio-lt05.mjs
+
       - name: STT-02 Offline Spanish WER comparison contract
         run: node scripts/certify-stt02-benchmark.mjs
 
