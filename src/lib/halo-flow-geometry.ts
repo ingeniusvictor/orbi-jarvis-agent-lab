@@ -79,6 +79,9 @@ export function haloCircleForCanvas(
   return {
     x: rect.left + rect.width / 2,
     y: rect.top + rect.height / 2,
-    radius: Math.min(rect.height * 0.355, rect.width * 0.245) + 16,
+    // R3F Core FIT=0.60 of the shorter canvas side. The +36 CSS px is a
+    // conservative exterior bloom + legibility guard beyond the luminous rim.
+    // Use the shorter dimension so canvas aspect ratio cannot shrink it.
+    radius: Math.min(rect.height, rect.width) * 0.355 + 36,
   }
 }
