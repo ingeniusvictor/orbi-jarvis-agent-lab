@@ -19,6 +19,7 @@ import {
   type VoiceTranscriptEvent,
 } from './lib/voice'
 import { ACTIVE_COMMAND_GRACE_MS, voiceModeForPhase } from './lib/voice-focus'
+import { shouldProtectWhisperCommandAtExpiry } from './lib/complex-voice-turn'
 import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { resolveFollowupGuardMs } from './lib/followup-latency'
@@ -87,6 +88,7 @@ const FOLLOW_UP_MS = 11000
 const FAST_LOCAL_FOLLOWUP = import.meta.env.VITE_LUMIA_FAST_LOCAL_FOLLOWUP === '1'
 const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_GRACE === '1'
 const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INPUT === '1'
+const COMPLEX_VOICE_ENABLED = import.meta.env.VITE_LUMIA_COMPLEX_VOICE_VQ01 === '1'
 const MULTIMODAL_COMPOSER = import.meta.env.VITE_LUMIA_MULTIMODAL_COMPOSER === '1'
 
 // Owner-side opt-in only. The browser recognizer remains at the certified hold.
@@ -139,6 +141,7 @@ export default function App() {
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const commandWindowStartedAt = useRef(0)
   const commandGraceUsed = useRef(false)
+  const commandExpiryAt = useRef(0)
   const voicePoll = useRef<ReturnType<typeof setInterval> | null>(null)
   const voiceRestart = useRef(0)
   // Exclusive voice-device test ownership: the paid WebRTC trial and the
@@ -171,6 +174,30 @@ export default function App() {
     s.setPhase('dormant')
   }
 
+  // End the authorized listen window ONLY once already-captured local COMMAND
+  // audio has been decoded. No standby or household-background authorization:
+  // expired unfocused speech cannot reawaken LUMIA.
+  const expireListening = () => {
+    if (store.getState().phase !== 'listening') return
+    const expiredByMs = Date.now() - commandExpiryAt.current
+    if (shouldProtectWhisperCommandAtExpiry({
+      enabled: COMPLEX_VOICE_ENABLED && voiceDiag.engine === 'whisper-local',
+      authorized: inputModeRef.current === 'continuous',
+      hasPending: Boolean(voice.current?.hasPendingCommand?.()),
+      expiredByMs,
+    })) {
+      idleTimer.current = setTimeout(expireListening, 400)
+      return
+    }
+    goDormant()
+  }
+  const scheduleCommandExpiry = (remainingMs: number) => {
+    clearIdle()
+    const ms = Math.max(1, remainingMs)
+    commandExpiryAt.current = Date.now() + ms
+    idleTimer.current = setTimeout(expireListening, ms)
+  }
+
   /** Open the mic and wait. `window` is how long before he gives up. */
   const listen = (window: number) => {
     clearIdle()
@@ -180,7 +207,7 @@ export default function App() {
     s.setCaption('')
     s.setPhase('listening')
     sfx.play('listen')
-    idleTimer.current = setTimeout(goDormant, window)
+    scheduleCommandExpiry(window)
   }
 
   // -- one turn -------------------------------------------------------------
@@ -405,7 +432,7 @@ export default function App() {
         clearIdle()
         const startedAt = commandWindowStartedAt.current || Date.now()
         const remainingMs = Math.max(1, ACTIVE_COMMAND_GRACE_MS - (Date.now() - startedAt))
-        idleTimer.current = setTimeout(goDormant, remainingMs)
+        scheduleCommandExpiry(remainingMs)
       }
       return
     }
@@ -451,7 +478,7 @@ export default function App() {
     )
     if (remaining <= 0) return
     clearIdle()
-    idleTimer.current = setTimeout(goDormant, remaining)
+    scheduleCommandExpiry(remaining)
   }
 
   const onUtterance = (text: string) => {
