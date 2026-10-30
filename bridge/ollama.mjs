@@ -33,6 +33,7 @@ import { applyVoiceRuntimeControl } from './orbia/voice-control.mjs'
 import { parseVoiceRuntimeControl } from './orbia/voice-runtime.mjs'
 import { createOllamaReplyGate } from './orbia/ollama-json-stream.mjs'
 import { isStaleModelReply } from './orbia/stale-answer-guard.mjs'
+import { isGenericReplyForQuestion, safeClarificationForQuestion } from './orbia/response-relevance-rc02.mjs'
 import { isComplexVoicePrompt, COMPLEX_VOICE_INSTRUCTION } from './orbia/complex-voice-intent.mjs'
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 
@@ -584,7 +585,7 @@ export async function streamOllama({
   // A smaller local model may answer a *new* question by recycling a long
   // earlier reply. Do not play the previous answer as if it were new.
   // The model path is buffered on the ASUS, so one bounded retry is safe.
-  if (isStaleModelReply({ answer: text, prompt, history })) {
+  if (isStaleModelReply({ answer: text, prompt, history }) || isGenericReplyForQuestion({ answer: text, prompt })) {
     console.warn('[lumia] probable repeated old answer to a different user prompt; retrying once')
     const latestPriorUser = [...history].reverse().find((entry) => entry.role === 'user')
     const correctionMessages = [
@@ -593,7 +594,7 @@ export async function streamOllama({
         content:
           systemPrompt +
           '\nLa pregunta ACTUAL del usuario tiene prioridad absoluta sobre el contexto. ' +
-          'Tu respuesta previa fue rechazada por repetir información que no respondía la pregunta actual. ' +
+          'Tu respuesta previa fue rechazada por ser repetitiva o genérica en lugar de responder la pregunta actual. ' +
           'Responde SOLO la última pregunta; no repitas tu respuesta anterior. ' +
           'Devuelve exclusivamente JSON {"respuesta":"una respuesta nueva y pertinente"}.',
       },
@@ -608,16 +609,16 @@ export async function streamOllama({
       const retryText = sanitizeLumiaVoiceOutput(
         parseAnswer(await runStructured(correctionMessages)),
       )
-      if (retryText && !isStaleModelReply({ answer: retryText, prompt, history })) {
+      if (retryText && !isStaleModelReply({ answer: retryText, prompt, history }) && !isGenericReplyForQuestion({ answer: retryText, prompt })) {
         text = retryText
       } else {
         console.warn('[lumia] regenerated reply remained stale; returning a brief explicit non-answer')
-        text = 'No conseguí responder correctamente a tu última pregunta. ¿Puedes repetírmela?'
+        text = safeClarificationForQuestion(prompt)
       }
     } catch (error) {
       if (signal?.aborted) throw error
       console.warn('[lumia] repeated-reply regeneration failed:', String(error?.message ?? error).slice(0,120))
-      text = 'Tu última pregunta se recibió, pero no pude generar una respuesta fiable. ¿Puedes repetirla?'
+      text = safeClarificationForQuestion(prompt)
     }
   }
 
