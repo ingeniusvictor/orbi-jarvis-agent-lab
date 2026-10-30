@@ -6,6 +6,9 @@
  */
 const LANGUAGES = Object.freeze({ es: 'español', en: 'inglés', zh: 'chino mandarín simplificado' })
 export const TRANSLATION_LANGUAGES = Object.freeze(Object.keys(LANGUAGES))
+export class LocalTranslationError extends Error {
+  constructor(code, message) { super(message); this.code = code; this.name = 'LocalTranslationError' }
+}
 const SPANISH_WORDS = new Set([
   'puedes','puede','hacer','hago','quiero','quieres','querias','quiere','traduccion',
   'traducir','traduciendo','voz','segunda','primera','salio','ingles','escribir',
@@ -137,10 +140,14 @@ export async function translateLocalText(request, { ollamaUrl, model, signal } =
     additionalProperties: false,
   }
   let previous = ''
+  let lastQualityIssue = 'invalid'
   // Fast path stays ONE local inference; a second bounded request occurs only
   // when the response is malformed, echoes Spanish or mixes the wrong language.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const extra = attempt
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // After two failed constrained outputs, try a minimal unstructured
+    // instruction. Qwen 2B often handles plain translation more reliably.
+    const plain = attempt === 2
+    const extra = attempt === 1
       ? 'ADVERTENCIA DE CALIDAD: La salida previa falló una revisión de idioma o fidelidad. ' +
         'Traduce de nuevo el ORIGINAL completo al ' + LANGUAGES[target] + '. ' +
         'Es indispensable conservar TODAS las negaciones (no / not / did not), ' +
@@ -158,8 +165,8 @@ export async function translateLocalText(request, { ollamaUrl, model, signal } =
         stream: false,
         think: false,
         keep_alive: '2h',
-        options: { temperature: 0, num_ctx: 4096, num_predict: 640 },
-        format: schema,
+        options: { temperature: 0, num_ctx: 4096, num_predict: plain ? 256 : 640 },
+        ...(plain ? {} : { format: schema }),
         messages: [
           { role: 'system', content:
             'Eres exclusivamente un traductor profesional. Traduce fielmente del ' +
