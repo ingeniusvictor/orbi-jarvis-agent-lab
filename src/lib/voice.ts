@@ -10,6 +10,7 @@ import { startVad, type Vad } from './vad'
 import { caps } from './capabilities'
 import { audioBlobToPcmWav } from './wav'
 import { decideTextTurnHold } from './adaptive-turn'
+import { complexVoiceHoldMs } from './complex-voice-turn'
 import {
   isNonSpeechTranscript,
   isRapidDuplicateTranscript,
@@ -94,6 +95,8 @@ export type Voice = {
   stop: () => void
   /** True while a recogniser is actually running. */
   live: () => boolean
+  /** Authorized, already captured command still being decoded/assembled. */
+  hasPendingCommand?: () => boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +224,7 @@ const ADAPTIVE_TURNS_ENABLED = import.meta.env.VITE_LUMIA_ADAPTIVE_TURNS === '1'
 const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_GRACE === '1'
 const NEAR_FIELD_FOCUS_ENABLED = import.meta.env.VITE_LUMIA_NEAR_FIELD_FOCUS === '1'
 const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INPUT === '1'
+const COMPLEX_VOICE_ENABLED = import.meta.env.VITE_LUMIA_COMPLEX_VOICE_VQ01 === '1'
 
 /**
  * How long to keep waiting, given what has been said so far.
@@ -265,6 +269,7 @@ function makeAssembler(
     adaptive?: boolean
     longHold?: () => boolean
     shouldDefer?: (sinceLastMs: number, heldForMs: number) => boolean
+    complexHold?: (text: string, segments: number) => number
   } = {},
 ): Assembler {
   const settleMs = timing.settleMs ?? SETTLE_MS
@@ -334,7 +339,7 @@ function makeAssembler(
       const longForm = timing.longHold?.() ?? false
       const hold = longForm
         ? Math.max(decision.holdMs, LONG_QUESTION_AFTER_TRANSCRIPT_MS)
-        : decision.holdMs
+        : Math.max(decision.holdMs, timing.complexHold?.(held, segments) ?? 0)
       const wait = Math.min(
         hold,
         Math.max(0, (longForm ? LONG_QUESTION_ASSEMBLY_CAP_MS : maxHoldMs) - (Date.now() - firstAt)),
@@ -613,6 +618,7 @@ async function startVadBridgeVoice(
   let lastTranscriptAt = 0
   let lastTranscriptEpoch = -1
   let longQuestionActive = false
+  let transcribingCommandEpoch = -1
 
   const beginLongQuestion = () => {
     if (!LONG_QUESTION_INPUT_ENABLED || provider !== 'local' ||
@@ -697,6 +703,8 @@ async function startVadBridgeVoice(
     partial: (text) => h.onPartial(text),
   }, {
     adaptive: ADAPTIVE_TURNS_ENABLED,
+    complexHold: (text, count) => COMPLEX_VOICE_ENABLED && h.mode() === 'command'
+      ? complexVoiceHoldMs(text, count, true) : 0,
     longHold: () => LONG_QUESTION_INPUT_ENABLED && longQuestionActive,
     shouldDefer: (sinceLastMs, heldForMs) => {
       if (!LONG_QUESTION_INPUT_ENABLED || h.mode() !== 'command') return false
@@ -944,11 +952,16 @@ async function startVadBridgeVoice(
       while (pendingAudio.length) {
         const pending = pendingAudio.shift()!
         refreshQueueDiag()
-        await transcribe(
-          pending.blob,
-          pending.capturedMode,
-          pending.epoch,
-        )
+        transcribingCommandEpoch = pending.capturedMode === 'command' ? pending.epoch : -1
+        try {
+          await transcribe(
+            pending.blob,
+            pending.capturedMode,
+            pending.epoch,
+          )
+        } finally {
+          transcribingCommandEpoch = -1
+        }
       }
     } finally {
       draining = false
@@ -1066,6 +1079,13 @@ async function startVadBridgeVoice(
       diag.running = false
     },
     live: () => vad?.live() ?? false,
+    hasPendingCommand: () => h.mode() === 'command' && (
+      Boolean(assemble.held()) ||
+      transcribingCommandEpoch === captureEpoch ||
+      pendingAudio.some(item => item.capturedMode === 'command' &&
+        item.epoch === captureEpoch) ||
+      Boolean(vad?.meter().speaking)
+    ),
   }
 }
 
