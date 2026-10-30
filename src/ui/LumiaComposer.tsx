@@ -171,20 +171,38 @@ export function LumiaComposer({
             }
           }}
         />
+        <input
+          ref={audioInput}
+          type="file"
+          accept=".ogg,.opus,.mp3,.m4a,.mp4,.wav,.webm,.aac,audio/*"
+          className="lumia-composer-file-input"
+          aria-label="Adjuntar mensaje de audio recibido para traducir"
+          onChange={(event) => {
+            const chosen=event.currentTarget.files?.[0] ?? null
+            setError('')
+            if (!chosen) { setAudioFile(null); return }
+            try { validateTranslationAudioFile(chosen); setAudioFile(chosen) }
+            catch (err) {
+              setAudioFile(null)
+              event.currentTarget.value=''
+              setError(err instanceof Error ? err.message : 'Audio no compatible.')
+            }
+          }}
+        />
         <button
           type="button"
-          className={'lumia-composer-icon-button lumia-composer-attach' + (photo ? ' is-attached' : '')}
-          aria-label={photo ? 'Cambiar fotografía adjunta' : 'Adjuntar imagen para LUMIA'}
-          title={visionAvailable ? 'Adjuntar foto JPG, PNG o WebP · análisis local' : 'Visión local no disponible'}
-          disabled={!visionAvailable || preparing || recording || translateEnabled}
-          onClick={() => photoInput.current?.click()}
-        ><DockIcon name="image" /></button>
+          className={'lumia-composer-icon-button lumia-composer-attach' + (photo || audioFile ? ' is-attached' : '')}
+          aria-label={translateEnabled ? (audioFile ? 'Cambiar audio para traducción' : 'Adjuntar audio para traducir') : (photo ? 'Cambiar fotografía adjunta' : 'Adjuntar imagen para LUMIA')}
+          title={translateEnabled ? 'Adjuntar audio de WhatsApp para traducir' : visionAvailable ? 'Adjuntar foto JPG, PNG o WebP · análisis local' : 'Visión local no disponible'}
+          disabled={(!translateEnabled && !visionAvailable) || preparing || busy || recording}
+          onClick={() => (translateEnabled ? audioInput : photoInput).current?.click()}
+        ><DockIcon name={translateEnabled ? 'audio' : 'image'} /></button>
 
         <textarea
           ref={textarea}
           className="lumia-composer-text"
           aria-label="Escribe tu mensaje a LUMIA"
-          placeholder={translateEnabled ? 'Escribe el texto que deseas traducir…' : 'Pregunta algo a Lumi…'}
+          placeholder={translateEnabled ? (audioFile ? 'Audio listo para traducir…' : 'Escribe o adjunta un audio para traducir…') : 'Pregunta algo a Lumi…'}
           rows={1}
           maxLength={6000}
           value={draft}
@@ -235,7 +253,9 @@ export function LumiaComposer({
             if (!translateEnabled) {
               if (mode !== 'text') onModeChange('text')
               setPhoto(null)
+              setAudioFile(null)
               if (photoInput.current) photoInput.current.value = ''
+              if (audioInput.current) audioInput.current.value = ''
             }
             setTranslateEnabled(!translateEnabled)
           }}
@@ -246,15 +266,15 @@ export function LumiaComposer({
           className="lumia-composer-send"
           aria-label="Enviar mensaje"
           title="Enviar · Enter"
-          disabled={preparing || busy || recording || (!draft.trim() && !photo) ||
-            (translateEnabled && (!draft.trim() || sourceLanguage === targetLanguage))}
+          disabled={preparing || busy || recording || (!draft.trim() && !photo && !audioFile) ||
+            (translateEnabled && (sourceLanguage === targetLanguage || (audioFile && !!draft.trim())))}
           onClick={() => void send()}
         ><DockIcon name="send" /></button>
       </div>
 
       {translateEnabled && (
         <div className="lumia-translator-options" role="group" aria-label="Idiomas de LUMIA Translate">
-          <span className="lumia-translator-title">TRADUCCIÓN LOCAL · TEXTO</span>
+          <span className="lumia-translator-title">TRADUCCIÓN LOCAL · TEXTO / AUDIO</span>
           <select aria-label="Idioma de origen" value={sourceLanguage}
             onChange={(event) => setSourceLanguage(event.target.value as TranslationLanguage)}>
             {TRANSLATION_CHOICES.map((language) => (
@@ -272,7 +292,7 @@ export function LumiaComposer({
           </select>
         </div>
       )}
-      {(photo || error || recording || busy) && (
+      {(photo || audioFile || error || recording || busy || preparing) && (
         <div className="lumia-composer-feedback" aria-live="polite">
           {photo && (
             <span className="lumia-composer-photo">
@@ -284,8 +304,20 @@ export function LumiaComposer({
               }}><DockIcon name="close" /></button>
             </span>
           )}
+          {audioFile && translateEnabled && (
+            <span className="lumia-composer-photo">
+              <DockIcon name="audio" />
+              <span title={audioFile.name}>{audioFile.name}</span>
+              <button type="button" aria-label="Quitar audio adjunto"
+                disabled={preparing} onClick={() => {
+                  setAudioFile(null)
+                  if (audioInput.current) audioInput.current.value = ''
+                }}><DockIcon name="close" /></button>
+            </span>
+          )}
           {recording && <span className="lumia-composer-mic-state">● GRABANDO · pulsa detener</span>}
           {!recording && busy && <span className="lumia-composer-mic-state">TRANSCRIBIENDO LOCALMENTE…</span>}
+          {preparing && translateEnabled && audioFile && <span className="lumia-composer-mic-state">AUDIO LOCAL · WHISPER + QWEN…</span>}
           {error && <span className="lumia-composer-error" role="alert">{error}</span>}
         </div>
       )}
