@@ -152,6 +152,9 @@ jobs:
       - name: LT-05C Editor click, focus and pass-through hologram regression
         run: npx tsx scripts/certify-lumia-translate-review-click-lt05c.ts
 
+      - name: LT-05D Original audio timing versus manual Qwen retranslation
+        run: npx tsx scripts/certify-lumia-translate-timing-lt05d.ts
+
       - name: STT-02 Offline Spanish WER comparison contract
         run: node scripts/certify-stt02-benchmark.mjs
 

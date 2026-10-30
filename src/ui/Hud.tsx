@@ -452,6 +452,12 @@ export function Hud() {
                         {' · total '}{elapsedLabel(turn.at, turn.finishedAt)}
                       </span>
                     )}
+                    {turn.retranslatedAt && (
+                      <span className="voice-line-stage voice-line-retranslation">
+                        Retraducido {timeLabel(turn.retranslatedAt)}
+                        {turn.retranslationMs != null ? ` · Qwen ${(turn.retranslationMs / 1000).toFixed(2)} s` : ''}
+                      </span>
+                    )}
                     {turn.errorNote && <span className="voice-line-error">ERROR: {turn.errorNote}</span>}
                     {turn.status === 'complete' && <AudioTranslationReview turnId={turn.id} text={turn.text} />}
                     </HaloFlow>

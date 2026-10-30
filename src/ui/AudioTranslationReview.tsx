@@ -42,8 +42,11 @@ export function AudioTranslationReview({turnId,text}: {turnId:string;text:string
     }
     setFailure('')
     setBusy(true)
+    const retranslationStartedAt=performance.now()
     try {
       const translation=await translateLocalText(corrected,data.source,data.target)
+      const retranslatedAt=Date.now()
+      const retranslationMs=Math.round(performance.now()-retranslationStartedAt)
       const current=useStore.getState().turns.find(turn=>turn.id===turnId)
       // Prevent a stale request from overwriting a replaced/completed turn.
       if (!current || current.text!==text) {
@@ -52,7 +55,8 @@ export function AudioTranslationReview({turnId,text}: {turnId:string;text:string
       }
       useStore.getState().updateTurn(turnId,{
         text:formatAudioTranslationReview(data,corrected,translation),
-        status:'complete',errorNote:undefined,finishedAt:Date.now(),
+        status:'complete',errorNote:undefined,
+        retranslatedAt,retranslationMs,
       })
       setEditing(false)
     }catch(err){

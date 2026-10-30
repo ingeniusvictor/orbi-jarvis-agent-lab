@@ -72,6 +72,9 @@ export type Turn = {
   firstTextAt?: number
   firstAudioAt?: number
   finishedAt?: number
+  /** Separate manual Qwen retranslation timing; never overwrite original total. */
+  retranslatedAt?: number
+  retranslationMs?: number
   status?: 'pending' | 'generating' | 'playing' | 'complete' | 'no-response' | 'error' | 'interrupted'
   errorNote?: string
   /** Timestamps are recorded on actual audio-element/speechSynthesis start. */
