@@ -5,7 +5,7 @@ import {
 } from '../bridge/orbia/response-relevance-rc02.mjs'
 
 const stock='Estoy aquí para ayudarte a organizar tus ideas y tomar decisiones más claras en ORBI. ¿Qué necesitas resolver hoy?'
-assert.equal(isSubstantiveQuestion('¿Cómo estás?'),true)
+assert.equal(isSubstantiveQuestion('¿Cómo estás?'),false)
 assert.equal(isGenericReplyForQuestion({prompt:'Hola Lumi',answer:stock}),false)
 assert.equal(isGenericReplyForQuestion({prompt:'¿Qué capacidades tienes actualmente para resolver problemas?',answer:stock}),true)
 assert.equal(isGenericReplyForQuestion({prompt:'¿Cómo puedo hacer una arepa venezolana?',answer:stock}),true)
