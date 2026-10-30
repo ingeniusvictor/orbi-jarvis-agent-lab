@@ -55,6 +55,8 @@ set "VITE_LUMIA_CURVED_TEXT=1"
 rem LT-01 explicit icon, text-only local translation: no automatic language detection.
 set "VITE_LUMIA_TRANSLATE_LT01=1"
 set "ORBIA_LUMIA_TRANSLATE_ENABLED=1"
+rem LT-05 explicitly selected WhatsApp voice notes; no continuous language detection.
+set "ORBIA_LUMIA_TRANSLATE_AUDIO_ENABLED=1"
 
 echo.
 echo ============================================================
