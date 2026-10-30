@@ -1,7 +1,7 @@
 /** VQ-01: interpret multiple QUESTIONS already accepted by the voice gate.
  * No wake permissions, diarization, or hallucinated reconstruction.
  */
-export function multiQuestionCount(text) {
+export function multiQuestionCount(text: string): number {
   const normalized=String(text??'').trim().slice(0,5000)
   if(!normalized) return 0
   const marks=(normalized.match(/[?？]/g)??[]).length
@@ -13,7 +13,7 @@ export function multiQuestionCount(text) {
   return Math.min(6,Math.max(marks-paired, starts, paired))
 }
 
-export function isComplexSpokenTurn(text) {
+export function isComplexSpokenTurn(text: string): boolean {
   const value=String(text??'').trim()
   if(value.length<24) return false
   if(multiQuestionCount(value)>=2) return true
@@ -23,7 +23,7 @@ export function isComplexSpokenTurn(text) {
 }
 
 /** A little extra assembly time only for obviously multipart turns. */
-export function complexVoiceHoldMs(text, segmentCount, enabled) {
+export function complexVoiceHoldMs(text: string, segmentCount: number, enabled: boolean): number {
   if(!enabled) return 0
   // A first VAD fragment may be a complete individual question followed
   // immediately by another; without a short grace it dispatches too early.
@@ -32,14 +32,14 @@ export function complexVoiceHoldMs(text, segmentCount, enabled) {
 }
 
 /** The normal voice budget is untouched for ordinary short requests. */
-export function complexVoiceTokenBudget(text, enabled) {
+export function complexVoiceTokenBudget(text: string, enabled: boolean): number | null {
   return enabled && isComplexSpokenTurn(text) ? 320 : null
 }
 
 /** Never attempt to answer unattended background conversations. */
 export function shouldProtectWhisperCommandAtExpiry({
   enabled, authorized, hasPending, expiredByMs,
-}) {
+}: {enabled:boolean; authorized:boolean; hasPending:boolean; expiredByMs:number}): boolean {
   return Boolean(enabled&&authorized&&hasPending&&
     Number.isFinite(expiredByMs)&&expiredByMs>=0&&expiredByMs<12000)
 }
