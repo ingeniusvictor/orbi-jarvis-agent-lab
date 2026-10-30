@@ -2835,7 +2835,20 @@ kbd {
 
 /* LT-05B — one inline review control under audio translation, no new dock.
  * Keep text legible inside UX-04C curved reply lane and on compact windows. */
-.lumia-audio-review { margin-top: 6px; font-family: 'Chakra Petch', sans-serif; }
+/* The HUD intentionally uses pointer-events:none so the hologram is
+ * unobstructed. Re-enable hit-testing on ONLY the inline review surface.
+ * Do not enable pointer events on the complete transparent voice pane. */
+.lumia-audio-review {
+  margin-top: 6px;
+  font-family: 'Chakra Petch', sans-serif;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+}
+.lumia-audio-review button,
+.lumia-audio-review textarea {
+  pointer-events: auto;
+}
 .lumia-audio-review-action {
   border: 1px solid rgba(119, 226, 224, .25);
   color: #9edbdc;
