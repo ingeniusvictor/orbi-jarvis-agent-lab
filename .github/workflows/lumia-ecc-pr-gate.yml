@@ -151,6 +151,9 @@ jobs:
       - name: UX-04B Mirrored circle geometry and visible-text layout regressions
         run: npx tsx scripts/certify-lumia-halo-ux04b.ts
 
+      - name: UX-04C Safe outer ring radius and real text-line collision guard
+        run: npx tsx scripts/certify-lumia-halo-ux04c.ts
+
       - name: VI-01 Owner-selected photograph in local multimodal Ollama
         run: npx tsx scripts/certify-lumia-visual-input-vi01.ts
 
