@@ -49,7 +49,7 @@ try {
   const result = await translateLocalText(
     {text:'¿Puedes hacer la traducción en voz?',source:'es',target:'en'},args)
   assert.equal(result.translation,'Can you translate it out loud?')
-  assert.equal(calls,2)
+  assert.equal(calls,3)
 
   calls = 0
   globalThis.fetch = async () => {
@@ -60,7 +60,7 @@ try {
   }
   await assert.rejects(()=>translateLocalText(
     {text:'¿Puedes hacer la traducción en voz?',source:'es',target:'en'},args),
-  /No mostraré como válida una traducción sin verificar/)
+  /no se pudo validar la traducción/)
   assert.equal(calls,2)
 
   calls = 0
