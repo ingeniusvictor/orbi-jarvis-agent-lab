@@ -50,7 +50,7 @@ import { audioBlobToPcmWav } from './lib/wav'
 import { startPushCapture, PUSH_CAPTURE_MAX_MS, type PushCapture } from './lib/push-to-talk'
 import { initialLumiaInputMode, shouldRunAlwaysOnVoice, type LumiaInputMode } from './lib/input-mode'
 import { BRIDGE_HTTP_URL } from './config'
-import { translateLocalText, type TranslationLanguage } from './lib/translate'
+import { translateLocalText, translateLocalAudioFile, AudioTranslationError, type TranslationLanguage } from './lib/translate'
 import {
   applyVoiceRuntimeSnapshot,
   caps,
@@ -1041,6 +1041,61 @@ export default function App() {
     })()
   }
 
+  /** LT-05: private file translation; manual source language (not wake STT).
+   * Show BOTH original transcript and translated text on the existing HUD. */
+  const translateAudioNote = async (
+    file: File, source: TranslationLanguage, target: TranslationLanguage,
+  ): Promise<void> => {
+    if (experimentOwner.current || !usingBridge) throw new Error('Traductor local no disponible.')
+    if (['offline', 'boot'].includes(store.getState().phase))
+      throw new Error('Enciende LUMIA antes de traducir el audio.')
+    clearIdle()
+    silence()
+    interrupt()
+    const mine=++turn.current
+    const previous=activeReply.current
+    if(previous) store.getState().updateTurn(previous,{
+      status:'interrupted',finishedAt:Date.now(),
+    })
+    const s=store.getState()
+    s.setError(null)
+    const acceptedAt=Date.now()
+    const languageName=(code:TranslationLanguage) =>
+      code==='es' ? 'español' : code==='en' ? 'inglés' : 'mandarín'
+    s.pushTurn({
+      id:newId(), role:'user',at:acceptedAt,
+      text:'Audio adjunto para traducir: '+languageName(source)+' → '+languageName(target),
+    })
+    const responseId=newId()
+    activeReply.current=responseId
+    s.pushTurn({id:responseId,role:'jarvis',text:'',at:acceptedAt,status:'pending'})
+    s.setPhase('thinking')
+    try {
+      const result=await translateLocalAudioFile(file,source,target)
+      if(turn.current!==mine) return
+      s.updateTurn(responseId,{
+        text:'Transcripción original ('+languageName(source)+'):\n'+
+          result.originalText+'\n\nTraducción al '+languageName(target)+':\n'+result.translation,
+        status:'complete',firstTextAt:Date.now(),finishedAt:Date.now(),
+      })
+    } catch(err) {
+      if(turn.current!==mine) return
+      const note=err instanceof Error ? err.message : 'Falló la traducción del audio.'
+      const transcript=err instanceof AudioTranslationError ? err.originalText : undefined
+      s.updateTurn(responseId,{
+        text:transcript ? 'Transcripción original ('+languageName(source)+'):\n'+transcript : '',
+        status:'error',errorNote:note,finishedAt:Date.now(),
+      })
+      s.setError(note)
+      throw err
+    } finally {
+      if(turn.current===mine) {
+        activeReply.current=null
+        s.setPhase('dormant')
+      }
+    }
+  }
+
   const submitWritten = (text: string, image?: LocalVisualImage) => {
     if (experimentOwner.current) return
     const phase = store.getState().phase
@@ -1178,6 +1233,7 @@ export default function App() {
           visionAvailable={usingBridge && import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1'}
           translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
           onTranslate={translateWritten}
+          onTranslateAudio={translateAudioNote}
           onModeChange={switchInputMode}
           onSend={submitWritten}
           onStartRecording={() => { void startPush() }}
