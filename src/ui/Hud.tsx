@@ -406,7 +406,8 @@ export function Hud() {
                 .map((turn) => (
                   <motion.div
                     key={turn.id}
-                    className="voice-line voice-line-lumi"
+                    className={'voice-line voice-line-lumi' +
+                      (turn.text.startsWith('Transcripción original (') ? ' voice-line-translation-audio' : '')}
                     initial={{ opacity: 0, x: 8 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0 }}
