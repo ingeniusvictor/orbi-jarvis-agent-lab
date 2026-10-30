@@ -2822,3 +2822,12 @@ kbd {
   .lumia-translator-options select { max-width: 126px; font-size: 10px; }
   .lumia-composer-translate { width: 30px; }
 }
+
+
+/* LT-05A: retain the actual transcript/translation separators, without
+ * adding cards or panels over the hologram. Native transcript contents remain
+ * in the existing turn, clipboard export and conversation timeline. */
+.voice-line-translation-audio .voice-line-text {
+  white-space: pre-line;
+  line-height: 1.52;
+}
