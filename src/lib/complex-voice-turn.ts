@@ -24,8 +24,11 @@ export function isComplexSpokenTurn(text) {
 
 /** A little extra assembly time only for obviously multipart turns. */
 export function complexVoiceHoldMs(text, segmentCount, enabled) {
-  if(!enabled||segmentCount<2||!isComplexSpokenTurn(text)) return 0
-  return 850
+  if(!enabled) return 0
+  // A first VAD fragment may be a complete individual question followed
+  // immediately by another; without a short grace it dispatches too early.
+  if(segmentCount===1) return 450
+  return isComplexSpokenTurn(text) ? 850 : 450
 }
 
 /** The normal voice budget is untouched for ordinary short requests. */
