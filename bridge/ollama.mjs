@@ -31,6 +31,10 @@ import {
 import { buildVoiceRuntimeStatus } from './orbia/voice-status.mjs'
 import { applyVoiceRuntimeControl } from './orbia/voice-control.mjs'
 import { parseVoiceRuntimeControl } from './orbia/voice-runtime.mjs'
+import { createOllamaReplyGate } from './orbia/ollama-json-stream.mjs'
+import { isStaleModelReply } from './orbia/stale-answer-guard.mjs'
+import { isComplexVoicePrompt, COMPLEX_VOICE_INSTRUCTION } from './orbia/complex-voice-intent.mjs'
+import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
@@ -42,6 +46,9 @@ export const OLLAMA_VOICE_NUM_PREDICT = Math.max(
   Math.min(180, Number(process.env.JARVIS_OLLAMA_NUM_PREDICT) || 120),
 )
 
+// Default conservative buffered JSON. Experimental streamed Spanish reply
+// requires explicit opt-in; do not emit a raw Ollama thinking channel.
+const STREAM_VOICE = process.env.ORBIA_OLLAMA_VOICE_STREAM === '1'
 const getVoiceRuntimeSnapshot = () => buildVoiceRuntimeStatus()
 
 const localToolRegistry = new ToolRegistry()
@@ -145,7 +152,17 @@ function modelInventoryToSpeech(models) {
     .map((item) => item.active ? `${item.name}, activo` : item.name)
     .join(', ')
 
-  return `Tengo disponibles ${names}.`
+  return `Tengo ${inventory.length} modelos instalados en Ollama: ${names}.`
+}
+
+function modelInventoryCountToSpeech(models) {
+  const inventory = buildModelInventory(models)
+  if (!inventory.length) {
+    return 'No encuentro modelos locales instalados en Ollama.'
+  }
+  const active = inventory.find((item) => item.active)?.name
+  return `Tengo ${inventory.length} modelos locales instalados en Ollama.` +
+    (active ? ` Ahora estoy usando ${active}.` : '')
 }
 
 export function toolResultToPrompt(execution) {
@@ -271,10 +288,12 @@ export async function streamOllama({
   systemPrompt,
   knowledgeContext,
   toolContext,
+  image,
   signal,
   onText,
 }) {
   const model = getActiveModel()
+  const complexVoice = process.env.ORBIA_LUMIA_COMPLEX_VOICE_VQ01 === '1' && isComplexVoicePrompt(prompt) && !image
 
   // Reuse the warm-up for the model selected at the start of this turn.
   await warmOllama(model)
@@ -287,6 +306,7 @@ export async function streamOllama({
           ? '\n' + knowledgeContextToPrompt(knowledgeContext)
           : '') +
         (toolContext ? '\n' + toolContext : '') +
+        (complexVoice ? COMPLEX_VOICE_INSTRUCTION : '') +
         '\nDevuelve exclusivamente un objeto JSON válido con esta forma exacta: ' +
         '{"respuesta":"texto final para pronunciar"}. ' +
         'El valor de respuesta debe estar completamente en español latinoamericano, ' +
@@ -294,8 +314,66 @@ export async function streamOllama({
         'traducciones, explicaciones del idioma ni texto fuera del JSON.',
     },
     ...history,
-    { role: 'user', content: prompt },
+    {
+      role: 'user',
+      content: prompt,
+      ...(image ? { images: [image.data] } : {}),
+    },
   ]
+
+  // A multimodal turn uses Ollama's native image field, with an explicit
+  // owner-selected photograph. The normal structured audio-only flow below is
+  // unchanged. Native plain text avoids cutting useful visual analysis inside
+  // the short JSON voice-response contract.
+  if (image) {
+    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt +
+              '\\nEstás examinando una foto proporcionada expresamente por el usuario. ' +
+              'Describe observaciones visuales; distingue claramente hipótesis. ' +
+              'No inventes detalles, y no repitas teléfonos ni identificadores privados. ' +
+              'Responde en español con frases naturales, breves y completas.',
+          },
+          ...history,
+          { role: 'user', content: prompt, images: [image.data] },
+        ],
+        stream: false,
+        think: false,
+        keep_alive: OLLAMA_KEEP_ALIVE,
+        options: { temperature: 0, num_ctx: 4096, num_predict: 256 },
+      }),
+      signal,
+    })
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      throw new Error(
+        `Ollama visual HTTP ${res.status}` +
+        (detail ? `: ${detail.slice(0, 160)}` : ''),
+      )
+    }
+    const packet = await res.json()
+    const answer = sanitizeLumiaVoiceOutput(
+      String(packet?.message?.content ?? '').trim(),
+    )
+    if (!answer) throw new Error('Ollama no entregó una descripción visual.')
+    // No image data in logs, transcript or process-local history.
+    const totalMs = Number(packet?.total_duration ?? 0) / 1_000_000
+    const promptMs = Number(packet?.prompt_eval_duration ?? 0) / 1_000_000
+    const loadMs = Number(packet?.load_duration ?? 0) / 1_000_000
+    console.log(
+      `[lumia] visual local model=${model} total=${totalMs.toFixed(0)}ms` +
+      ` input=${promptMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
+      ` outputTokens=${Number(packet?.eval_count ?? 0)}`,
+    )
+    onText(answer)
+    return answer
+  }
 
   const responseSchema = {
     type: 'object',
@@ -306,7 +384,7 @@ export async function streamOllama({
     additionalProperties: false,
   }
 
-  const runStructured = async (requestMessages) => {
+  const runStructured = async (requestMessages, numPredict = OLLAMA_VOICE_NUM_PREDICT) => {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -324,7 +402,7 @@ export async function streamOllama({
           // Voice replies are intentionally short. This prevents a malformed
           // local turn from generating hundreds of tokens before the user
           // hears anything, while leaving ample room for two spoken sentences.
-          num_predict: OLLAMA_VOICE_NUM_PREDICT,
+          num_predict: numPredict,
         },
       }),
       signal,
@@ -348,6 +426,7 @@ export async function streamOllama({
 
     console.log(
       `[orbia] LUMIA local latency model=${model}` +
+        ` done_reason=${String(packet?.done_reason ?? 'unknown').slice(0,24)}` +
         ` total=${totalMs.toFixed(0)}ms` +
         ` prompt=${promptMs.toFixed(0)}ms` +
         ` generate=${evalMs.toFixed(0)}ms` +
@@ -390,33 +469,157 @@ export async function streamOllama({
     return typeof candidate === 'string' ? candidate.trim() : ''
   }
 
-  let raw = await runStructured(messages)
+  if (STREAM_VOICE) {
+    const gate = createOllamaReplyGate({ onText })
+    let rawLines = ''
+    let chunks = 0
+    let lastPacket = null
+    const streamedStartedAt = performance.now()
+    try {
+      const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model, messages, stream: true, think: false,
+          format: responseSchema,
+          keep_alive: OLLAMA_KEEP_ALIVE,
+          options: { temperature: 0, num_predict: OLLAMA_VOICE_NUM_PREDICT },
+        }),
+        signal,
+      })
+      if (!res.ok || !res.body) {
+        throw new Error(`Ollama streaming unavailable: HTTP ${res.status}`)
+      }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      const consume = (line) => {
+        if (!line.trim()) return
+        if (++chunks > 4000) throw new Error('Ollama stream exceeded the safe packet limit')
+        const packet = JSON.parse(line)
+        if (packet.error) throw new Error('Ollama streaming returned an error')
+        const delta = packet.message?.content
+        if (typeof delta === 'string' && delta) gate.feed(delta)
+        if (packet.done === true) lastPacket = packet
+      }
+      try {
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          rawLines += decoder.decode(value, { stream: true })
+          if (rawLines.length > 128 * 1024) throw new Error('Ollama stream buffer overflow')
+          let nl
+          while ((nl = rawLines.indexOf('\n')) >= 0) {
+            const line = rawLines.slice(0, nl)
+            rawLines = rawLines.slice(nl + 1)
+            consume(line)
+          }
+        }
+        rawLines += decoder.decode()
+        if (rawLines.trim()) consume(rawLines)
+      } finally {
+        reader.releaseLock()
+      }
+      if (!lastPacket) throw new Error('Ollama stream ended without a completion marker')
+      const streamed = gate.finish()
+      const finalText = sanitizeLumiaVoiceOutput(streamed)
+      // All already-emitted speech must be a prefix of the final answer.
+      // This is an opt-in experiment; if a model violates the contract after
+      // audible output, signal the error rather than replaying duplicate text.
+      if (!finalText) throw new Error('Ollama streamed response empty')
+      const totalMs = Number(lastPacket.total_duration ?? 0) / 1_000_000
+      const promptMs = Number(lastPacket.prompt_eval_duration ?? 0) / 1_000_000
+      const evalMs = Number(lastPacket.eval_duration ?? 0) / 1_000_000
+      const tokens = Number(lastPacket.eval_count ?? 0)
+      console.log(
+        `[orbia] LUMIA streamed latency model=${model}` +
+        ` observed=${Math.round(performance.now() - streamedStartedAt)}ms` +
+        ` total=${totalMs.toFixed(0)}ms prompt=${promptMs.toFixed(0)}ms` +
+        ` generate=${evalMs.toFixed(0)}ms output=${tokens}tok` +
+        (evalMs > 0 ? ` speed=${(tokens / evalMs * 1000).toFixed(1)}tok/s` : ''),
+      )
+      return finalText
+    } catch (error) {
+      if (signal?.aborted) throw error
+      // A partial answer may already have been spoken; repeating it with the
+      // buffered fallback would be confusing and could double-execute intent.
+      if (gate.startedSpeaking) throw error
+      console.warn('[lumia] stream unavailable before speech; using validated buffered answer')
+    }
+  }
+
+  // Ordinary voice stays at the fast 120-token budget. Complex interventions
+  // get room to answer each understood question instead of one stock sentence.
+  const raw = await runStructured(messages, complexVoice ? 320 : OLLAMA_VOICE_NUM_PREDICT)
   let text = parseAnswer(raw)
 
-  // One bounded repair attempt. Do not fail an otherwise healthy conversation
-  // merely because a small local model named the JSON field incorrectly.
+  // Recover one malformed structured reply using the actual latest question.
+  // Never ask Ollama to reformat only its invalid output: that loses the user
+  // intent. Keep the usual 120-token limit for successful first attempts.
   if (!text) {
-    raw = await runStructured([
+    console.warn('[lumia] invalid local JSON: retrying latest user question once')
+    const recent = Array.isArray(history) ? history.slice(-2) : []
+    const retryMessages = [
       {
         role: 'system',
         content:
-          'Convierte la respuesta dada a un único objeto JSON que cumpla exactamente ' +
-          'el esquema solicitado. El campo "respuesta" debe contener solo la respuesta ' +
-          'final en español latinoamericano, sin razonamiento, traducciones ni comentarios.',
+          systemPrompt +
+          '\nResponde ÚNICAMENTE a la última pregunta. El contexto anterior ' +
+          'sirve para interpretar referencias, no para repetir respuestas viejas. ' +
+          'Responde en una o dos frases breves, sin inventar información. ' +
+          'Devuelve solamente un objeto JSON con la propiedad "respuesta".',
       },
-      {
-        role: 'user',
-        content: raw || 'No hubo contenido útil. Responde brevemente en español.',
-      },
-    ])
-    text = parseAnswer(raw)
-  }
-
-  if (!text) {
-    throw new Error('Ollama no entregó una respuesta final válida en español.')
+      ...recent,
+      { role: 'user', content: prompt },
+    ]
+    const retriedRaw = await runStructured(retryMessages, 256)
+    text = parseAnswer(retriedRaw)
+    if (!text) {
+      console.warn('[lumia] JSON still invalid after one local retry')
+      text = 'Te escuché, pero el modelo local no pudo generar una respuesta válida. ¿Puedes repetir tu pregunta?'
+    }
   }
 
   text = sanitizeLumiaVoiceOutput(text)
+
+  // A smaller local model may answer a *new* question by recycling a long
+  // earlier reply. Do not play the previous answer as if it were new.
+  // The model path is buffered on the ASUS, so one bounded retry is safe.
+  if (isStaleModelReply({ answer: text, prompt, history })) {
+    console.warn('[lumia] probable repeated old answer to a different user prompt; retrying once')
+    const latestPriorUser = [...history].reverse().find((entry) => entry.role === 'user')
+    const correctionMessages = [
+      {
+        role: 'system',
+        content:
+          systemPrompt +
+          '\nLa pregunta ACTUAL del usuario tiene prioridad absoluta sobre el contexto. ' +
+          'Tu respuesta previa fue rechazada por repetir información que no respondía la pregunta actual. ' +
+          'Responde SOLO la última pregunta; no repitas tu respuesta anterior. ' +
+          'Devuelve exclusivamente JSON {"respuesta":"una respuesta nueva y pertinente"}.',
+      },
+      ...(latestPriorUser ? [{
+        role: 'user',
+        content: 'Contexto de la conversación anterior, NO es la pregunta actual: ' +
+          String(latestPriorUser.content).slice(0, 360),
+      }] : []),
+      { role: 'user', content: prompt },
+    ]
+    try {
+      const retryText = sanitizeLumiaVoiceOutput(
+        parseAnswer(await runStructured(correctionMessages)),
+      )
+      if (retryText && !isStaleModelReply({ answer: retryText, prompt, history })) {
+        text = retryText
+      } else {
+        console.warn('[lumia] regenerated reply remained stale; returning a brief explicit non-answer')
+        text = 'No conseguí responder correctamente a tu última pregunta. ¿Puedes repetírmela?'
+      }
+    } catch (error) {
+      if (signal?.aborted) throw error
+      console.warn('[lumia] repeated-reply regeneration failed:', String(error?.message ?? error).slice(0,120))
+      text = 'Tu última pregunta se recibió, pero no pude generar una respuesta fiable. ¿Puedes repetirla?'
+    }
+  }
 
   onText(text)
   return text
@@ -480,7 +683,13 @@ export function attachOllamaSession(socket) {
       let answer = ''
       try {
         const history = getConversationHistory(conversationId)
-        const voiceControl = parseVoiceRuntimeControl(prompt)
+        // One single local photo; malformed payloads fail before model call.
+        // It is never added to chat history, console output or diagnostics.
+        const image = parseLocalVisualImage(msg.image)
+        if (image && process.env.ORBIA_LUMIA_VISION_ENABLED !== '1') {
+          throw new Error('Visión experimental deshabilitada en este bridge.')
+        }
+        const voiceControl = image ? null : parseVoiceRuntimeControl(prompt)
 
         if (voiceControl) {
           send({ type: 'tool', ask, name: 'orbi_voice_runtime_control' })
@@ -507,19 +716,21 @@ export function attachOllamaSession(socket) {
           return
         }
 
-        const modelControl = parseModelControl(prompt)
+        const modelControl = image ? null : parseModelControl(prompt, history)
 
         if (modelControl) {
           const toolName =
-            modelControl.action === 'list'
-              ? 'orbi_model_registry'
-              : 'orbi_model_switch'
+            modelControl.action === 'switch'
+              ? 'orbi_model_switch'
+              : 'orbi_model_registry'
 
           send({ type: 'tool', ask, name: toolName })
 
           const probe = await probeOllama()
           if (!probe.ok) {
             answer = 'No puedo consultar los modelos locales porque Ollama no está disponible.'
+          } else if (modelControl.action === 'count') {
+            answer = modelInventoryCountToSpeech(probe.models)
           } else if (modelControl.action === 'list') {
             answer = modelInventoryToSpeech(probe.models)
           } else {
@@ -561,7 +772,7 @@ export function attachOllamaSession(socket) {
         }
 
         const knowledgeContext = buildKnowledgeContext(prompt)
-        const toolRequest = selectReadOnlyTool(
+        const toolRequest = image ? null : selectReadOnlyTool(
           prompt,
           conversationId,
           `${ask ?? 'turn'}-tool`,
@@ -586,6 +797,7 @@ export function attachOllamaSession(socket) {
           }),
           knowledgeContext,
           toolContext,
+          image,
           signal: controller.signal,
           onText: (delta) => send({ type: 'text', ask, delta }),
         })

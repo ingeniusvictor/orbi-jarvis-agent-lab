@@ -52,10 +52,33 @@ export type Blade = {
   hold: 'turn' | 'sticky'
 }
 
+export type SpokenSegment = {
+  text: string
+  at: number
+  gapMs: number | null
+  queuedAt: number
+  synthesizedAt?: number
+  waitingTextMs: number | null
+  waitingAudioMs: number | null
+  waitingPlaybackMs: number | null
+}
+
 export type Turn = {
   id: string
   role: 'user' | 'jarvis'
   text: string
+  /** Local clock timestamp for accepted commands and queued replies. */
+  at?: number
+  firstTextAt?: number
+  firstAudioAt?: number
+  finishedAt?: number
+  /** Separate manual Qwen retranslation timing; never overwrite original total. */
+  retranslatedAt?: number
+  retranslationMs?: number
+  status?: 'pending' | 'generating' | 'playing' | 'complete' | 'no-response' | 'error' | 'interrupted'
+  errorNote?: string
+  /** Timestamps are recorded on actual audio-element/speechSynthesis start. */
+  spokenSegments?: Array<SpokenSegment>
   /** Tool names invoked while producing this turn, for the HUD readout. */
   tools?: string[]
 }
@@ -68,6 +91,8 @@ export type HeardLine = {
   wakeMatched: boolean
   mode: Phase | 'wake' | 'command' | 'guard' | 'deaf'
   at: number
+  /** Local Whisper/ElevenLabs conversion + transport, if measured. */
+  sttMs?: number
 }
 
 export type MultiSpeakerLine = {
@@ -240,6 +265,7 @@ type State = {
   turns: Turn[]
   activeTool: string | null
   error: string | null
+  errorAt: number | null
   connected: string[]
   /** Name of the speech-synthesis voice in use, shown in the HUD. */
   voice: string
@@ -283,6 +309,9 @@ type State = {
   setConnected: (c: string[]) => void
   pushTurn: (t: Turn) => void
   appendToLastTurn: (text: string) => void
+  appendToTurn: (id: string, delta: string) => void
+  updateTurn: (id: string, patch: Partial<Omit<Turn, 'id' | 'role'>>) => void
+  pushSpokenSegment: (id: string, segment: SpokenSegment) => void
 
   applyUi: (patch: UiPatch) => void
   addOrbit: (o: OrbitObject) => void
@@ -302,6 +331,7 @@ export const useStore = create<State>((set) => ({
   turns: [],
   activeTool: null,
   error: null,
+  errorAt: null,
   connected: [],
   voice: '',
   gestures: false,
@@ -381,7 +411,7 @@ export const useStore = create<State>((set) => ({
       multiSpeakerLines: [...s.multiSpeakerLines.slice(-59), line],
     })),
   setActiveTool: (activeTool) => set({ activeTool }),
-  setError: (error) => set({ error }),
+  setError: (error) => set({ error, errorAt: error ? Date.now() : null }),
   setConnected: (connected) => set({ connected }),
   pushTurn: (turn) => set((s) => ({ turns: [...s.turns.slice(-40), turn] })),
   appendToLastTurn: (text) =>
@@ -392,6 +422,26 @@ export const useStore = create<State>((set) => ({
       turns[turns.length - 1] = { ...last, text: last.text + text }
       return { turns }
     }),
+  appendToTurn: (id, delta) =>
+    set((s) => ({
+      turns: s.turns.map((entry) =>
+        entry.id === id && entry.role === 'jarvis'
+          ? { ...entry, text: entry.text + delta }
+          : entry,
+      ),
+    })),
+  updateTurn: (id, patch) =>
+    set((s) => ({
+      turns: s.turns.map((entry) => entry.id === id ? { ...entry, ...patch } : entry),
+    })),
+  pushSpokenSegment: (id, segment) =>
+    set((s) => ({
+      turns: s.turns.map((entry) =>
+        entry.id === id && entry.role === 'jarvis'
+          ? { ...entry, spokenSegments: [...(entry.spokenSegments ?? []), segment].slice(-16) }
+          : entry,
+      ),
+    })),
 
   // Deep on purpose. "Make the reactor red" arrives as a patch touching only
   // reactor.color, and a shallow merge would take the scale, spin and style

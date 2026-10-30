@@ -22,13 +22,20 @@ function writeAscii(view: DataView, offset: number, value: string) {
 export async function audioBlobToPcmWav(
   blob: Blob,
   targetRate = 16_000,
+  maxDurationSeconds?: number,
 ): Promise<Blob> {
   if (!blob.size) throw new Error('Audio segment is empty.')
 
   const encoded = await blob.arrayBuffer()
   const decoded = await context().decodeAudioData(encoded.slice(0))
   if (!decoded.length || !decoded.numberOfChannels) {
-    throw new Error('Audio segment could not be decoded.')
+    throw new Error('No se pudo decodificar el audio seleccionado.')
+  }
+  // LT-05 file imports enforce a duration cap BEFORE allocating the PCM
+  // output; existing microphone capture callers are unchanged.
+  if (maxDurationSeconds != null && decoded.duration > maxDurationSeconds) {
+    throw new Error('El audio supera los ' + maxDurationSeconds +
+      ' segundos. Divide el mensaje en partes.')
   }
 
   const rate = Math.max(8_000, Math.min(48_000, Math.round(targetRate)))

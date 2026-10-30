@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useStore, accentFor, type Phase } from '../store'
 import { Suggestions } from './Suggestions'
+import { HaloFlow } from './HaloFlow'
+import { AudioTranslationReview } from './AudioTranslationReview'
 import { BladeSweep, Blades } from './Blades'
 import { Effects } from './Effects'
 import { Pointer } from './Pointer'
 import { GestureGuide } from './GestureGuide'
 import { brainLabel } from '../lib/capabilities'
+import { dateLabel, timeLabel, elapsedLabel, turnStateLabel, exportConversationTimeline } from '../lib/conversation-timeline'
 
 const statusText: Record<Phase, string> = {
   offline: 'DESCONECTADA',
@@ -162,6 +165,8 @@ function DecodeText({ text }: { text: string }) {
 
 export function Hud() {
   const phase = useStore((s) => s.phase)
+  const curved = import.meta.env.VITE_LUMIA_CURVED_TEXT === '1' && window.innerWidth > 1200
+  const curvePaneStyle = curved ? { width: 'min(44vw, 760px)' } : undefined
   const caption = useStore((s) => s.caption)
   const heardLines = useStore((s) => s.heardLines)
   const multiSpeakerLines = useStore((s) => s.multiSpeakerLines)
@@ -169,6 +174,17 @@ export function Hud() {
   const activeTool = useStore((s) => s.activeTool)
   const connected = useStore((s) => s.connected)
   const error = useStore((s) => s.error)
+  const errorAt = useStore((s) => s.errorAt)
+  const [now, setNow] = useState(() => Date.now())
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const heardScroll = useRef<HTMLElement>(null)
+  const replyScroll = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    // Observational clock; refresh pending durations, never drive the voice loop.
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
   const level = useStore((s) => s.level)
   const voice = useStore((s) => s.voice)
   const bootNote = useStore((s) => s.bootNote)
@@ -178,6 +194,16 @@ export function Hud() {
 
   const latestHeard = heardLines[heardLines.length - 1]
   const latestUserTurn = [...turns].reverse().find((turn) => turn.role === 'user')
+  const latestResponse = [...turns].reverse().find((turn) => turn.role === 'jarvis')
+  const latestHeardId = latestHeard?.id
+  const lastReplyLength = latestResponse?.text.length ?? 0
+  const latestReplyId = latestResponse?.id
+  useEffect(() => {
+    if (heardScroll.current) heardScroll.current.scrollTop = heardScroll.current.scrollHeight
+  }, [latestHeardId])
+  useEffect(() => {
+    if (replyScroll.current) replyScroll.current.scrollTop = replyScroll.current.scrollHeight
+  }, [latestReplyId, lastReplyLength])
 
   // accentFor folds JARVIS's overrides in over the phase colour, so one
   // variable on the root carries a theme change into every .hud-* rule without
@@ -225,6 +251,23 @@ export function Hud() {
           </span>
         </div>
       </header>
+
+      {ui.chrome.transcript && (
+        <div className="conversation-date-bar" aria-label="Fecha de la conversación">
+          <span>{dateLabel(now)} · REGISTRO LOCAL</span>
+          <button type="button" className="conversation-copy"
+            title="Copiar las transcripciones y los tiempos de esta sesión; no envía datos automáticamente"
+            onClick={() => {
+              const text = exportConversationTimeline({ heard: heardLines, turns, at: now, error, errorAt })
+              void navigator.clipboard.writeText(text)
+                .then(() => setCopyState('copied'))
+                .catch(() => setCopyState('error'))
+            }}>
+            {copyState === 'copied' ? 'REGISTRO COPIADO' :
+              copyState === 'error' ? 'ERROR AL COPIAR' : 'COPIAR REGISTRO'}
+          </button>
+        </div>
+      )}
 
       {/* Left rail: which integrations are live */}
       {ui.chrome.systems && (
@@ -284,7 +327,7 @@ export function Hud() {
           thing as a command or an assistant response. */}
       {ui.chrome.transcript && (
         <>
-          <section className="voice-pane voice-pane-heard">
+          <section ref={heardScroll} className={`voice-pane voice-pane-heard${curved ? ' voice-pane-curved' : ''}`} style={curvePaneStyle}>
             <div className="voice-pane-head">
               <span>ESCUCHANDO</span>
               <span className="voice-pane-sub">
@@ -295,7 +338,7 @@ export function Hud() {
             </div>
 
             <AnimatePresence initial={false}>
-              {heardLines.slice(-10).map((line) => (
+              {heardLines.slice(-25).map((line) => (
                 <motion.div
                   key={line.id}
                   className={`voice-line voice-line-heard ${
@@ -312,7 +355,14 @@ export function Hud() {
                   <span className="voice-line-mode">
                     {heardLaneLabel(line.kind, line.mode, line.wakeMatched)}
                   </span>
-                  <span className="voice-line-text">{line.text}</span>
+                  <div className="voice-line-body">
+                    <HaloFlow side="left">
+                      <span className="voice-line-time">{timeLabel(line.at)}
+                        {line.sttMs != null ? ` · STT ${line.sttMs} ms` : ''}
+                      </span>
+                      <span className="voice-line-text">{line.text}</span>
+                    </HaloFlow>
+                  </div>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -320,7 +370,12 @@ export function Hud() {
             {latestUserTurn && (
               <div className="voice-command-final">
                 <span className="voice-command-label">COMANDO A O.R.B.I.A.</span>
-                <span className="voice-command-text">{latestUserTurn.text}</span>
+                <div className="voice-command-text">
+                  <HaloFlow side="left">
+                    <span className="voice-line-time">{timeLabel(latestUserTurn.at)}</span>
+                    {latestUserTurn.text}
+                  </HaloFlow>
+                </div>
               </div>
             )}
 
@@ -339,7 +394,7 @@ export function Hud() {
             </AnimatePresence>
           </section>
 
-          <section className="voice-pane voice-pane-lumi">
+          <section ref={replyScroll} className={`voice-pane voice-pane-lumi${curved ? ' voice-pane-curved' : ''}`} style={curvePaneStyle}>
             <div className="voice-pane-head">
               <span>RESPUESTA</span>
               <span className="voice-pane-sub">L.U.M.I.A.</span>
@@ -352,14 +407,60 @@ export function Hud() {
                 .map((turn) => (
                   <motion.div
                     key={turn.id}
-                    className="voice-line voice-line-lumi"
+                    className={'voice-line voice-line-lumi' +
+                      (turn.text.startsWith('Transcripción original (') ? ' voice-line-translation-audio' : '')}
                     initial={{ opacity: 0, x: 8 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0 }}
                   >
-                    <span className="voice-line-text">
-                      <DecodeText text={turn.text} />
+                    <HaloFlow side="right">
+                    <span className="voice-line-time">{timeLabel(turn.at)} · {turnStateLabel(turn, now)}
+                      {turn.at && turn.status === 'pending'
+                        ? ` · +${elapsedLabel(turn.at, now)}` : ''}
                     </span>
+                    <span className="voice-line-text">
+                      {turn.text ? <DecodeText text={turn.text} /> : '(aún sin texto)'}
+                    </span>
+                    {turn.firstTextAt && (
+                      <span className="voice-line-stage">
+                        Primer texto {timeLabel(turn.firstTextAt)}
+                        {' · +'}{elapsedLabel(turn.at, turn.firstTextAt)}
+                      </span>
+                    )}
+                    {turn.firstAudioAt && (
+                      <span className="voice-line-stage">
+                        Inicio de audio {timeLabel(turn.firstAudioAt)}
+                        {' · +'}{elapsedLabel(turn.at, turn.firstAudioAt)}
+                      </span>
+                    )}
+                    {turn.spokenSegments?.map((segment, index) => (
+                      <span key={index} className="voice-line-stage">
+                        Voz #{index + 1} {timeLabel(segment.at)}
+                        {segment.gapMs !== null ? ` · pausa ${(segment.gapMs / 1000).toFixed(2)} s` : ''}
+                        {segment.waitingTextMs !== null
+                          ? ` · texto ${(segment.waitingTextMs / 1000).toFixed(2)} s` : ''}
+                        {segment.waitingAudioMs !== null
+                          ? ` · Kokoro ${(segment.waitingAudioMs / 1000).toFixed(2)} s` : ''}
+                        {segment.waitingPlaybackMs !== null
+                          ? ` · reproducción ${(segment.waitingPlaybackMs / 1000).toFixed(2)} s` : ''}
+                        {' · '}{segment.text.slice(0, 66)}
+                      </span>
+                    ))}
+                    {turn.finishedAt && (
+                      <span className="voice-line-stage">
+                        Fin {timeLabel(turn.finishedAt)}
+                        {' · total '}{elapsedLabel(turn.at, turn.finishedAt)}
+                      </span>
+                    )}
+                    {turn.retranslatedAt && (
+                      <span className="voice-line-stage voice-line-retranslation">
+                        Retraducido {timeLabel(turn.retranslatedAt)}
+                        {turn.retranslationMs != null ? ` · Qwen ${(turn.retranslationMs / 1000).toFixed(2)} s` : ''}
+                      </span>
+                    )}
+                    {turn.errorNote && <span className="voice-line-error">ERROR: {turn.errorNote}</span>}
+                    {turn.status === 'complete' && <AudioTranslationReview turnId={turn.id} text={turn.text} />}
+                    </HaloFlow>
                   </motion.div>
                 ))}
             </AnimatePresence>
@@ -391,7 +492,9 @@ export function Hud() {
 
       {ui.chrome.suggestions && <Suggestions />}
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error">
+        <span className="voice-line-time">{timeLabel(errorAt)} · ERROR</span> {error}
+      </div>}
 
       <footer className="hud-bottom">
         <span className="hint">

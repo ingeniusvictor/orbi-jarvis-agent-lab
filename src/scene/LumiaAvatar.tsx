@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useStore } from '../store'
+import { isFaceOnlyAvatar } from './avatar-profile'
 import type { Drive } from './Scene'
 
 const MODEL_URL = '/models/lumia/lumia.glb'
@@ -12,6 +13,8 @@ type Prepared = {
   reactive: THREE.MeshStandardMaterial[]
   center: THREE.Vector3
   height: number
+  /** Face-only edition is explicitly marked inside the uploaded GLB. */
+  faceOnly: boolean
 }
 
 /**
@@ -35,19 +38,69 @@ const OPTICAL_LIFT = 0.095
  */
 const OPTICAL_SHIFT_PX = -28
 
+/**
+ * Face-only screenshot acceptance AV-01B (27 Oct 2026): the shoulders and
+ * hair were close to the reactor rim, and the face sat slightly left of its
+ * visual centre. Keep offsets in CSS pixels for consistent desktop framing.
+ * The original robot retains its established optical calibration.
+ */
+const FACE_HEIGHT_FRACTION = 0.47
+const FACE_SHIFT_PX = 25
+
+/**
+ * Per-machine face-only size correction. Preserve the approved canonical
+ * fraction and the legacy robot by default. This multiplier shrinks the
+ * complete bust uniformly around its geometric centre, never editing GLB.
+ * Small, opt-in ASUS trial: 0.92 gives 8% more breathing room inside the rings.
+ */
+const faceScaleSetting = import.meta.env.VITE_LUMIA_FACE_SCALE
+const faceScaleParsed = Number(faceScaleSetting)
+const FACE_SCALE_EFFECTIVE =
+  faceScaleSetting !== undefined &&
+  String(faceScaleSetting).trim() !== '' &&
+  Number.isFinite(faceScaleParsed) &&
+  faceScaleParsed >= 0.80 &&
+  faceScaleParsed <= 1
+    ? faceScaleParsed
+    : 1
+
+/**
+ * Optional per-machine horizontal optical calibration for face-v1 ONLY.
+ * The original +25px approved baseline is preserved when no override is set.
+ * On ASUS, the owner's live capture shows the face a little right of centre;
+ * VITE_LUMIA_FACE_SHIFT_PX=0 is a reversible trial (no GLB changes).
+ * Numeric range [-80, 80] prevents accidentally losing the avatar offscreen.
+ * Vite reads this on server launch; restarting is required to apply changes.
+ */
+const faceShiftSetting = import.meta.env.VITE_LUMIA_FACE_SHIFT_PX
+const faceShiftParsed = Number(faceShiftSetting)
+const FACE_SHIFT_EFFECTIVE_PX =
+  faceShiftSetting !== undefined &&
+  String(faceShiftSetting).trim() !== '' &&
+  Number.isFinite(faceShiftParsed) &&
+  Math.abs(faceShiftParsed) <= 80
+    ? faceShiftParsed
+    : FACE_SHIFT_PX
+
 function cloneMaterial(
   material: THREE.Material,
   reactive: THREE.MeshStandardMaterial[],
+  faceOnly: boolean,
 ): THREE.Material {
   const clone = material.clone()
 
   if (clone instanceof THREE.MeshStandardMaterial) {
     // Preserve the authored maps while giving the model enough internal light
     // to read as part of the reactor instead of as a normal opaque 3D asset.
-    clone.emissive = new THREE.Color('#0b3d42')
-    clone.emissiveIntensity = 0.34
-    clone.metalness = Math.max(0.22, clone.metalness)
-    clone.roughness = Math.min(0.58, clone.roughness)
+    // Face-only asset comes with authored PBR/skin/crystal textures. Preserve
+    // those maps and their metallic response; strong emissive retuning would
+    // bleach facial details after the scene's bloom pass.
+    clone.emissive = new THREE.Color(faceOnly ? '#051c23' : '#0b3d42')
+    clone.emissiveIntensity = faceOnly ? 0.12 : 0.34
+    if (!faceOnly) {
+      clone.metalness = Math.max(0.22, clone.metalness)
+      clone.roughness = Math.min(0.58, clone.roughness)
+    }
     reactive.push(clone)
   }
 
@@ -75,6 +128,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
   const prepared = useMemo<Prepared>(() => {
     const reactive: THREE.MeshStandardMaterial[] = []
     const object = scene.clone(true)
+    const faceOnly = isFaceOnlyAvatar(object)
 
     object.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
@@ -84,8 +138,8 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
       child.receiveShadow = false
 
       child.material = Array.isArray(child.material)
-        ? child.material.map((material) => cloneMaterial(material, reactive))
-        : cloneMaterial(child.material, reactive)
+        ? child.material.map((material) => cloneMaterial(material, reactive, faceOnly))
+        : cloneMaterial(child.material, reactive, faceOnly)
     })
 
     const box = new THREE.Box3().setFromObject(object)
@@ -97,6 +151,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
       reactive,
       center,
       height: Math.max(size.y, 0.001),
+      faceOnly,
     }
   }, [scene])
 
@@ -104,7 +159,9 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
     if (!root.current) return
 
     const fit = Math.min(viewport.width, viewport.height)
-    const targetHeight = fit * 0.45
+    // A head alone can occupy more of the inner circle without any feet or
+    // antenna extending outside the hologram. Retain the classic size otherwise.
+    const targetHeight = fit * (prepared.faceOnly ? FACE_HEIGHT_FRACTION : 0.45)
     const modelScale = targetHeight / prepared.height
     const t = state.clock.elapsedTime
     const phase = useStore.getState().phase
@@ -139,10 +196,12 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
               ? 0.22
               : 0
 
-    root.current.scale.setScalar(modelScale * voicePulse)
+    root.current.scale.setScalar(
+      modelScale * voicePulse * (prepared.faceOnly ? FACE_SCALE_EFFECTIVE : 1),
+    )
     const worldPerPixelX = viewport.width / Math.max(canvasWidth, 1)
     root.current.position.set(
-      OPTICAL_SHIFT_PX * worldPerPixelX,
+      (prepared.faceOnly ? FACE_SHIFT_EFFECTIVE_PX : OPTICAL_SHIFT_PX) * worldPerPixelX,
       Math.sin(t * 0.82) * floatAmount,
       0.12,
     )
@@ -158,7 +217,9 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
 
     // Let L.U.M.I.A.'s own surfaces breathe with the same accent/audio energy
     // as the surrounding hologram.
-    const targetIntensity = 0.28 + drive.level * 0.75
+    const targetIntensity = prepared.faceOnly
+      ? 0.10 + drive.level * 0.28
+      : 0.28 + drive.level * 0.75
     for (const material of prepared.reactive) {
       material.emissive.lerp(drive.reactor.color, Math.min(1, dt * 3))
       material.emissiveIntensity +=
@@ -171,7 +232,7 @@ export function LumiaAvatar({ drive }: { drive: Drive }) {
       <group
         position={[
           -prepared.center.x,
-          -prepared.center.y + prepared.height * OPTICAL_LIFT,
+          -prepared.center.y + prepared.height * (prepared.faceOnly ? 0 : OPTICAL_LIFT),
           -prepared.center.z,
         ]}
       >

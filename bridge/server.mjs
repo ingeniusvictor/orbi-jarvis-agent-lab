@@ -21,7 +21,7 @@ import { displayServer } from './panels.mjs'
 import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
-import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, probeOllama, warmOllama } from './ollama.mjs'
+import { attachOllamaSession, OLLAMA_MODEL, OLLAMA_URL, getOllamaModel, probeOllama, warmOllama } from './ollama.mjs'
 import { attachOpenAISession, OPENAI_MODEL, openAIConfigured } from './providers/openai.mjs'
 import { attachHybridSession } from './providers/hybrid.mjs'
 import { brainProviderStatus, resolveBrainProvider } from './providers/registry.mjs'
@@ -49,10 +49,15 @@ import {
 } from './orbia/local-tts.mjs'
 import { transcribeMultivoiceLocalWav } from './orbia/multivoice-stt.mjs'
 import { ensureWhisperServer } from './orbia/whisper-server-runtime.mjs'
+import { translateLocalText, validateTranslation } from './orbia/local-translate.mjs'
+import { transcribeTranslationAudio, AUDIO_TRANSLATE_MAX_WAV_BYTES } from './orbia/translation-audio-stt.mjs'
+import { prewarmResidentKokoro } from './orbia/resident-tts.mjs'
+import { createRealtimeGrantService } from './orbia/realtime-grants.mjs'
 
 const PORT = Number(process.env.JARVIS_BRIDGE_PORT ?? 8787)
 const speakerEnrollmentSamples = []
 const SPEAKER_SAMPLE_LIMIT = 10 * 1024 * 1024
+const realtimeGrants = createRealtimeGrantService()
 
 
 /**
@@ -692,7 +697,7 @@ function corsFor(req) {
   const headers = { vary: 'origin' }
   if (origin) {
     headers['access-control-allow-origin'] = origin
-    headers['access-control-allow-headers'] = 'content-type, x-orbia-voice-mode'
+    headers['access-control-allow-headers'] = 'content-type, x-orbia-voice-mode, x-orbia-realtime-pin'
   }
   return headers
 }
@@ -726,6 +731,9 @@ async function readSpeakerWav(req) {
   return Buffer.concat(chunks)
 }
 
+// At most one imported audio at a time on the owner's local ASUS CPU.
+let translateAudioActive = false
+
 const handleRequest = async (req, res) => {
   const origin = req.headers.origin
   if (origin && !originAllowed(origin)) {
@@ -738,6 +746,160 @@ const handleRequest = async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, cors)
     return res.end()
+  }
+
+  // LT-05: a deliberately chosen voice-note FILE, not a live microphone.
+  // The browser decodes an original audio attachment to bounded PCM WAV.
+  // Whisper CLI uses the manually chosen language, no wake detector/prompt,
+  // no Spanish vocabulary correction and no cloud transfer.
+  if (req.method === 'POST' && req.url?.startsWith('/translate/audio?')) {
+    const headers = { ...cors, 'content-type': 'application/json',
+      'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }
+    const reply = (status, body) => {
+      res.writeHead(status, headers)
+      return res.end(JSON.stringify(body))
+    }
+    if (process.env.ORBIA_LUMIA_TRANSLATE_ENABLED !== '1' ||
+        process.env.ORBIA_LUMIA_TRANSLATE_AUDIO_ENABLED !== '1' ||
+        PROVIDER !== 'ollama') {
+      return reply(503,{ok:false,error:'LT-05 no está habilitado en este perfil local.'})
+    }
+    const url=new URL(req.url,'http://localhost')
+    const source=url.searchParams.get('source')
+    const target=url.searchParams.get('target')
+    if (!['es','en','zh'].includes(source) || !['es','en','zh'].includes(target) ||
+        source === target) {
+      return reply(400,{ok:false,error:'Selecciona dos idiomas diferentes.'})
+    }
+    if (!['audio/wav','audio/x-wav','audio/wave'].includes(
+      String(req.headers['content-type'] || '').split(';')[0].toLowerCase().trim())) {
+      return reply(415,{ok:false,error:'Se requiere WAV PCM convertido localmente.'})
+    }
+    if (translateAudioActive)
+      return reply(429,{ok:false,error:'Hay un audio en traducción. Termina el anterior.'})
+    translateAudioActive=true
+    try {
+      let size=0
+      const chunks=[]
+      for await(const chunk of req) {
+        size+=chunk.length
+        if(size>AUDIO_TRANSLATE_MAX_WAV_BYTES)
+          return reply(413,{ok:false,error:'El audio supera los 90 segundos permitidos.'})
+        chunks.push(chunk)
+      }
+      let transcript
+      try {
+        transcript=await transcribeTranslationAudio(Buffer.concat(chunks),{language:source})
+      } catch(e) {
+        const code=String(e?.code || '')
+        const status=code==='STT_NOT_INSTALLED' || code==='MULTILINGUAL_MODEL_REQUIRED' ? 503
+          : code==='STT_TIMEOUT' ? 504 : code==='STT_EMPTY' ? 422
+            : code==='INVALID_AUDIO' || code==='INVALID_LANGUAGE' ? 400 : 502
+        // Only predefined local error messages. No raw audio or text in logs.
+        return reply(status,{ok:false,stage:'stt',code,
+          error:e?.message || 'No se pudo reconocer el audio localmente.'})
+      }
+      try {
+        const started=performance.now()
+        const result=await translateLocalText({
+          text:transcript.text,source,target,
+        },{
+          ollamaUrl:OLLAMA_URL,model:getOllamaModel(),
+          signal:AbortSignal.timeout(65_000),
+        })
+        return reply(200,{ok:true,source,target,
+          originalText:transcript.text,translation:result.translation,
+          durationSeconds:transcript.durationSeconds,
+          sttMs:transcript.sttMs,
+          translationMs:Math.round(performance.now()-started)})
+      } catch(e) {
+        if(e?.code==='QUALITY_REJECTED') {
+          // A useful transcript must survive even when translation fails:
+          // the owner can inspect it and retry with another language.
+          return reply(422,{ok:false,stage:'translation',code:'QUALITY_REJECTED',
+            originalText:transcript.text,error:e.message})
+        }
+        if(e?.name==='TimeoutError' || e?.name==='AbortError') {
+          return reply(504,{ok:false,stage:'translation',code:'OLLAMA_TIMEOUT',
+            originalText:transcript.text,
+            error:'Ollama tardó demasiado en traducir el audio.'})
+        }
+        return reply(502,{ok:false,stage:'translation',code:'OLLAMA_FAILURE',
+          originalText:transcript.text,
+          error:'Ollama no pudo traducir el audio transcrito.'})
+      }
+    } finally {
+      translateAudioActive=false
+    }
+  }
+
+  // LT-01: independent opt-in translation. It never changes Whisper's
+  // Spanish language setting, chat history, Kokoro or microphone permissions.
+  if (req.method === 'POST' && req.url === '/translate/local') {
+    const headers = { ...cors, 'content-type': 'application/json',
+      'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }
+    const reply = (status, payload) => {
+      res.writeHead(status, headers)
+      return res.end(JSON.stringify(payload))
+    }
+    if (process.env.ORBIA_LUMIA_TRANSLATE_ENABLED !== '1' || PROVIDER !== 'ollama')
+      return reply(503, { ok: false, error: 'Traducción local desactivada.' })
+    if (!String(req.headers['content-type'] || '').includes('application/json'))
+      return reply(415, { ok: false, error: 'Se requiere JSON.' })
+    const chunks = []
+    let size = 0
+    for await (const chunk of req) {
+      size += chunk.length
+      if (size > 16_384) return reply(413, { ok: false, error: 'Texto demasiado largo.' })
+      chunks.push(chunk)
+    }
+    let request
+    try {
+      request = validateTranslation(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+    } catch {
+      return reply(400, { ok: false, error: 'Solicitud o idiomas inválidos.' })
+    }
+    try {
+      const result = await translateLocalText(request, {
+        ollamaUrl: OLLAMA_URL,
+        model: getOllamaModel(),
+        signal: AbortSignal.timeout(45_000),
+      })
+      return reply(200, { ok: true, ...result })
+    } catch (err) {
+      // Keep data private: return only the validated, non-sensitive reason
+      // for model quality rejection; never raw prompt or model output.
+      if (err?.code === 'QUALITY_REJECTED') {
+        return reply(422, { ok: false, code: 'QUALITY_REJECTED',
+          error: err.message })
+      }
+      if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        return reply(504, { ok: false, code: 'OLLAMA_TIMEOUT',
+          error: 'Ollama excedió el tiempo permitido para esta traducción.' })
+      }
+      return reply(502, { ok: false, code: 'OLLAMA_FAILURE',
+        error: 'Ollama local no respondió correctamente. Revisa que esté activo.' })
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/voice/realtime/client-secret') {
+    // Extra authorization beyond the normal bridge origin policy. The secret
+    // is ONLY obtainable from an allowed local UI with a separate owner PIN,
+    // an explicit cloud-trial switch and remaining per-boot trial budget.
+    // No Origin means no browser identity, so fail closed.
+    const result = await realtimeGrants.grant({
+      origin,
+      pin: req.headers['x-orbia-realtime-pin'],
+      bridgePort: PORT,
+    })
+    res.writeHead(result.status, {
+      ...cors,
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+      'pragma': 'no-cache',
+      'x-content-type-options': 'nosniff',
+    })
+    return res.end(JSON.stringify(result.body))
   }
 
   if (req.method === 'GET' && req.url === '/health') {
@@ -1029,15 +1191,18 @@ const handleRequest = async (req, res) => {
     }
 
     try {
+      const voiceStartedAt = performance.now()
       const result = await synthesizeLocalSpeech(payload?.text, {
         speaker: payload?.speaker || 'ef_dora',
       })
+      const synthesisMs = Math.round(performance.now() - voiceStartedAt)
       res.writeHead(200, {
         ...cors,
         'content-type': result.mimeType,
         'cache-control': 'no-cache',
         'x-orbia-voice-provider': result.provider,
         'x-orbia-voice-speaker': result.speaker,
+        'x-orbia-tts-synthesis-ms': String(synthesisMs),
       })
       return res.end(Buffer.from(result.audio))
     } catch (err) {
@@ -1430,6 +1595,17 @@ if (!voiceRuntimeAtBoot.local.ttsAvailable) {
   console.warn(
     `${CONSOLE_TAG} Kokoro missing: ${missingKokoro.join(', ') || 'unknown'} · run INSTALAR_VOZ_LOCAL_LUMIA.cmd`,
   )
+}
+
+// Resident Kokoro is an explicitly enabled Windows experiment, independent
+// from Whisper's own resident-server setting. Prepare it during Ollama warm-up,
+// not on the first few spoken words.
+if (voiceRuntimeAtBoot.local.ttsAvailable &&
+    process.env.ORBIA_KOKORO_RESIDENT_ENABLED === '1') {
+  void prewarmResidentKokoro().then((ready) => {
+    if (ready.ready) console.log(`${CONSOLE_TAG} Kokoro resident ready · local model kept loaded`)
+    else console.warn(`${CONSOLE_TAG} Kokoro resident unavailable; standard local voice remains ready`)
+  })
 }
 
 if (

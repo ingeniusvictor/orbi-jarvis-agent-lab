@@ -4,33 +4,87 @@
  * the earlier stream, so everything that needs audio goes through here.
  */
 
-let stream: MediaStream | null = null
+import { createSharedMic } from './mic-lease'
+
+// ASUS-only experiment. Chrome's AGC can raise distant speech as if it were
+// close to the laptop. Keep noise suppression and echo cancellation enabled.
+const NEAR_FIELD_FOCUS = import.meta.env.VITE_LUMIA_NEAR_FIELD_FOCUS === '1'
+let observedAutoGain: boolean | null = null
+export const microphoneAutoGainObserved = () => observedAutoGain
+
 let ctx: AudioContext | null = null
 let analyser: AnalyserNode | null = null
+let analyserStream: MediaStream | null = null
 let buf: Uint8Array | null = null
+let analyserOpening: Promise<void> | null = null
 
-export async function getMic(): Promise<MediaStream> {
-  if (stream) return stream
-  stream = await navigator.mediaDevices.getUserMedia({
+// The original getMic() returned a cached stream unconditionally and could
+// run two concurrent getUserMedia prompts. Both are dangerous when a Windows
+// headset is removed, reconnected, or the voice loop restarts during boot.
+const sharedMic = createSharedMic(() =>
+  navigator.mediaDevices.getUserMedia({
     audio: {
       echoCancellation: true,
       noiseSuppression: true,
-      autoGainControl: true,
+      autoGainControl: !NEAR_FIELD_FOCUS,
     },
-  })
+  }),
+)
+
+/** Explicit release for text mode / completed push-to-talk. No recordings retained. */
+export function releaseMicrophone(): void {
+  const oldContext = ctx
+  ctx = null
+  analyser = null
+  analyserStream = null
+  buf = null
+  if (oldContext) void oldContext.close().catch(() => {})
+  sharedMic.release()
+  observedAutoGain = null
+}
+
+export async function getMic(): Promise<MediaStream> {
+  const stream = await sharedMic()
+  const actual = stream.getAudioTracks()[0]?.getSettings?.().autoGainControl
+  observedAutoGain = typeof actual === 'boolean' ? actual : null
   return stream
 }
 
-export async function startAnalyser(): Promise<void> {
-  if (analyser) return
-  const s = await getMic()
-  ctx = new AudioContext()
-  const src = ctx.createMediaStreamSource(s)
-  analyser = ctx.createAnalyser()
-  analyser.fftSize = 512
-  analyser.smoothingTimeConstant = 0.75
-  src.connect(analyser)
-  buf = new Uint8Array(analyser.frequencyBinCount)
+export function startAnalyser(): Promise<void> {
+  if (analyserOpening) return analyserOpening
+  const attempt: Promise<void> = (async () => {
+    const sourceStream = await getMic()
+    if (analyser && analyserStream === sourceStream && ctx?.state !== 'closed') return
+
+    // Rebind the analyser to a newly acquired microphone instead of reading
+    // a dead original stream forever after a USB/Bluetooth device changes.
+    const oldContext = ctx
+    ctx = null
+    analyser = null
+    analyserStream = null
+    buf = null
+    if (oldContext) await oldContext.close().catch(() => {})
+
+    const freshContext = new AudioContext()
+    try {
+      const source = freshContext.createMediaStreamSource(sourceStream)
+      const next = freshContext.createAnalyser()
+      next.fftSize = 512
+      next.smoothingTimeConstant = 0.75
+      source.connect(next)
+      ctx = freshContext
+      analyser = next
+      analyserStream = sourceStream
+      buf = new Uint8Array(next.frequencyBinCount)
+    } catch (error) {
+      void freshContext.close().catch(() => {})
+      throw error
+    }
+  })().finally(() => {
+    if (analyserOpening === attempt) analyserOpening = null
+  })
+  analyserOpening = attempt
+  return attempt
 }
 
 /** 0..1 loudness. Returns 0 before the analyser is up. */

@@ -30,6 +30,8 @@
     "certify:c1:voice-probe": "node scripts/certify-c1-local-voice-probe.mjs",
     "certify:c1:voice-adapters": "node scripts/certify-c1-local-voice-adapters.mjs",
     "voice:doctor": "node scripts/voice-doctor.mjs",
+    "voice:benchmark:stt02": "node scripts/benchmark-stt02.mjs",
+    "voice:preflight": "node scripts/lumia-voice-preflight.mjs --live",
     "certify:vrm:runtime": "node scripts/certify-vrm-control-runtime.mjs",
     "certify:voice": "npm run certify:c1 && npm run certify:vrm && npm run certify:vrm:runtime && npm run certify:c1:voice-probe && npm run certify:c1:voice-adapters && npm run certify:voice-focus && npm run certify:diarization-probe && npm run certify:diarization-adapter && npm run certify:multivoice-stt && npm run certify:voice-gate && npm run certify:c1:tool-runtime",
     "voice:setup": "node scripts/setup-local-voice.mjs",

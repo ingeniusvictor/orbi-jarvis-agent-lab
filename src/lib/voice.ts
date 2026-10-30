@@ -1,5 +1,5 @@
 import { BRIDGE_HTTP_URL, SPEECH_LANG } from '../config'
-import { getMic } from './audio'
+import { getMic, microphoneAutoGainObserved } from './audio'
 import {
   speakerOutputActive,
   speakingEchoReference,
@@ -9,14 +9,24 @@ import {
 import { startVad, type Vad } from './vad'
 import { caps } from './capabilities'
 import { audioBlobToPcmWav } from './wav'
+import { decideTextTurnHold } from './adaptive-turn'
+import { complexVoiceHoldMs } from './complex-voice-turn'
 import {
   isNonSpeechTranscript,
   isRapidDuplicateTranscript,
   shouldDropStaleVoiceSegment,
   shouldInterruptBusyAssistant,
+  shouldRecoverGuardToWake,
   transcriptSegmentIsStillActive,
   type FocusVoiceMode,
 } from './voice-focus'
+import {
+  isLongCommandSegment,
+  shouldDeferLongQuestion,
+  LONG_QUESTION_ASSEMBLY_CAP_MS,
+  LONG_QUESTION_AFTER_TRANSCRIPT_MS,
+  LONG_QUESTION_POLL_MS,
+} from './long-question'
 
 /**
  * The voice loop.
@@ -56,6 +66,7 @@ export type VoiceTranscriptEvent = {
   wakeMatched: boolean
   capturedMode: VoiceMode
   at: number
+  sttMs?: number
 }
 
 export type VoiceHandlers = {
@@ -67,6 +78,9 @@ export type VoiceHandlers = {
   onWake: (trailing: string) => void
   /** The user has genuinely started talking. This is the barge-in trigger. */
   onSpeechStart: () => void
+  /** Owner-enabled long local command confirmed; extend the existing command
+   * window once, never a standby/wake/guard authorization. */
+  onLongSpeechSegment?: () => void
   /** Live transcript, for the caption under the reactor. */
   onPartial: (text: string) => void
   /** A raw recogniser segment before turn assembly/model submission. */
@@ -81,6 +95,8 @@ export type Voice = {
   stop: () => void
   /** True while a recogniser is actually running. */
   live: () => boolean
+  /** Authorized, already captured command still being decoded/assembled. */
+  hasPendingCommand?: () => boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +219,13 @@ const BROWSER_SETTLE_MS = 300
 const BROWSER_CONTINUE_MS = 2400
 const BROWSER_MAX_HOLD_MS = 30000
 
+/** Experiment off by default; never changes Voice Gate or action authority. */
+const ADAPTIVE_TURNS_ENABLED = import.meta.env.VITE_LUMIA_ADAPTIVE_TURNS === '1'
+const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_GRACE === '1'
+const NEAR_FIELD_FOCUS_ENABLED = import.meta.env.VITE_LUMIA_NEAR_FIELD_FOCUS === '1'
+const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INPUT === '1'
+const COMPLEX_VOICE_ENABLED = import.meta.env.VITE_LUMIA_COMPLEX_VOICE_VQ01 === '1'
+
 /**
  * How long to keep waiting, given what has been said so far.
  * 0 means "this is a complete thought, send it now".
@@ -243,6 +266,10 @@ function makeAssembler(
     settleMs?: number
     continueMs?: number
     maxHoldMs?: number
+    adaptive?: boolean
+    longHold?: () => boolean
+    shouldDefer?: (sinceLastMs: number, heldForMs: number) => boolean
+    complexHold?: (text: string, segments: number) => number
   } = {},
 ): Assembler {
   const settleMs = timing.settleMs ?? SETTLE_MS
@@ -251,6 +278,8 @@ function makeAssembler(
   let held = ''
   let timer: ReturnType<typeof setTimeout> | null = null
   let firstAt = 0
+  let lastFeedAt = 0
+  let segments = 0
 
   const clear = () => {
     if (timer) clearTimeout(timer)
@@ -259,15 +288,31 @@ function makeAssembler(
 
   const fire = () => {
     clear()
+    const heldForMs = firstAt ? Math.max(0, Date.now() - firstAt) : 0
+    const sinceLastMs = lastFeedAt ? Math.max(0, performance.now() - lastFeedAt) : 0
+    const cap = timing.longHold?.() ? LONG_QUESTION_ASSEMBLY_CAP_MS : maxHoldMs
+    if (held && heldForMs < cap && timing.shouldDefer?.(sinceLastMs, heldForMs)) {
+      timer = setTimeout(fire, LONG_QUESTION_POLL_MS)
+      return
+    }
     const text = held.trim()
     held = ''
     firstAt = 0
-    if (text) h.emit(text)
+    segments = 0
+    if (text) {
+      // Actual hold between the last recognized fragment and dispatch.
+      diag.assemblyHoldMs = lastFeedAt
+        ? Math.max(0, Math.round(performance.now() - lastFeedAt))
+        : null
+      h.emit(text)
+    }
   }
 
   return {
     feed(text, active) {
       if (!text.trim()) return
+      lastFeedAt = performance.now()
+      segments++
       held = `${held} ${text}`.replace(/\s+/g, ' ').trim()
       if (!firstAt) firstAt = Date.now()
       // The caption shows the whole thought as it assembles, not just the
@@ -283,10 +328,23 @@ function makeAssembler(
         return
       }
 
+      const decision = decideTextTurnHold({
+        text: held,
+        baselineMs: holdFor(held, settleMs, continueMs),
+        settleMs,
+        continueMs,
+        segments,
+        enabled: timing.adaptive,
+      })
+      const longForm = timing.longHold?.() ?? false
+      const hold = longForm
+        ? Math.max(decision.holdMs, LONG_QUESTION_AFTER_TRANSCRIPT_MS)
+        : Math.max(decision.holdMs, timing.complexHold?.(held, segments) ?? 0)
       const wait = Math.min(
-        holdFor(held, settleMs, continueMs),
-        Math.max(0, maxHoldMs - (Date.now() - firstAt)),
+        hold,
+        Math.max(0, (longForm ? LONG_QUESTION_ASSEMBLY_CAP_MS : maxHoldMs) - (Date.now() - firstAt)),
       )
+      diag.turnHoldReason = decision.reason
       diag.waitedMs = wait
       if (wait === 0) {
         fire()
@@ -299,6 +357,7 @@ function makeAssembler(
       clear()
       held = ''
       firstAt = 0
+      segments = 0
       diag.holding = ''
     },
     held: () => held,
@@ -443,8 +502,26 @@ export const diag = {
   maxQueueDepth: 0,
   /** Background/guard segments dropped to keep voice responsive. */
   queueDrops: 0,
-  /** Milliseconds the last transcription round-trip took. */
+  /** Milliseconds the last transcription round-trip took (legacy field; browser path records idle time). */
   idleMs: 0,
+  /** Completed local/cloud bridge transcription in ms, including audio conversion. Browser STT is opaque. */
+  sttRoundTripMs: null as number | null,
+  /** Actual delay from the last accepted transcript fragment to turn dispatch. */
+  assemblyHoldMs: null as number | null,
+  /** Last post-TTS follow-up hold, recorded without storing speech. */
+  postSpeechGuardMs: 2600,
+  /** Acoustic policy only alters *local command* segmentation on explicit opt-in. */
+  adaptiveTurnsEnabled: ADAPTIVE_TURNS_ENABLED,
+  acousticWindowMs: 650,
+  turnHoldReason: 'baseline',
+  longQuestionOptIn: LONG_QUESTION_INPUT_ENABLED,
+  longQuestionActive: false,
+  longQuestionParts: 0,
+  nearFieldFocus: NEAR_FIELD_FOCUS_ENABLED,
+  microphoneAgcActual: null as boolean | null,
+  microphoneRms: 0,
+  noiseFloorRms: 0,
+  triggerRms: 0,
 }
 
 /** Record why a transcript went nowhere. Silence always has a reason; this is
@@ -540,6 +617,16 @@ async function startVadBridgeVoice(
   let lastTranscript = ''
   let lastTranscriptAt = 0
   let lastTranscriptEpoch = -1
+  let longQuestionActive = false
+  let transcribingCommandEpoch = -1
+
+  const beginLongQuestion = () => {
+    if (!LONG_QUESTION_INPUT_ENABLED || provider !== 'local' ||
+        h.mode() !== 'command' || longQuestionActive) return
+    longQuestionActive = true
+    diag.longQuestionActive = true
+    h.onLongSpeechSegment?.()
+  }
 
   const refreshQueueDiag = () => {
     diag.queueDepth = pendingAudio.length
@@ -581,8 +668,11 @@ async function startVadBridgeVoice(
 
     pendingAudio.push({ blob, capturedMode, epoch })
 
-    // Hard ceiling: local voice must stay interactive even in a noisy room.
-    while (pendingAudio.length > 4) {
+    // Hard ceiling remains. Only an already-authorized complex COMMAND can
+    // queue two extra VAD parts; standby and guard remain at four and cannot
+    // flood Whisper with unattended household speech.
+    const queueLimit = COMPLEX_VOICE_ENABLED && capturedMode === 'command' ? 6 : 4
+    while (pendingAudio.length > queueLimit) {
       const backgroundIndex = pendingAudio.findIndex(
         (pending) => pending.capturedMode !== 'command',
       )
@@ -604,6 +694,8 @@ async function startVadBridgeVoice(
       // arrived while Whisper was decoding this command belongs to a later
       // speaker/turn and must not be appended just because it is already queued.
       captureEpoch++
+      longQuestionActive = false
+      diag.longQuestionActive = false
       pendingAudio.length = 0
       refreshQueueDiag()
       diag.dropped = ''
@@ -612,6 +704,25 @@ async function startVadBridgeVoice(
       h.onUtterance(text)
     },
     partial: (text) => h.onPartial(text),
+  }, {
+    adaptive: ADAPTIVE_TURNS_ENABLED,
+    complexHold: (text, count) => COMPLEX_VOICE_ENABLED && h.mode() === 'command'
+      ? complexVoiceHoldMs(text, count, true) : 0,
+    longHold: () => LONG_QUESTION_INPUT_ENABLED && longQuestionActive,
+    shouldDefer: (sinceLastMs, heldForMs) => {
+      if (!LONG_QUESTION_INPUT_ENABLED || h.mode() !== 'command') return false
+      const queuedCommand = pendingAudio.some(
+        (item) => item.capturedMode === 'command' && item.epoch === captureEpoch,
+      ) || draining
+      const recordingCommand = vad?.meter().speaking ?? false
+      return shouldDeferLongQuestion({
+        active: longQuestionActive,
+        elapsedFromFirstMs: heldForMs,
+        elapsedFromLastMs: sinceLastMs,
+        queuedCommand,
+        recordingCommand,
+      })
+    },
   })
 
   /**
@@ -663,6 +774,9 @@ async function startVadBridgeVoice(
       }
       const { text } = (await res.json()) as { text?: string }
       const said = (text ?? '').trim()
+      if (capturedMode === 'command') {
+        diag.sttRoundTripMs = Math.max(0, Math.round(performance.now() - t0))
+      }
       diag.lastError = ''
 
       // A previous segment may have completed the command while this one was
@@ -715,9 +829,13 @@ async function startVadBridgeVoice(
         text: said,
         provider: provider === 'local' ? 'whisper-local' : 'elevenlabs',
         kind: selfEcho ? 'self-echo' : nonSpeech ? 'non-speech' : 'speech',
-        wakeMatched: capturedMode === 'wake' && WAKE.test(said),
+        wakeMatched:
+          WAKE.test(said) &&
+          (capturedMode === 'wake' ||
+            (capturedMode === 'guard' && h.mode() === 'wake')),
         capturedMode: capturedMode as VoiceMode,
         at: Date.now(),
+        sttMs: Math.max(0, Math.round(performance.now() - t0)),
       })
 
       if (selfEcho) {
@@ -750,12 +868,41 @@ async function startVadBridgeVoice(
           return
         }
 
+        // When this GUARD segment was captured, L.U.M.I.A. was still
+        // finishing a previous turn. If Whisper returns only after the UI has
+        // timed out to WAKE/standby, onUtterance would silently discard the
+        // user's fully recognized request. Re-enter through the actual wake
+        // path, but only for an explicit addressed command (never background
+        // TV, acoustic labels, or generic household speech).
+        const trailing = WAKE.test(said) ? afterWake(said) : ''
+        const currentMode = h.mode()
+        if (shouldRecoverGuardToWake('guard', currentMode, said, {
+          wake: WAKE,
+          bareWake: BARE_WAKE,
+        })) {
+          if (Date.now() - lastWake > WAKE_DEBOUNCE) {
+            lastWake = Date.now()
+            diag.wakes++
+            diag.dropped = ''
+            diag.accepted++
+            h.onWake(trailing)
+          } else {
+            drop('guard-to-wake recovery suppressed by wake debounce')
+          }
+          return
+        }
+
+        // A stale GUARD-only override or bare name must not cancel an idle
+        // assistant or accidentally inject a question into the next session.
+        if (currentMode === 'wake') {
+          drop('guard transcript arrived in standby without a full wake request')
+          return
+        }
+
         h.onSpeechStart()
 
-        // "Lumi, explícame..." is an intentional barge-in and should become a
-        // new command. A bare "Lumi" or "para" only stops the current answer
-        // and leaves the assistant listening for what comes next.
-        const trailing = WAKE.test(said) ? afterWake(said) : ''
+        // "Lumi, explícame..." while still busy is intentional barge-in.
+        // A bare "Lumi" or "para" only stops an active answer.
         if (trailing) h.onUtterance(trailing)
         return
       }
@@ -771,6 +918,16 @@ async function startVadBridgeVoice(
           drop(`heard "${said.slice(-40)}" — not his name`)
         }
         return
+      }
+
+      // A later VAD segment may already be recording while this Whisper
+      // transcript finishes. Do not answer the first half of a long question.
+      if (LONG_QUESTION_INPUT_ENABLED && capturedMode === 'command' &&
+          h.mode() === 'command' &&
+          (vad?.meter().speaking || pendingAudio.some(
+            (item) => item.capturedMode === 'command' && item.epoch === captureEpoch,
+          ))) {
+        beginLongQuestion()
       }
 
       // Not a turn yet — a piece of one. This segment has already ended before
@@ -798,11 +955,16 @@ async function startVadBridgeVoice(
       while (pendingAudio.length) {
         const pending = pendingAudio.shift()!
         refreshQueueDiag()
-        await transcribe(
-          pending.blob,
-          pending.capturedMode,
-          pending.epoch,
-        )
+        transcribingCommandEpoch = pending.capturedMode === 'command' ? pending.epoch : -1
+        try {
+          await transcribe(
+            pending.blob,
+            pending.capturedMode,
+            pending.epoch,
+          )
+        } finally {
+          transcribingCommandEpoch = -1
+        }
       }
     } finally {
       draining = false
@@ -810,6 +972,11 @@ async function startVadBridgeVoice(
   }
 
   vad = await startVad({
+    captureMode: () => h.mode(),
+    nearFieldFocus: NEAR_FIELD_FOCUS_ENABLED && provider === 'local',
+    adaptiveEndpointing: () =>
+      ADAPTIVE_TURNS_ENABLED && provider === 'local' && h.mode() === 'command',
+    onEndpointWindow: (windowMs) => { diag.acousticWindowMs = windowMs },
     suppress: () =>
       provider === 'local' &&
       h.mode() === 'guard' &&
@@ -819,9 +986,18 @@ async function startVadBridgeVoice(
       diag.mode = mode
       diag.sessions++
       if (mode === 'deaf') return
+      // Signal real capture only inside an already authorized local COMMAND.
+      // App extends that window once to cover bounded Whisper decoding.
+      if (provider === 'local' && mode === 'command' && ACTIVE_COMMAND_GRACE_ENABLED) {
+        h.onSpeechStart()
+      }
       // Standing down mid-thought throws the thought away with it. Otherwise
       // held text would surface as the opening of the *next* conversation.
-      if (mode === 'wake') assemble.cancel()
+      if (mode === 'wake') {
+        assemble.cancel()
+        longQuestionActive = false
+        diag.longQuestionActive = false
+      }
       // The barge-in. In guard mode the user has started talking over him, and
       // because the guard threshold is high this is a real interruption rather
       // than leaked playback — so cut him off now, do not wait for the words.
@@ -838,12 +1014,15 @@ async function startVadBridgeVoice(
         if (provider !== 'local') h.onSpeechStart()
       }
     },
-    onEnd: (blob) => {
-      queueAudio(
-        blob,
-        h.mode() as FocusVoiceMode,
-        captureEpoch,
-      )
+    onEnd: (blob, durationMs) => {
+      const capturedMode = h.mode() as FocusVoiceMode
+      if (isLongCommandSegment(
+        capturedMode, durationMs, LONG_QUESTION_INPUT_ENABLED && provider === 'local',
+      )) beginLongQuestion()
+      if (capturedMode === 'command' && LONG_QUESTION_INPUT_ENABLED) {
+        diag.longQuestionParts++
+      }
+      queueAudio(blob, capturedMode, captureEpoch)
       void drain()
     },
     onLevel: (v) => {
@@ -864,6 +1043,7 @@ async function startVadBridgeVoice(
     },
   })
   diag.running = vad.live()
+  diag.microphoneAgcActual = microphoneAutoGainObserved()
 
   // Raise the trigger bar exactly while he speaks. The mode is polled rather
   // than pushed because nothing in the app pushes phase changes here, and a
@@ -875,21 +1055,40 @@ async function startVadBridgeVoice(
       mode === 'guard' &&
       (speakerOutputActive() || Boolean(speakingNow()))
     vad?.setGuard(mode === 'guard')
+    const acoustic = vad?.meter()
+    if (acoustic) {
+      diag.microphoneRms = Math.round(acoustic.energy * 10000) / 10000
+      diag.noiseFloorRms = Math.round(acoustic.floor * 10000) / 10000
+      diag.triggerRms = Math.round(acoustic.threshold * 10000) / 10000
+    }
     // He has stood down — by Escape, by the idle timeout, or by dropping back
     // to the wake word. Anything half-said belonged to a conversation that is
     // over, and letting the hold expire later would open the next one with a
     // fragment of the last.
-    if ((mode === 'wake' || mode === 'deaf') && assemble.held()) assemble.cancel()
+    if (mode === 'wake' || mode === 'deaf') {
+      if (assemble.held()) assemble.cancel()
+      longQuestionActive = false
+      diag.longQuestionActive = false
+    }
   }, 200)
 
   return {
     stop: () => {
       clearInterval(guardPoll)
       assemble.cancel()
+      longQuestionActive = false
+      diag.longQuestionActive = false
       vad?.stop()
       diag.running = false
     },
     live: () => vad?.live() ?? false,
+    hasPendingCommand: () => h.mode() === 'command' && (
+      Boolean(assemble.held()) ||
+      transcribingCommandEpoch === captureEpoch ||
+      pendingAudio.some(item => item.capturedMode === 'command' &&
+        item.epoch === captureEpoch) ||
+      Boolean(vad?.meter().speaking)
+    ),
   }
 }
 
@@ -908,6 +1107,8 @@ async function startVadBridgeVoice(
  * assistant that keeps listening.
  */
 function startBrowserVoice(h: VoiceHandlers): Voice {
+  // Native browser SpeechRecognition does not expose a trusted STT request duration.
+  diag.sttRoundTripMs = null
   const Ctor =
     (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
   if (!Ctor) {
@@ -945,6 +1146,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
       settleMs: BROWSER_SETTLE_MS,
       continueMs: BROWSER_CONTINUE_MS,
       maxHoldMs: BROWSER_MAX_HOLD_MS,
+      adaptive: ADAPTIVE_TURNS_ENABLED,
     },
   )
 

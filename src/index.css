@@ -493,6 +493,69 @@ body::after {
   }
 }
 
+/* TL-01: screenshot-readable, per-event local clock for voice diagnosis. */
+.conversation-date-bar {
+  position: absolute;
+  top: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: min(94vw, 500px);
+  font: 10px/1.4 'JetBrains Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aceaf0;
+  opacity: 0.83;
+  text-shadow: 0 1px 5px #00141b;
+}
+.conversation-copy {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 4px 9px;
+  border: 1px solid rgba(64, 188, 192, 0.4);
+  border-radius: 8px;
+  color: #b7f2f4;
+  background: rgba(0, 17, 28, 0.78);
+  font: 9px 'JetBrains Mono', monospace;
+  letter-spacing: 0.08em;
+}
+.conversation-copy:hover { border-color: #b7f2f4; }
+.voice-line-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+.voice-line-time,
+.voice-line-stage,
+.voice-line-error {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #7cc5c9;
+  opacity: 0.88;
+  overflow-wrap: anywhere;
+}
+.voice-line-stage { color: #93aaab; font-size: 9px; }
+.voice-line-error { color: #ff8e85; opacity: 1; }
+.voice-line-lumi {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.voice-command-text .voice-line-time { margin-bottom: 4px; }
+@media (max-width: 820px) {
+  .conversation-date-bar { top: 91px; font-size: 9px; }
+  .voice-line-time { font-size: 9px; }
+}
+
 /* Conversation log */
 
 .log {
@@ -2379,4 +2442,467 @@ kbd {
   object-fit: cover;
   transform: scaleX(-1);
   background: #000;
+}
+
+
+/* VI-01 visual input: opt-in local photo control outside the face viewport.
+ * No scene geometry, avatar calibration, or existing HUD styles are changed. */
+.lumia-visual-input {
+  position: fixed;
+  right: 22px;
+  bottom: 24px;
+  z-index: 20;
+  width: min(330px, calc(100vw - 44px));
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  pointer-events: auto;
+  color: #bceef7;
+  font-family: 'Chakra Petch', sans-serif;
+}
+.lumia-visual-toggle,
+.lumia-visual-submit {
+  border: 1px solid rgba(0, 229, 255, 0.65);
+  color: #d8fbff;
+  background: rgba(0, 20, 36, 0.92);
+  padding: 10px 14px;
+  letter-spacing: .13em;
+  font: inherit;
+  cursor: pointer;
+}
+.lumia-visual-dialog {
+  width: 100%;
+  margin-bottom: 9px;
+  padding: 16px;
+  border: 1px solid rgba(0, 229, 255, 0.6);
+  background: rgba(1, 10, 20, .97);
+  box-shadow: 0 0 18px rgba(0, 229, 255, .12);
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lumia-visual-heading {
+  font-size: 13px;
+  letter-spacing: .12em;
+  font-weight: 600;
+}
+.lumia-visual-help {
+  color: rgba(216, 251, 255, .78);
+  line-height: 1.5;
+}
+.lumia-visual-filename {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.lumia-visual-label {
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+.lumia-visual-dialog textarea {
+  background: #061c2b;
+  border: 1px solid #416576;
+  color: #ecfcff;
+  resize: vertical;
+  width: 100%;
+  min-height: 70px;
+  padding: 8px;
+  font: inherit;
+}
+.lumia-visual-submit:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+.lumia-visual-error {
+  color: #ffb2ac;
+  overflow-wrap: anywhere;
+}
+
+
+/* UX-02: one-row holographic glass dock, user-approved compact reference.
+ * Existing avatar, rings, instrument layers and HUD remain untouched. */
+.lumia-composer {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(740px, calc(100vw - 32px));
+  z-index: 24;
+  pointer-events: auto;
+  color: rgba(222, 252, 255, .94);
+  font-family: 'Chakra Petch', sans-serif;
+}
+.lumia-composer-dock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(111, 231, 254, .43);
+  background: linear-gradient(110deg, rgba(3, 23, 36, .38), rgba(2, 13, 28, .24));
+  box-shadow: 0 3px 25px rgba(1, 5, 17, .26),
+    inset 0 1px rgba(193, 253, 255, .12),
+    0 0 12px rgba(0, 215, 255, .11);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+  backdrop-filter: blur(16px) saturate(125%);
+  transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+.lumia-composer-dock:focus-within {
+  border-color: rgba(137, 247, 255, .83);
+  background: linear-gradient(110deg, rgba(3, 23, 36, .56), rgba(2, 13, 28, .38));
+  box-shadow: 0 4px 28px rgba(1, 5, 17, .3), 0 0 17px rgba(0, 215, 255, .22);
+}
+.lumia-composer-icon-button, .lumia-composer-send {
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: rgba(167, 229, 241, .85);
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.lumia-composer-icon-button:hover:not(:disabled),
+.lumia-composer-icon-button:focus-visible {
+  background: rgba(70, 215, 247, .15);
+  color: #f4ffff;
+}
+.lumia-composer-icon-button:disabled, .lumia-composer-send:disabled {
+  opacity: .40;
+  cursor: not-allowed;
+}
+.lumia-composer-icon-button:focus-visible, .lumia-composer-send:focus-visible,
+.lumia-composer-feedback button:focus-visible {
+  outline: 2px solid #a9faff;
+  outline-offset: 2px;
+}
+.lumia-composer-attach {
+  border-color: rgba(122, 225, 247, .20);
+  background: rgba(0, 36, 52, .27);
+}
+.lumia-composer-attach.is-attached {
+  color: #8fffdc;
+  border-color: rgba(95, 247, 190, .58);
+}
+.lumia-composer-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.lumia-composer-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: block;
+  box-sizing: border-box;
+  height: 26px;
+  min-height: 26px;
+  max-height: 116px;
+  padding: 2px 8px;
+  border: 0;
+  border-right: 1px solid rgba(118, 219, 239, .17);
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  background: transparent;
+  color: #ecfdff;
+  font: 14px/22px system-ui, sans-serif;
+}
+.lumia-composer-text::placeholder { color: rgba(156, 205, 223, .75); }
+.lumia-composer-dictate.is-recording {
+  color: #ffd9d3;
+  border-color: rgba(255, 128, 117, .60);
+  background: rgba(190, 55, 56, .30);
+  animation: lumia-dock-recording 1.3s ease-in-out infinite;
+}
+.lumia-composer-continuous.is-active {
+  color: #8af9ff;
+  background: rgba(9, 156, 188, .22);
+  box-shadow: 0 0 12px rgba(14, 219, 255, .18);
+}
+.lumia-composer-continuous.is-active::after {
+  content: '';
+  position: absolute;
+  margin: -27px -23px 0 0;
+  width: 5px;
+  height: 5px;
+  background: #64f8d8;
+  border-radius: 50%;
+  box-shadow: 0 0 7px #64f8d8;
+}
+.lumia-composer-send {
+  width: 42px;
+  height: 42px;
+  color: #001a27;
+  border: 1px solid rgba(172, 252, 255, .75);
+  background: linear-gradient(140deg, #38d8f3, #89ebf5);
+  box-shadow: 0 0 13px rgba(0, 216, 255, .31);
+}
+.lumia-composer-send:hover:not(:disabled) {
+  background: #a5f8ff;
+  box-shadow: 0 0 19px rgba(0, 238, 255, .45);
+}
+.lumia-composer-send:disabled { opacity: .64; }
+.lumia-composer-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 7px 18px 0;
+  font-size: 11px;
+  letter-spacing: .02em;
+}
+.lumia-composer-photo,
+.lumia-composer-mic-state,
+.lumia-composer-error {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid rgba(102, 216, 233, .31);
+  border-radius: 14px;
+  background: rgba(1, 20, 32, .75);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.lumia-composer-photo span {
+  max-width: min(340px, 48vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lumia-composer-photo svg { width: 14px; height: 14px; }
+.lumia-composer-photo button {
+  display: inline-flex;
+  border: none;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.lumia-composer-mic-state { color: #b5f5ff; }
+.lumia-composer-error { color: #ffb4ac; border-color: rgba(255, 132, 117, .47); }
+@keyframes lumia-dock-recording {
+  50% { box-shadow: 0 0 12px rgba(255, 107, 98, .45); }
+}
+@media (max-width: 650px) {
+  .lumia-composer {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100vw - 16px);
+  }
+  .lumia-composer-dock { min-height: 50px; gap: 3px; padding: 4px 6px; }
+  .lumia-composer-icon-button { width: 33px; height: 33px; }
+  .lumia-composer-send { width: 38px; height: 38px; }
+  .lumia-composer-text { font-size: 13px; padding-inline: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lumia-composer-dictate.is-recording { animation: none; }
+  .lumia-composer-dock,
+  .lumia-composer-icon-button,
+  .lumia-composer-send { transition: none; }
+}
+
+
+/* UX-03 — Halo-aware response rail (ASUS reference 1761×831).
+ * The avatar and orbit camera remain unchanged. Reserve the circle plus a
+ * safety gutter in viewport units instead of clipping unreadable glyphs.
+ *
+ * For desktop: right pane's inner edge stays outside the visible outer ring.
+ * On compact screens use an opaque, lower-height readable card rather than
+ * allowing narrow columns to hide letters behind the 3D halo. */
+@media (min-width: 1201px) {
+  .voice-pane-lumi {
+    --lumia-orbit-safe-radius: min(42vh, 31vw);
+    --lumia-orbit-safe-gap: 16px;
+    right: max(72px, 5.5vw);
+    width: min(
+      34vw,
+      520px,
+      calc(
+        50vw - max(72px, 5.5vw)
+        - var(--lumia-orbit-safe-radius) - var(--lumia-orbit-safe-gap)
+      )
+    );
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+/* Use a legible protected reply card when there is no room for a full side
+ * column beside the circle; preserve scroll access and the text itself. */
+@media (max-width: 1200px) {
+  .voice-pane-lumi {
+    right: 18px;
+    left: auto;
+    bottom: 94px;
+    width: min(42vw, 410px);
+    height: min(32vh, 240px);
+    max-height: min(32vh, 240px);
+    box-sizing: border-box;
+    background: rgba(2, 13, 22, .89);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(103, 228, 239, .24);
+    border-radius: 10px;
+  }
+}
+@media (max-width: 650px) {
+  .voice-pane-lumi {
+    right: 9px;
+    bottom: 82px;
+    width: min(54vw, 275px);
+    height: min(25vh, 175px);
+    max-height: min(25vh, 175px);
+    font-size: 11px;
+  }
+}
+
+
+/* LT-01: one compact language icon; controls appear only while active.
+ * The single-row UX-02 glass dock remains unchanged in size and position. */
+.lumia-composer-translate.is-active {
+  color: #8cffe6;
+  background: rgba(15, 165, 158, .2);
+  border-color: rgba(128, 255, 223, .34);
+  box-shadow: 0 0 13px rgba(72, 239, 211, .14);
+}
+.lumia-translator-options {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 7px;
+  max-width: calc(100vw - 24px);
+  padding: 7px 10px;
+  background: rgba(1, 17, 28, .84);
+  border: 1px solid rgba(99, 224, 225, .40);
+  border-radius: 14px;
+  box-shadow: 0 5px 24px rgba(0, 0, 0, .25);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  font: 11px 'Chakra Petch', sans-serif;
+}
+.lumia-translator-title { color: #9cece5; font-size: 10px; letter-spacing: .05em; }
+.lumia-translator-options select {
+  max-width: 148px;
+  color: #e8ffff;
+  background: #093344;
+  border: 1px solid rgba(120, 220, 230, .4);
+  border-radius: 7px;
+  padding: 6px;
+  font: inherit;
+}
+.lumia-translator-swap {
+  color: #b5ffff;
+  border: 0;
+  border-radius: 50%;
+  padding: 5px 8px;
+  background: rgba(0, 130, 164, .15);
+  cursor: pointer;
+}
+.lumia-translator-options select:focus-visible, .lumia-translator-swap:focus-visible {
+  outline: 2px solid #9ef4ef;
+  outline-offset: 2px;
+}
+@media (max-width: 650px) {
+  .lumia-translator-options { gap: 4px; padding: 6px; right: 0; }
+  .lumia-translator-title { width: 100%; text-align: right; }
+  .lumia-translator-options select { max-width: 126px; font-size: 10px; }
+  .lumia-composer-translate { width: 30px; }
+}
+
+
+/* LT-05A: retain the actual transcript/translation separators, without
+ * adding cards or panels over the hologram. Native transcript contents remain
+ * in the existing turn, clipboard export and conversation timeline. */
+.voice-line-translation-audio .voice-line-text {
+  white-space: pre-line;
+  line-height: 1.52;
+}
+
+
+/* LT-05B — one inline review control under audio translation, no new dock.
+ * Keep text legible inside UX-04C curved reply lane and on compact windows. */
+/* The HUD intentionally uses pointer-events:none so the hologram is
+ * unobstructed. Re-enable hit-testing on ONLY the inline review surface.
+ * Do not enable pointer events on the complete transparent voice pane. */
+.lumia-audio-review {
+  margin-top: 6px;
+  font-family: 'Chakra Petch', sans-serif;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+}
+.lumia-audio-review button,
+.lumia-audio-review textarea {
+  pointer-events: auto;
+}
+.lumia-audio-review-action {
+  border: 1px solid rgba(119, 226, 224, .25);
+  color: #9edbdc;
+  background: rgba(0, 35, 44, .3);
+  border-radius: 999px;
+  padding: 4px 9px;
+  font: 10px 'Chakra Petch', sans-serif;
+  cursor: pointer;
+}
+.lumia-audio-review-action:hover { border-color: rgba(144, 243, 235, .66); color: #e1ffff; }
+.lumia-audio-review-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgba(103, 228, 239, .3);
+  border-radius: 12px;
+  background: rgba(1, 16, 25, .82);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.lumia-audio-review-editor label { font-size: 10px; color: #a1eaec; line-height: 1.4; }
+.lumia-audio-review-editor textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-height: 170px;
+  resize: vertical;
+  padding: 8px;
+  color: #effdff;
+  font: 12px/1.5 'Chakra Petch', sans-serif;
+  background: rgba(3, 33, 43, .84);
+  border: 1px solid rgba(108, 220, 231, .3);
+  border-radius: 8px;
+}
+.lumia-audio-review-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.lumia-audio-review-actions button {
+  border: 1px solid rgba(107, 236, 228, .36);
+  border-radius: 8px;
+  background: rgba(3, 68, 85, .45);
+  color: #d5faff;
+  padding: 5px 8px;
+  font: 10px 'Chakra Petch', sans-serif;
+  cursor: pointer;
+}
+.lumia-audio-review-actions button:disabled { opacity: .47; cursor: default; }
+.lumia-audio-review button:focus-visible,
+.lumia-audio-review textarea:focus-visible { outline: 2px solid #8aeeea; outline-offset: 2px; }
+.lumia-audio-review-error {
+  color: #ffaaa2;
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
