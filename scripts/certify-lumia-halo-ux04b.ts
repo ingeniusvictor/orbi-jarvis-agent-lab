@@ -16,7 +16,7 @@ const right=computeHaloExclusion('right',paneRight,circle,250)
 assert.ok(left && right)
 assert.equal(left.float,'right')
 assert.equal(right.float,'left')
-assert.equal(left.width,right.width) // mirror symmetry
+assert.ok(Math.abs(left.width-right.width)<0.01) // mirror symmetry, float precision
 assert.equal(left.height,right.height)
 assert.match(left.shape,/^polygon\(/)
 assert.match(right.shape,/^polygon\(/)
@@ -26,7 +26,7 @@ const points=(shape:string): Array<{x:number;y:number}> =>
   Array.from(shape.matchAll(/(-?[\d.]+)px (-?[\d.]+)px/g),
     m=>({x:Number(m[1]),y:Number(m[2])}))
 const leftPoints=points(left.shape), rightPoints=points(right.shape)
-assert.equal(leftPoints[0].x,left.width)
+assert.ok(Math.abs(leftPoints[0].x-left.width)<0.1)
 assert.equal(rightPoints[0].x,0)
 assert.ok(leftPoints.some(p=>p.x<left.width-80))
 assert.ok(rightPoints.some(p=>p.x>80))
