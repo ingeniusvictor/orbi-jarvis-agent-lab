@@ -120,12 +120,12 @@ const WAKE_DEBOUNCE = 1500
  * indication why. Better a rare false wake than a name that does not answer.
  */
 const WAKE =
-  /\b(?:hey|hi|ok|okay|yo|oye|hola)?\s*(?:lumi|lumia|lumi a|jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)\b(?!'s)/i
+  /\b(?:hey|hi|ok|okay|yo|oye|hola)?\s*(?:lumi|lumia|lumi a|jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)\b(?!'s)|^\s*(?:(?:hola|oye|hey)\s+)?lo\s+m[ií](?=$|[\s,.:;!?-])/i
 
 /** A wake name with no actual instruction. In busy GUARD mode this is ignored
  * because laptop speaker echo frequently collapses to a lone assistant name. */
 const BARE_WAKE =
-  /^(?:hey|hi|ok|okay|yo|oye|hola)?\s*(?:lumi|lumia|lumi a|jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)\s*[,.!?]*$/i
+  /^(?:(?:hey|hi|ok|okay|yo|oye|hola)?\s*(?:lumi|lumia|lumi a|jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)|(?:(?:hola|oye|hey)\s+)?lo\s+m[ií])\s*[,.!?]*$/i
 
 /** Everything after the wake phrase, which is usually the actual command. */
 function afterWake(text: string): string {
