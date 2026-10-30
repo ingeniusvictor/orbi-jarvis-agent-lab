@@ -146,6 +146,9 @@ jobs:
       - name: LT-05 Offline WhatsApp voice-note import, multilingual Whisper and translation
         run: node scripts/certify-lumia-translate-audio-lt05.mjs
 
+      - name: LT-05B Owner-controlled audio transcript corrections
+        run: npx tsx scripts/certify-lumia-translate-review-lt05b.ts
+
       - name: STT-02 Offline Spanish WER comparison contract
         run: node scripts/certify-stt02-benchmark.mjs
 
