@@ -35,6 +35,7 @@ import { createOllamaReplyGate } from './orbia/ollama-json-stream.mjs'
 import { isStaleModelReply } from './orbia/stale-answer-guard.mjs'
 import { isGenericReplyForQuestion, safeClarificationForQuestion } from './orbia/response-relevance-rc02.mjs'
 import { isComplexVoicePrompt, COMPLEX_VOICE_INSTRUCTION } from './orbia/complex-voice-intent.mjs'
+import { rc03GroundedReply, RC03_VOICE_GROUNDING_INSTRUCTION } from './orbia/grounded-claims-rc03.mjs'
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
@@ -295,6 +296,19 @@ export async function streamOllama({
 }) {
   const model = getActiveModel()
   const complexVoice = process.env.ORBIA_LUMIA_COMPLEX_VOICE_VQ01 === '1' && isComplexVoicePrompt(prompt) && !image
+  const rc03Pilot = process.env.ORBIA_LUMIA_RC03_GROUNDING === '1'
+  const groundedSystemPrompt = systemPrompt + (rc03Pilot ? RC03_VOICE_GROUNDING_INSTRUCTION : '')
+
+  // For an already-authorized voice turn, answer unsupported pilot claims
+  // without inventing weather measurements or pretending to control the PC.
+  // This path preserves the existing bridge onText/done/history contract and
+  // avoids a needless model call. All other requests go to Qwen as before.
+  const grounded = rc03Pilot && !image ? rc03GroundedReply({ prompt, history }) : null
+  if (grounded) {
+    if (signal?.aborted) throw new Error('LUMIA request aborted')
+    onText(grounded)
+    return grounded
+  }
 
   // Reuse the warm-up for the model selected at the start of this turn.
   await warmOllama(model)
@@ -302,7 +316,7 @@ export async function streamOllama({
     {
       role: 'system',
       content:
-        systemPrompt +
+        groundedSystemPrompt +
         (knowledgeContextToPrompt(knowledgeContext)
           ? '\n' + knowledgeContextToPrompt(knowledgeContext)
           : '') +
@@ -563,7 +577,7 @@ export async function streamOllama({
       {
         role: 'system',
         content:
-          systemPrompt +
+          groundedSystemPrompt +
           '\nResponde ÚNICAMENTE a la última pregunta. El contexto anterior ' +
           'sirve para interpretar referencias, no para repetir respuestas viejas. ' +
           'Responde en una o dos frases breves, sin inventar información. ' +
@@ -592,7 +606,7 @@ export async function streamOllama({
       {
         role: 'system',
         content:
-          systemPrompt +
+          groundedSystemPrompt +
           '\nLa pregunta ACTUAL del usuario tiene prioridad absoluta sobre el contexto. ' +
           'Tu respuesta previa fue rechazada por ser repetitiva o genérica en lugar de responder la pregunta actual. ' +
           'Responde SOLO la última pregunta; no repitas tu respuesta anterior. ' +
