@@ -42,6 +42,9 @@ rem VQ-01: save already-authorized fast multipart questions while Whisper decode
 rem Does NOT enable responding to unattended household speech; no model/voice change.
 set "VITE_LUMIA_COMPLEX_VOICE_VQ01=1"
 set "ORBIA_LUMIA_COMPLEX_VOICE_VQ01=1"
+rem RC-03: correct unsupported weather claims and describe actual ASUS pilot permissions.
+rem Only replies to already-authorized turns; no internet or OS control added.
+set "ORBIA_LUMIA_RC03_GROUNDING=1"
 rem SR-01 rollback: NF-01 was too strict for normal voices, especially a second
 rem person nearby. Restore Chrome automatic mic gain + baseline VAD; preserve
 rem wake-word/household guard and LC-01 long-question reception.
