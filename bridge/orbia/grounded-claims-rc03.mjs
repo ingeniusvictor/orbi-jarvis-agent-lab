@@ -16,7 +16,7 @@ const weatherWords =
 const weatherFuture =
   /\b(?:hoy|manana|pasado manana|actual|ahora|en vivo|tiempo real|este fin de semana|esta semana|proxima semana|pronostico|prediccion|va a llover|va a nevar|va a hacer)\b/
 const explanatory =
-  /^(?:que es|como funciona|como se forma|por que se forma|por que llueve|por que nieva|como se hace|como hacer|explicame que es|cual es la diferencia)\b/
+  /^(?:que es|como funciona|como se forma|por que se forma|por que llueve|por que nieva|como se hace|como hacer|como calcular|explicame como hacer|explicame como calcular|explicame que es|cual es la diferencia)\b/
 const weatherSourceChallenge =
   /\b(?:como hiciste|como calculaste|de donde sacaste|como sabes|de donde obtuviste|de donde salio|sin acceso|sin fuentes|sin consultar|inventaste)\b/
 const generalCapabilities =
