@@ -33,6 +33,21 @@ function recentWeatherContext(history) {
   )
 }
 
+function priorUnverifiedForecast(history) {
+  if (!Array.isArray(history)) return false
+  const last = [...history].reverse().find((entry) => entry?.role === 'assistant')
+  const answer = fold(last?.content)
+  // A truthful disclaimer is not an invented prediction.
+  if (/\b(?:no tengo|no puedo confirmar|no he consultado|sin datos|sin fuentes|sin verificar)\b/.test(answer)) return false
+  return /\b(?:probablemente|posibles|nevadas?|llovera|nevara|temperaturas? entre|se esperan|estara soleado|estara nublado|habra lluvia|habra nieve)\b/.test(answer)
+}
+
+function noForecastReply() {
+  return 'No he consultado datos meteorológicos ni he ejecutado un modelo del ' +
+    'tiempo. Si antes mencioné condiciones concretas sin una fuente, no eran ' +
+    'una predicción verificada; para confirmarlas necesito datos actualizados.'
+}
+
 function weatherReply() {
   return 'En este piloto no tengo una fuente meteorológica actualizada conectada, ' +
     'ni he consultado datos del tiempo para esta pregunta. No puedo confirmar un ' +
@@ -77,7 +92,7 @@ export function rc03GroundedReply({ prompt, history = [] } = {}) {
     /\b(?:hoy|manana|noviembre|diciembre|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|fecha|dia)\b/.test(text)
 
   if (directWeather && hadWeatherContext && weatherSourceChallenge.test(text)) {
-    return correctionReply()
+    return priorUnverifiedForecast(history) ? correctionReply() : noForecastReply()
   }
 
   if (locationFollowup) return weatherReply()
