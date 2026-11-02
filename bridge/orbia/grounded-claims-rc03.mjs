@@ -37,8 +37,8 @@ function priorUnverifiedForecast(history) {
   if (!Array.isArray(history)) return false
   const last = [...history].reverse().find((entry) => entry?.role === 'assistant')
   const answer = fold(last?.content)
-  // A truthful disclaimer is not an invented prediction.
-  if (/\b(?:no tengo|no puedo confirmar|no he consultado|sin datos|sin fuentes|sin verificar)\b/.test(answer)) return false
+  // A disclaimer alone is not a forecast; an asserted weather condition still
+  // counts even if the model prefaced it with an access disclaimer.
   return /\b(?:probablemente|posibles|nevadas?|llovera|nevara|temperaturas? entre|se esperan|estara soleado|estara nublado|habra lluvia|habra nieve)\b/.test(answer)
 }
 
