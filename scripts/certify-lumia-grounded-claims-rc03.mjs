@@ -17,6 +17,8 @@ assert.match(reply('Lumi, tienes información del clima.'),/no puedo confirmar u
 assert.match(reply('Estoy en Rancagua, Chile y hoy es primero de noviembre del 2026.', weatherHistory),/no puedo confirmar un pronóstico fiable/i)
 assert.match(reply('Me gustaría saber cómo hiciste esa predicción del clima, si no tienes acceso a ninguna fuente externa.',madeUpWeatherHistory),/Fue una suposición del modelo/i)
 assert.match(reply('¿De dónde sacaste ese pronóstico sin fuentes?',madeUpWeatherHistory),/no debí presentarla/i)
+assert.match(reply('¿Cómo hiciste esa predicción del clima sin consultar fuentes?',weatherHistory),/No he consultado datos meteorológicos/i)
+assert.match(reply('¿De dónde sacaste ese pronóstico sin fuentes?', [{role:'assistant',content:'No tengo acceso a fuentes meteorológicas, pero probablemente habrá nevadas ligeras.'}]),/no debí presentarla/i)
 assert.match(reply('Lumi, ¿tienes capacidad para tomar el control de mi computadora si te lo pidiera?'),/no tengo habilitado el control general/i)
 assert.match(reply('¿Qué capacidades tienes actualmente?'),/diagnóstico y controles específicos/i)
 
