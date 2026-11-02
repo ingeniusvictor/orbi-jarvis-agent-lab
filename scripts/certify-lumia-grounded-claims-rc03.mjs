@@ -39,4 +39,35 @@ assert.match(launcher,/ORBIA_LUMIA_RC03_GROUNDING=1/)
 assert.match(brain,/process\.env\.ORBIA_LUMIA_RC03_GROUNDING === '1'/)
 assert.match(brain,/const grounded = rc03Pilot && !image \? rc03GroundedReply\(\{ prompt, history \}\) : null/)
 assert.match(brain,/if \(grounded\) \{[\s\S]*?onText\(grounded\)[\s\S]*?return grounded/)
+
+// Integration smoke: a sanctioned offline weather answer must use the same
+// onText -> done/history contract without invoking Ollama or remote providers.
+process.env.ORBIA_LUMIA_RC03_GROUNDING = '1'
+const { streamOllama } = await import('../bridge/ollama.mjs')
+const originalFetch = globalThis.fetch
+let fetchCount = 0
+globalThis.fetch = async () => {
+  fetchCount++
+  throw new Error('RC-03 should not request an external model for an unsupported forecast')
+}
+try {
+  const spoken = []
+  const answer = await streamOllama({
+    prompt:'Lumi, ¿cómo estará el clima mañana en Rancagua?',
+    history: [],
+    systemPrompt:'Sistema local.',
+    knowledgeContext:null,
+    toolContext:'',
+    image:null,
+    signal: new AbortController().signal,
+    onText: (part) => spoken.push(part),
+  })
+  assert.match(answer,/no puedo confirmar un pronóstico fiable/i)
+  assert.deepEqual(spoken,[answer])
+  assert.equal(fetchCount,0)
+} finally {
+  globalThis.fetch = originalFetch
+  delete process.env.ORBIA_LUMIA_RC03_GROUNDING
+}
+
 console.log('LUMIA RC-03: offline weather, follow-up correction, capabilities and normal conversation PASS')
