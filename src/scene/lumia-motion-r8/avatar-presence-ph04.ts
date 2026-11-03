@@ -94,24 +94,30 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
 
   const motionCommand = /^(?:haz|hace|ejecuta|realiza|activa|reproduce|pon|muestra|muestrame|saluda|saludame|aplaude|camina|senala|niega)\b/.test(said)
   if (!motionCommand) return null
+  // All 17 catalog IDs are also directly addressable by their exact ID:
+  // "Lumi, ejecuta animación pointing", "Lumi reproduce animación walking".
+  // Never accept a free-form clip path or URL.
+  const exact = said.match(/^(?:ejecuta|reproduce|activa)\s+(?:(?:la|el|una|un)\s+)?(?:animacion|movimiento|gesto)\s+(?:de\s+)?([a-z0-9]+)$/)
+  if (exact && motionIds.has(exact[1])) return { kind: 'motion', id: exact[1] }
 
   const motions: Array<[RegExp, string]> = [
     [/\b(?:saluda|saludame|saludo|saludar|waving)\b/, 'waving'],
     [/\b(?:aplaude|aplauso|aplaudir|clapping)\b/, 'clapping'],
     [/\b(?:beso|besito|lanzar un beso)\b/, 'kiss'],
-    [/\b(?:senala|senalar|apunta|apuntar|pointing)\b/, 'pointinggesture'],
+    [/\b(?:senalamiento directo|senalamiento simple|senalala con un dedo|senala con un dedo|pointing simple)\b/, 'pointing'],
+    [/\b(?:senala|senalar|apunta|apuntar|pointing gesture)\b/, 'pointinggesture'],
     [/\b(?:niega|negacion|di que no|gesto de no)\b/, 'no'],
     [/\b(?:pensar|pensando|reflexion|thinking)\b/, 'thinking'],
     [/\b(?:alegria|feliz|happy)\b/, 'happy'],
     [/\b(?:entusiasmo|emocionada|excited)\b/, 'excited'],
     [/\b(?:sorpresa|sorprendida|surprised)\b/, 'surprised'],
     [/\b(?:camina|caminar en circulo|paseo circular)\b/, 'walkingcircle'],
-    [/\b(?:caminar en sitio|caminar sin avanzar)\b/, 'walking'],
+    [/\b(?:caminar en sitio|camina en sitio|caminar sin avanzar)\b/, 'walking'],
     [/\b(?:caminar hacia delante|camina hacia delante)\b/, 'walkingforward'],
     [/\b(?:hablar|conversacion|talking)\b/, 'talking'],
     [/\b(?:reposo|descanso|quieta|idle)\b/, 'idle'],
     [/\b(?:escuchar|escuchando|head gesture)\b/, 'listening'],
-    [/\b(?:revisar las manos|unas|nails)\b/, 'nails'],
+    [/\b(?:revisar las manos|revisa tus manos|revisa las manos|unas|nails)\b/, 'nails'],
   ]
   for (const [pattern, id] of motions) {
     if (pattern.test(said) && motionIds.has(id)) return { kind: 'motion', id }
