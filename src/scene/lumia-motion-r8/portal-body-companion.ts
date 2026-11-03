@@ -72,6 +72,7 @@ export class R8BodyCompanion {
   private semanticGestureUsed:string|null = null
   private lastState:MotionState='idle'
   private elapsed=0
+  private manualUntil=0
   private readonly allowClips:boolean
   private readonly rig:HeadRig
 
@@ -193,13 +194,14 @@ export class R8BodyCompanion {
     this.activeLoop=clip.loop
   }
 
-  requestClip(id:string):void {
+  requestClip(id:string,manual=false):void {
     if(!this.allowClips||!animationLibrary[id]||this.failed.has(id)||
        this.pending||this.activeId===id)return
     this.pending=id
     const stateAtRequest=this.lastState
     void this.loadClip(id).then(clip=>{
-      if(this.pending!==id||this.lastState!==stateAtRequest)return
+      if(this.pending!==id || (!manual && this.lastState!==stateAtRequest) ||
+         (manual && this.elapsed>=this.manualUntil))return
       this.playReady(clip)
       this.director.commit(this.gestureToken,this.elapsed)
       console.info('[lumia:ph03] R8 animation:',id)
@@ -210,6 +212,23 @@ export class R8BodyCompanion {
       if(this.pending===id)this.pending=null
       this.gestureToken=null
     })
+  }
+
+  /** Owner-authorized one-shot request; temporary priority over automatic R8. */
+  requestManualClip(id:string):boolean {
+    if (!this.allowClips || !animationLibrary[id] || this.failed.has(id)) return false
+    this.manualUntil=this.elapsed+7.5
+    this.pending=null // invalidate older asynchronous auto/gesture loading
+    this.stopClip()
+    this.requestClip(id,true)
+    return true
+  }
+
+  resumeAutomatic():void {
+    this.manualUntil=0
+    this.pending=null
+    this.stopClip()
+    this.director.postpone(this.elapsed,.2)
   }
 
   onSpokenPhrase(text:string):void {
@@ -228,13 +247,18 @@ export class R8BodyCompanion {
     if(state!==this.lastState){
       this.lastState=state
       this.semanticGestureUsed=null
-      this.stopClip()
+      if (this.elapsed>=this.manualUntil) this.stopClip()
       this.director.observe(state,this.elapsed)
     }
     const pose=this.core.step(dt,this.config(state))
     const presence=this.presence.step(dt,this.presenceConfig(state))
     this.applyProcedural(pose,presence)
 
+    if (this.manualUntil>0 && this.elapsed>=this.manualUntil) {
+      this.manualUntil=0
+      this.stopClip()
+      this.director.postpone(this.elapsed,.3)
+    }
     if(this.action)this.activeMixer.update(dt)
     this.blend.step(dt)
 
@@ -249,7 +273,8 @@ export class R8BodyCompanion {
       bone.quaternion.multiply(this.q)
     }
     // R8 semantic gestures only when the actual TTS text is audibly playing.
-    if(semantic.kind && semantic.kind!==this.semanticGestureUsed && speechAudible){
+    if(semantic.kind && semantic.kind!==this.semanticGestureUsed && speechAudible &&
+       this.elapsed>=this.manualUntil){
       this.semanticGestureUsed=semantic.kind
       const mapping:Record<string,string>={
         greet:'waving',affirm:'happy',deny:'no',explain:'pointinggesture',
@@ -258,7 +283,7 @@ export class R8BodyCompanion {
       const clip=mapping[semantic.kind]
       if(clip && (this.activeId==='talking'||!this.activeId))this.requestClip(clip)
     }
-    if(this.allowClips && !this.pending){
+    if(this.allowClips && !this.pending && this.elapsed>=this.manualUntil){
       const intent=this.director.decide({
         now:this.elapsed,state,activeId:this.activeId,
         active:Boolean(this.activeId),pending:Boolean(this.pending),
