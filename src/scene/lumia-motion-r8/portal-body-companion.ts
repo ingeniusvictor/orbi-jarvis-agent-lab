@@ -69,7 +69,7 @@ export class R8BodyCompanion {
   private activeId:string|null = null
   private action:THREE.AnimationAction|null = null
   private activeLoop=false
-  private gestureToken:string|null = null
+  private gestureToken:{id:string;reason:string;revision:number}|null = null
   private semanticGestureUsed:string|null = null
   private lastState:MotionState='idle'
   private elapsed=0
@@ -80,10 +80,7 @@ export class R8BodyCompanion {
     this.rig=rig
     this.allowClips=allowClips
     this.activeMixer=new THREE.AnimationMixer(rig.scene)
-    for(const name of PROCEDURAL_BONES) {
-      const bone=rig.bodyBones.get(name)
-      if (bone) this.rest.set(name,bone.quaternion.clone())
-    }
+    for(const [name,bone] of rig.bodyBones) this.rest.set(name,bone.quaternion.clone())
     // The full R8 viewer also performs a short warm-up BEFORE the first frame
     // to eliminate a T-pose flash. Preserve that behavior in Portal Body.
     for(let k=0;k<55;k++){
