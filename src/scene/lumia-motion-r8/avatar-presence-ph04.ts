@@ -142,6 +142,10 @@ export function setLumiaAvatarView(view: LumiaAvatarView): boolean {
   if (typeof window !== 'undefined') {
     const url = new URL(window.location.href)
     url.searchParams.set('lumiaAvatar', view)
+    // Experimental clipping and PH-01 baseline flags must not leak into a
+    // later owner-selected presentation.
+    url.searchParams.delete('lumiaNeck')
+    url.searchParams.delete('lumiaHeadQA')
     window.history.replaceState(window.history.state, '', url.toString())
   }
   if (snapshot.view !== view) {
