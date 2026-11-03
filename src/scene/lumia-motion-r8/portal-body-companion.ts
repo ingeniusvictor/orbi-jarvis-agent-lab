@@ -29,7 +29,6 @@ const PROCEDURAL_BONES = [
   'leftShoulder','rightShoulder','leftUpperArm','rightUpperArm',
   'leftLowerArm','rightLowerArm','leftHand','rightHand','chest','spine','hips',
 ] as const
-const DEG = Math.PI / 180
 
 export function portalMotionState(phase:string, audible:boolean):MotionState {
   if (audible) return 'speaking'
