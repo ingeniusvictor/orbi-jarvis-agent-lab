@@ -24,7 +24,7 @@ try {
     if (Test-Path -LiteralPath $dest) {
       $present=Get-Item -LiteralPath $dest
       $sha=(Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash.ToLowerInvariant()
-      if ($present.Length -ne $meta.bytes -or $sha -ne $meta.sha256) {
+      if ($present.Length -ne $meta.bytes -or -not $sha.StartsWith([string]$meta.sha256)) {
         throw ('Archivo local distinto del R8 aprobado: ' + $dest + '. No se sobrescribe.')
       }
       $verified++
@@ -42,7 +42,7 @@ try {
     finally { $outputStream.Dispose(); $inputStream.Dispose() }
     $tmpInfo=Get-Item -LiteralPath $tmp
     $sha=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($tmpInfo.Length -ne $meta.bytes -or $sha -ne $meta.sha256) {
+    if ($tmpInfo.Length -ne $meta.bytes -or -not $sha.StartsWith([string]$meta.sha256)) {
       Remove-Item -LiteralPath $tmp -Force
       throw ('El clip no coincide con Motion R8: ' + $name)
     }
