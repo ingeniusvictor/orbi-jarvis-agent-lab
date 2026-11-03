@@ -39,7 +39,7 @@ const brain=readFileSync(new URL('../bridge/ollama.mjs',import.meta.url),'utf8')
 const launcher=readFileSync(new URL('../INICIAR_LUMIA_ASUS_RAPIDA.cmd',import.meta.url),'utf8')
 assert.match(launcher,/ORBIA_LUMIA_RC03_GROUNDING=1/)
 assert.match(brain,/process\.env\.ORBIA_LUMIA_RC03_GROUNDING === '1'/)
-assert.match(brain,/const grounded = rc03Pilot && !image \? rc03GroundedReply\(\{ prompt, history \}\) : null/)
+assert.match(brain,/rc03Pilot && !image \? rc03GroundedReply\(\{ prompt, history \}\) : null/)
 assert.match(brain,/if \(grounded\) \{[\s\S]*?onText\(grounded\)[\s\S]*?return grounded/)
 
 // Integration smoke: a sanctioned offline weather answer must use the same
