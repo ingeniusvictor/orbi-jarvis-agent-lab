@@ -2,12 +2,12 @@
  * PH-02 optical calibration. The original face VRM remains immutable.
  * "baseline" restores the PH-01 framing / head movement and light preset.
  */
-export function usePh02Presentation(search = '') {
+export function isPh02Presentation(search = '') {
   return new URLSearchParams(search).get('lumiaHeadQA') !== 'baseline'
 }
 
-export function useNeckPreview(search = '') {
-  return usePh02Presentation(search) &&
+export function isNeckPreviewEnabled(search = '') {
+  return isPh02Presentation(search) &&
     new URLSearchParams(search).get('lumiaNeck') === '1'
 }
 
