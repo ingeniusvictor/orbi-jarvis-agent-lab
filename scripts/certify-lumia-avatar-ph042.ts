@@ -8,12 +8,12 @@ import {
 } from '../src/scene/lumia-motion-r8/avatar-presence-ph04'
 
 const log = [
- ['Lumi, cambia la vista principal, por favor.','bust-vrm'],
+ ['Lumi, cambia la vista principal, por favor.','head-vrm'],
  ['Lumi, cambia la versión solo a rostro, por favor.','head-vrm'],
  ['Bista solo rostro.','head-vrm'],
  ['Lumia cambia a la vista de solo rostro.','head-vrm'],
  ['Ahora cambia tu presentación a cuerpo completo.','body-vrm'],
- ['Lumia, puedes cambiar a la vista principal.','bust-vrm'],
+ ['Lumia, puedes cambiar a la vista principal.','head-vrm'],
  ['Lumi, necesito que cambies a la versión de cuerpo completo.','body-vrm'],
  ['Cambia a la versión solo rostro, por favor.','head-vrm'],
  ['Ahora cambia la presentación a la versión cuerpo intermedio.','bust-vrm'],
