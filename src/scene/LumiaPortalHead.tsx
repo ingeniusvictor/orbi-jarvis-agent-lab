@@ -32,7 +32,7 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
   const root = useRef<THREE.Group>(null)
   const gltf = useLoader(GLTFLoader, VRM_URL)
   const rig = useMemo(() => prepareLumiaHead(gltf), [gltf])
-  const { viewport, size } = useThree()
+  const viewport = useThree((state) => state.viewport)
   const pointer = useRef({ x: 0, y: 0 })
   const speech = useRef<SpeechState>({
     active: false, id: null, text: '', phraseStarted: 0,
