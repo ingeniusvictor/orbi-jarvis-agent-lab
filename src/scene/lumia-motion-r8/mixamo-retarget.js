@@ -4,6 +4,7 @@
  * Adaptation strategy follows the public three-vrm Mixamo example.
  */
 const map={Hips:'hips',Spine:'spine',Spine1:'chest',Spine2:'upperChest',
+  Neck:'neck',Head:'head',
   LeftShoulder:'leftShoulder',LeftArm:'leftUpperArm',LeftForeArm:'leftLowerArm',LeftHand:'leftHand',
   RightShoulder:'rightShoulder',RightArm:'rightUpperArm',RightForeArm:'rightLowerArm',RightHand:'rightHand'};
 for(const side of ['Left','Right']){
