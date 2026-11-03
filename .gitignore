@@ -34,3 +34,7 @@ public/models/lumia/lumia.glb
 
 # PH-01: VRM privado instalado solo localmente
 public/models/lumia-motion/*.vrm
+
+# Motion R8 private Mixamo clip assets (17 approved FBX), never publish.
+public/models/lumia-motion/clips/
+
