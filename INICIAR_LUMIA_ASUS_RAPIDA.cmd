@@ -48,6 +48,9 @@ set "ORBIA_LUMIA_RC03_GROUNDING=1"
 rem RC-04: describe only translation features that are enabled in this ASUS session.
 rem Informational: does not open files, activate translation or change voice modes.
 set "ORBIA_LUMIA_RC04_CAPABILITIES=1"
+rem SKILL-01: inspect registered abilities from active switches and local assets.
+rem MEM-01 remains pending: no persistent data or new permissions are created.
+set "ORBIA_LUMIA_SKILL_REGISTRY=1"
 rem SR-01 rollback: NF-01 was too strict for normal voices, especially a second
 rem person nearby. Restore Chrome automatic mic gain + baseline VAD; preserve
 rem wake-word/household guard and LC-01 long-question reception.
