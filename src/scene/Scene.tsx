@@ -1,4 +1,4 @@
-import { Component, Suspense, useMemo, type ReactNode } from 'react'
+import { Component, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import {
   EffectComposer,
@@ -15,6 +15,7 @@ import { Orbits } from './Orbits'
 import { LumiaAvatar } from './LumiaAvatar'
 import { LumiaPortalHead } from './LumiaPortalHead'
 import { isPh02Presentation } from './lumia-head/head-presentation-ph02'
+import { avatarPresenceSnapshot, subscribeAvatarPresence } from './lumia-motion-r8/avatar-presence-ph04'
 import { useStore, phaseColor, accentFor, type Phase } from '../store'
 
 /** Rings spin harder while JARVIS is working — reads as effort. */
@@ -127,17 +128,10 @@ class AvatarErrorBoundary extends Component<
 }
 
 /**
- * Head VRM POC is opt-in, so every existing user retains the approved GLB.
- * The original R3F Canvas, HUD, AI and reactor are never replaced.
- * Open ?lumiaAvatar=head-vrm to preview, ?lumiaAvatar=legacy to revert.
+ * PH-04: one Canvas for the three live VRM presentations. The view changes
+ * through a local store event; no page reload, no STT/TTS/LLM restart.
+ * Without PH-04 launch opt-in, previous URL-selectable modes still work.
  */
-const queryAvatarMode = new URLSearchParams(window.location.search).get('lumiaAvatar')
-const HEAD_VRM_ENABLED =
-  queryAvatarMode === 'head-vrm' ||
-  queryAvatarMode === 'bust-vrm' ||
-  queryAvatarMode === 'body-vrm' ||
-  (queryAvatarMode !== 'legacy' && import.meta.env.VITE_LUMIA_AVATAR_MODE === 'head-vrm')
-const HEAD_PH02_OPTICAL = HEAD_VRM_ENABLED && isPh02Presentation(window.location.search)
 
 class HeadVrmErrorBoundary extends Component<
   { drive: Drive; children: ReactNode }, { failed: boolean }
@@ -160,6 +154,13 @@ class HeadVrmErrorBoundary extends Component<
 const STYLE_INDEX = { ring: 0, sphere: 1, wire: 2 } as const
 
 function Rig() {
+  const [avatarView, setAvatarView] = useState(() => avatarPresenceSnapshot().view)
+  useEffect(() => subscribeAvatarPresence(() => {
+    setAvatarView(avatarPresenceSnapshot().view)
+  }), [])
+  const headEnabled = avatarView !== 'legacy'
+  const headOptical = headEnabled && isPh02Presentation(window.location.search)
+
   const drive = useMemo<Drive>(
     () => ({
       color: new THREE.Color(phaseColor.offline),
@@ -243,10 +244,10 @@ function Rig() {
     <>
       <Core drive={drive} />
       <AvatarErrorBoundary>
-        {HEAD_VRM_ENABLED ? (
-          <HeadVrmErrorBoundary drive={drive}>
+        {headEnabled ? (
+          <HeadVrmErrorBoundary key={avatarView} drive={drive}>
             <Suspense fallback={<LumiaAvatar drive={drive} />}>
-              <LumiaPortalHead drive={drive} />
+              <LumiaPortalHead key={avatarView} drive={drive} avatarView={avatarView} />
             </Suspense>
           </HeadVrmErrorBoundary>
         ) : (
@@ -260,9 +261,9 @@ function Rig() {
 
       {/* The original reactor shaders ignore lights, so these affect only the
           GLB avatar and leave the holographic ring visually unchanged. */}
-      <ambientLight intensity={HEAD_PH02_OPTICAL ? 0.65 : 1.15} />
-      <directionalLight position={[3, 4, 5]} intensity={HEAD_PH02_OPTICAL ? 0.80 : 1.6} color="#e8ffff" />
-      <pointLight position={[-2.2, 0.8, 3]} intensity={HEAD_PH02_OPTICAL ? 1.45 : 5.5} distance={8} color="#19c4c4" />
+      <ambientLight intensity={headOptical ? 0.65 : 1.15} />
+      <directionalLight position={[3, 4, 5]} intensity={headOptical ? 0.80 : 1.6} color="#e8ffff" />
+      <pointLight position={[-2.2, 0.8, 3]} intensity={headOptical ? 1.45 : 5.5} distance={8} color="#19c4c4" />
     </>
   )
 }

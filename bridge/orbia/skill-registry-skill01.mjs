@@ -60,6 +60,13 @@ export function buildLumiaSkillRegistry({
       ttsReady ? 'Archivos preparados; la reproducción real requiere una prueba de audio.' :
         'Faltan componentes locales o no se seleccionó el modo Kokoro.',
       'env+asset-probe'),
+    entry('avatar-presence', 'Avatar virtual animado', 'PH-04/Motion R8',
+      enabled(env.ORBIA_LUMIA_AVATAR_PH04) ? 'experimental' : 'disabled',
+      'Tres vistas locales: solo rostro, medio cuerpo como principal y cuerpo completo. ' +
+      'Puede cambiar de vista y solicitar gestos de un catálogo de 17 animaciones.',
+      'La naturalidad corporal y la reproducción real de cada FBX requieren prueba en ASUS y archivos privados compatibles. ' +
+      'No controla aplicaciones ni archivos del equipo.',
+      'local-ui+motion-catalog'),
     entry('translation-text', 'Traducción de texto', 'LT-01/LT-04Q',
       translation.textEnabled ? 'configured' : 'disabled',
       'Traducir texto entre español, inglés y mandarín con idiomas seleccionados manualmente.',

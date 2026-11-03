@@ -51,6 +51,10 @@ set "ORBIA_LUMIA_RC04_CAPABILITIES=1"
 rem SKILL-01: inspect registered abilities from active switches and local assets.
 rem MEM-01 remains pending: no persistent data or new permissions are created.
 set "ORBIA_LUMIA_SKILL_REGISTRY=1"
+rem PH-04: keep native bust VRM in portal; owner-only three-view commands and 17 local R8 motions.
+rem Does not enable general desktop access, persistence or new microphones.
+set "VITE_LUMIA_AVATAR_PH04=1"
+set "ORBIA_LUMIA_AVATAR_PH04=1"
 rem SR-01 rollback: NF-01 was too strict for normal voices, especially a second
 rem person nearby. Restore Chrome automatic mic gain + baseline VAD; preserve
 rem wake-word/household guard and LC-01 long-question reception.

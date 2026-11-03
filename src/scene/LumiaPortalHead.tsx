@@ -3,7 +3,8 @@ import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import * as THREE from 'three'
 import { useStore } from '../store'
-import { R8BodyCompanion, isR8BodyMode, isR8ClipEnabled } from './lumia-motion-r8/portal-body-companion'
+import { R8BodyCompanion } from './lumia-motion-r8/portal-body-companion'
+import { avatarPresenceSnapshot, subscribeAvatarPresence, type LumiaAvatarView } from './lumia-motion-r8/avatar-presence-ph04'
 import type { Drive } from './Scene'
 import {
   approximateVowel, prepareLumiaHead, setHeadExpressions,
@@ -35,17 +36,22 @@ type SpeechState = {
   phraseStarted: number
 }
 
-export function LumiaPortalHead({ drive }: { drive: Drive }) {
+export function LumiaPortalHead({ drive, avatarView }: {
+  drive: Drive
+  avatarView: LumiaAvatarView
+}) {
   const root = useRef<THREE.Group>(null)
   const pivot = useRef<THREE.Group>(null)
   const ph02 = isPh02Presentation(window.location.search)
   const showNeck = isNeckPreviewEnabled(window.location.search)
-  const showBody = isR8BodyMode(window.location.search)
-  const clipEnabled = isR8ClipEnabled(window.location.search)
-  const avatarMode = new URLSearchParams(window.location.search).get('lumiaAvatar')
-  const fullBody = avatarMode === 'body-vrm'
-  const bust = avatarMode === 'bust-vrm'
-  const centerY = fullBody ? 0.99 : bust ? 1.28 : HEAD_CENTER_Y
+  const showBody = avatarView === 'bust-vrm' || avatarView === 'body-vrm' || showNeck
+  const clipEnabled = showBody &&
+    new URLSearchParams(window.location.search).get('lumiaR8') !== 'procedural'
+  const fullBody = avatarView === 'body-vrm'
+  const bust = avatarView === 'bust-vrm'
+  // Align face centre with the centre of the holographic rings. In the
+  // screenshot the old bust centre (1.28) lifted the face too high.
+  const centerY = fullBody ? 0.99 : bust ? 1.50 : HEAD_CENTER_Y
   const gltf = useLoader(GLTFLoader, VRM_URL)
   const rig = useMemo(
     () => prepareLumiaHead(gltf, { ph02, showNeck, showBody }),
@@ -56,6 +62,27 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
     [rig, showBody, clipEnabled],
   )
   useEffect(() => () => { body?.dispose() }, [body])
+  // The view switch is a React remount; replay a newly authorised gesture
+  // once after the bust companion exists. No replay of old commands on reload.
+  const lastMotionSequence = useRef<number>(avatarPresenceSnapshot().motion?.sequence ?? 0)
+  useEffect(() => {
+    if (!body) return
+    const apply = () => {
+      const command = avatarPresenceSnapshot().motion
+      if (!command || command.sequence <= lastMotionSequence.current ||
+          Date.now() - command.sentAt > 1600) return
+      lastMotionSequence.current = command.sequence
+      if (command.kind === 'auto') body.resumeAutomatic()
+      else if (command.id) body.requestManualClip(command.id)
+    }
+    // The view may have switched in the same accepted voice command.
+    const current = avatarPresenceSnapshot().motion
+    if (current) {
+      lastMotionSequence.current = Math.min(lastMotionSequence.current, current.sequence - 1)
+    }
+    apply()
+    return subscribeAvatarPresence(apply)
+  }, [body])
   const viewport = useThree((state) => state.viewport)
   const gl = useThree((state) => state.gl)
 
@@ -131,7 +158,7 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
     // Independent optics: portrait, conversational bust and full-body
     // companion share the SAME avatar rig and same Portal/HUD/TTS stack.
     const fit = Math.min(viewport.width, viewport.height)
-    const fraction = fullBody ? .84 : bust ? .70
+    const fraction = fullBody ? .84 : bust ? .82
       : (ph02 ? HEAD_FRACTION_PH02 : HEAD_FRACTION_PH01)
     const height = fullBody ? BODY_HEIGHT_M : bust ? BUST_HEIGHT_M : HEAD_HEIGHT_M
     const scale = fit * fraction / height * (1 + drive.level * 0.005)
