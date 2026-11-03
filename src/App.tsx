@@ -24,7 +24,7 @@ import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { portalSpeechStart, portalSpeechPhrase, portalSpeechEnd, portalSpeechInterrupt } from './scene/lumia-head/portal-speech-events'
 import { parseLumiaAvatarAction, respondToLumiaAvatarAction } from './scene/lumia-motion-r8/avatar-presence-ph04'
-import { LumiaViewDock } from './ui/LumiaViewDock'
+
 import { resolveFollowupGuardMs } from './lib/followup-latency'
 import * as sfx from './lib/sfx'
 import * as music from './lib/music'
@@ -1276,7 +1276,6 @@ export default function App() {
   return (
     <>
       <Scene />
-      {AVATAR_PH04_ENABLED && <LumiaViewDock />}
       <Hud />
       <Boot />
       <Diagnostics />
@@ -1288,6 +1287,7 @@ export default function App() {
           busy={pushBusy}
           visionAvailable={usingBridge && import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1'}
           translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
+          avatarViewControl={AVATAR_PH04_ENABLED}
           onTranslate={translateWritten}
           onTranslateAudio={translateAudioNote}
           onModeChange={switchInputMode}
