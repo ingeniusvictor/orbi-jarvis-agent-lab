@@ -62,8 +62,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
     [gltf, ph02, showNeck, showBody],
   )
   const body = useMemo(
-    () => showBody ? new R8BodyCompanion(rig, { allowClips: clipEnabled, safePose }) : null,
-    [rig, showBody, clipEnabled, safePose],
+    () => showBody ? new R8BodyCompanion(rig, { allowClips: clipEnabled, safePose, fullBodySafe: fullBody }) : null,
+    [rig, showBody, clipEnabled, safePose, fullBody],
   )
   useEffect(() => () => { body?.dispose() }, [body])
   // The view switch is a React remount; replay a newly authorised gesture
