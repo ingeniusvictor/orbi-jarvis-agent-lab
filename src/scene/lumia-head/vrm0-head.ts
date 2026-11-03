@@ -24,6 +24,7 @@ export type HeadRig = {
   visibleMeshes: THREE.Mesh[]
   neckClipPlane: THREE.Plane | null
   neckMeshes: THREE.Mesh[]
+  bodyBones: Map<string, THREE.Object3D>
 }
 
 /**
@@ -34,7 +35,7 @@ export type HeadRig = {
  * This adapter interprets the VRM0 humanoid and blendShapeMaster metadata.
  * It is a reversible POC; advanced VRM springbones/MToon are not yet enabled.
  */
-export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck?: boolean } = {}): HeadRig {
+export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck?: boolean; showBody?: boolean } = {}): HeadRig {
   const parser = gltf.parser as unknown as ParserInfo
   const vrm = parser.json?.extensions?.VRM
   if (!vrm) throw new Error('LUMIA PH01: se esperaba un VRM 0.x con extensión VRM.')
@@ -67,7 +68,7 @@ export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck
     // materials in the PH-02 visual preview; the original VRM is untouched.
     const neckBody = Boolean(neckClipPlane && sourceMesh === 1 &&
       /(?:body|skin|neck)/i.test(mesh.name + ' ' + (mesh.parent?.name ?? '')))
-    mesh.visible = sourceMesh === 0 || sourceMesh === 2 || neckBody
+    mesh.visible = sourceMesh === 0 || sourceMesh === 2 || neckBody || Boolean(options.showBody)
     if (mesh.visible && options.ph02) {
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       const clones = materials.map((original) => {
@@ -108,6 +109,19 @@ export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck
       ?? gltf.scene.getObjectByName(parser.json?.nodes?.[ref.node]?.name ?? '')
       ?? null
   }
+  const bodyBones = new Map<string, THREE.Object3D>()
+  const names = [
+    'hips','spine','chest','upperChest','neck','head',
+    'leftShoulder','leftUpperArm','leftLowerArm','leftHand',
+    'rightShoulder','rightUpperArm','rightLowerArm','rightHand',
+    'leftUpperLeg','leftLowerLeg','leftFoot','leftToes',
+    'rightUpperLeg','rightLowerLeg','rightFoot','rightToes',
+  ]
+  for (const name of names) {
+    const node = bone(name)
+    if (node) bodyBones.set(name, node)
+  }
+
   const expressions = new Map<string, VrmBind[]>()
   for (const group of vrm.blendShapeMaster?.blendShapeGroups ?? []) {
     const key = (group.presetName && group.presetName !== 'unknown'
@@ -120,7 +134,7 @@ export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck
   return {
     scene: gltf.scene, head: bone('head'), neck: bone('neck'),
     leftEye: bone('leftEye'), rightEye: bone('rightEye'),
-    expressions, meshes, visibleMeshes, neckClipPlane, neckMeshes,
+    expressions, meshes, visibleMeshes, neckClipPlane, neckMeshes, bodyBones,
   }
 }
 

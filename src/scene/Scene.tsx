@@ -134,6 +134,8 @@ class AvatarErrorBoundary extends Component<
 const queryAvatarMode = new URLSearchParams(window.location.search).get('lumiaAvatar')
 const HEAD_VRM_ENABLED =
   queryAvatarMode === 'head-vrm' ||
+  queryAvatarMode === 'bust-vrm' ||
+  queryAvatarMode === 'body-vrm' ||
   (queryAvatarMode !== 'legacy' && import.meta.env.VITE_LUMIA_AVATAR_MODE === 'head-vrm')
 const HEAD_PH02_OPTICAL = HEAD_VRM_ENABLED && isPh02Presentation(window.location.search)
 

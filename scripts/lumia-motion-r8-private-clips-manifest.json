@@ -1,0 +1,79 @@
+{
+  "schema": "lumia-motion-r8-private-clips/v1",
+  "kit": "LUMIA_VITA_NATURAL_V085_R8_NATURAL_CONVERSATION_KIT.zip",
+  "kitSha256": "16a5db203cafb2ee82ca7ad2e02c57c8ca7480c42ab0c6dcd2d570a6422a2caa",
+  "vrm": {
+    "sha256": "f2e68b5379d8e16e8ef2a5cd4a51468b0ceff5a95966f948ca0e46d3421ac8a6",
+    "bytes": 18058700
+  },
+  "clips": {
+    "Blow A Kiss.fbx": {
+      "sha256": "30106bf6a6c257c713394ad5848482149135e66c7e137a89030d17fc1be88946",
+      "bytes": 1979232
+    },
+    "Clapping.fbx": {
+      "sha256": "d46a8f0a35fc4df0df4a210380459f7f5c19cf3578eff258b8ee6fcf55a7f1c1",
+      "bytes": 1440016
+    },
+    "Dwarf Idle.fbx": {
+      "sha256": "74a1185528d4fa81c518e33c59d11bee6466195df23e7dedc8fc5862926373f3",
+      "bytes": 1907280
+    },
+    "Excited.fbx": {
+      "sha256": "9fccf23848f02c4aefd054e241ee5c2c6b4e87cb72e0f46393c9132549d9d017",
+      "bytes": 2184288
+    },
+    "Happy.fbx": {
+      "sha256": "ad1b19d82fc812780e1a809944f1878143ac7b1628f0a0b2ee7ea66c9f082f80",
+      "bytes": 2409152
+    },
+    "Head Gesture.fbx": {
+      "sha256": "6147e02a262cfaa59765550e48bdde961e7d05d075b2e68b3074a1010fc4bb3f",
+      "bytes": 2073056
+    },
+    "Idle.fbx": {
+      "sha256": "9d56544a4634a0c814bf679d845a10b3afe0915007661e3d5d49e8cbd1800f41",
+      "bytes": 3635680
+    },
+    "No.fbx": {
+      "sha256": "f15dd302ef8baf5e93f689d8cfd18514d892c1bdd3153c4fb17ec745bc422e51",
+      "bytes": 1991536
+    },
+    "Pointing Gesture.fbx": {
+      "sha256": "c4fe2bd7d4990b907c0842f4c572b67060526d18b5d306cb8fcf59e710861e41",
+      "bytes": 1574624
+    },
+    "Pointing.fbx": {
+      "sha256": "d6a16bc0d5fe7b8688637905817d12142f625f6d6f763e561022e7665392be98",
+      "bytes": 1710560
+    },
+    "Surprised.fbx": {
+      "sha256": "5e3663b4c095b225ab21648f1ad5524dc92327d5684feb32bc8b08f41e72aa84",
+      "bytes": 1991792
+    },
+    "Talking.fbx": {
+      "sha256": "705eba737a65f47d8158e1df6f2bb866363828cdb557cbd15a2c1bd2bff1a528",
+      "bytes": 2463296
+    },
+    "Thinking.fbx": {
+      "sha256": "75bf903fa1f1e3a1efe74474aa26dbcd4378298592b0a3274bb75028f4906935",
+      "bytes": 1932672
+    },
+    "Walk In Circle.fbx": {
+      "sha256": "997c75b23464a47147b9856d29222a2bf8ee95902039582916993f0107eb3153",
+      "bytes": 2338912
+    },
+    "Walking adelante.fbx": {
+      "sha256": "f04b7e584ef1e9d40b48247e3edd6225eba6a2ea35a14daefa7d65304bcb6ecb",
+      "bytes": 1511808
+    },
+    "Walking in place.fbx": {
+      "sha256": "3292b1ffc8afddb03fcd843adce57a68be7bc0facf166cbfd4837bbe00a692f0",
+      "bytes": 1474912
+    },
+    "Waving.fbx": {
+      "sha256": "33ce3315242e261422e9afba3e8e12c6c43fbad6b477df0cbef0f263",
+      "bytes": 1358768
+    }
+  }
+}
