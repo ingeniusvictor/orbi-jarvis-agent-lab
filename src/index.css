@@ -2714,6 +2714,90 @@ kbd {
 }
 
 
+/* PH-04.3: avatar view switcher INSIDE the existing bottom chat bar.
+ * The menu rises above the composer and never overlays the face or the HUD.
+ */
+.lumia-avatar-view-picker {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  z-index: 2;
+}
+.lumia-avatar-view-trigger {
+  color: rgba(158, 238, 255, .92);
+  border-color: rgba(90, 218, 248, .22);
+}
+.lumia-avatar-view-trigger.is-active,
+.lumia-avatar-view-trigger:hover,
+.lumia-avatar-view-trigger:focus-visible {
+  color: #d8feff;
+  background: rgba(25, 164, 196, .18);
+  border-color: rgba(117, 239, 255, .57);
+}
+.lumia-avatar-view-options {
+  position: absolute;
+  z-index: 3;
+  left: -20px;
+  bottom: calc(100% + 17px);
+  width: max-content;
+  min-width: 182px;
+  max-width: min(78vw, 260px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid rgba(117, 239, 255, .42);
+  border-radius: 15px;
+  background: rgba(2, 23, 35, .97);
+  color: #c6f8ff;
+  box-shadow: 0 9px 28px rgba(0, 0, 0, .43), 0 0 20px rgba(0, 182, 210, .15);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.lumia-avatar-view-title {
+  color: rgba(144, 223, 238, .65);
+  font: 600 9px ui-monospace, monospace;
+  letter-spacing: .13em;
+  padding: 3px 9px 6px;
+}
+.lumia-avatar-view-option {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(191, 242, 251, .78);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  cursor: pointer;
+  text-align: left;
+  font: 500 12px system-ui, sans-serif;
+}
+.lumia-avatar-view-option:hover,
+.lumia-avatar-view-option:focus-visible,
+.lumia-avatar-view-option.is-selected {
+  color: #d3faff;
+  background: rgba(35, 183, 217, .16);
+  border-color: rgba(121, 235, 255, .25);
+}
+.lumia-avatar-view-option:focus-visible {
+  outline: 2px solid rgba(164, 247, 255, .9);
+  outline-offset: 1px;
+}
+.lumia-avatar-view-check {
+  color: #70ebff;
+  margin-left: auto;
+}
+@media (max-width: 650px) {
+  .lumia-avatar-view-options {
+    left: -9px;
+    bottom: calc(100% + 11px);
+    min-width: 155px;
+  }
+  .lumia-avatar-view-option { padding: 8px 9px; }
+}
+
 /* UX-03 — Halo-aware response rail (ASUS reference 1761×831).
  * The avatar and orbit camera remain unchanged. Reserve the circle plus a
  * safety gutter in viewport units instead of clipping unreadable glyphs.
