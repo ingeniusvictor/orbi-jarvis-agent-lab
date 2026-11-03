@@ -22,6 +22,8 @@ export type HeadRig = {
   expressions: Map<string, VrmBind[]>
   meshes: Map<number, THREE.Mesh[]>
   visibleMeshes: THREE.Mesh[]
+  neckClipPlane: THREE.Plane | null
+  neckMeshes: THREE.Mesh[]
 }
 
 /**
@@ -32,7 +34,7 @@ export type HeadRig = {
  * This adapter interprets the VRM0 humanoid and blendShapeMaster metadata.
  * It is a reversible POC; advanced VRM springbones/MToon are not yet enabled.
  */
-export function prepareLumiaHead(gltf: GLTF): HeadRig {
+export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck?: boolean } = {}): HeadRig {
   const parser = gltf.parser as unknown as ParserInfo
   const vrm = parser.json?.extensions?.VRM
   if (!vrm) throw new Error('LUMIA PH01: se esperaba un VRM 0.x con extensión VRM.')
@@ -40,6 +42,10 @@ export function prepareLumiaHead(gltf: GLTF): HeadRig {
   const nodes = new Map<number, THREE.Object3D>()
   const meshes = new Map<number, THREE.Mesh[]>()
   const visibleMeshes: THREE.Mesh[] = []
+  // Optional, non-destructive neck preview: only a clipped section of the
+  // original Body mesh; no synthetic neck or VRM re-export.
+  const neckClipPlane = options.showNeck ? new THREE.Plane(new THREE.Vector3(0, 1, 0), 1.4) : null
+  const neckMeshes: THREE.Mesh[] = []
 
   gltf.scene.traverse((node) => {
     const association = associations?.get(node)
@@ -57,8 +63,32 @@ export function prepareLumiaHead(gltf: GLTF): HeadRig {
     list.push(mesh)
     meshes.set(sourceMesh, list)
 
-    // Hide mesh material only. Leave Body bones, skin bindings and hierarchy intact.
-    mesh.visible = sourceMesh === 0 || sourceMesh === 2
+    // Preserve the original glTF skeleton and material maps. Only clone
+    // materials in the PH-02 visual preview; the original VRM is untouched.
+    const neckBody = Boolean(neckClipPlane && sourceMesh === 1 &&
+      /(?:body|skin|neck)/i.test(mesh.name + ' ' + (mesh.parent?.name ?? '')))
+    mesh.visible = sourceMesh === 0 || sourceMesh === 2 || neckBody
+    if (mesh.visible && options.ph02) {
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      const clones = materials.map((original) => {
+        const clone = original.clone()
+        const surface = clone as THREE.MeshStandardMaterial
+        if (surface.color instanceof THREE.Color) {
+          surface.color.multiplyScalar(sourceMesh === 0 ? 0.84 : sourceMesh === 2 ? 0.73 : 0.88)
+        }
+        if (surface.emissive instanceof THREE.Color) {
+          surface.emissive.multiplyScalar(0.60)
+          surface.emissiveIntensity *= 0.65
+        }
+        if (neckBody && neckClipPlane) {
+          clone.clippingPlanes = [neckClipPlane]
+          clone.clipShadows = true
+        }
+        return clone
+      })
+      mesh.material = Array.isArray(mesh.material) ? clones : clones[0]
+    }
+    if (neckBody) neckMeshes.push(mesh)
     mesh.frustumCulled = false
     if (mesh.visible) {
       mesh.castShadow = false
@@ -90,7 +120,7 @@ export function prepareLumiaHead(gltf: GLTF): HeadRig {
   return {
     scene: gltf.scene, head: bone('head'), neck: bone('neck'),
     leftEye: bone('leftEye'), rightEye: bone('rightEye'),
-    expressions, meshes, visibleMeshes,
+    expressions, meshes, visibleMeshes, neckClipPlane, neckMeshes,
   }
 }
 
