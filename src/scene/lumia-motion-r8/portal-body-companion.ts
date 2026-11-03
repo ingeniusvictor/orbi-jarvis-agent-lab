@@ -347,7 +347,7 @@ export class R8BodyCompanion {
     this.semantic.end()
     // During the owner-guided tour, "Talking.fbx" must complete its actual
     // authored cycle even after the short narration has finished.
-    if(this.activeId==='talking' && !this.demoClipId)this.stopClip()
+    if(this.activeId==='talking' && !this.explicitClipId)this.stopClip()
   }
 
   step(dt:number,phase:string,speechAudible:boolean):SemanticPose {
