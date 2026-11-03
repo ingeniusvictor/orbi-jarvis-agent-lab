@@ -21,7 +21,7 @@ export type LumiaAvatarAction =
 export type LumiaAvatarSnapshot = {
   view: LumiaAvatarView
   sequence: number
-  motion: { sequence: number; id: string | null; kind: 'play' | 'auto' } | null
+  motion: { sequence: number; id: string | null; kind: 'play' | 'auto'; sentAt: number } | null
 }
 
 const AVAILABLE_VIEWS: Record<Exclude<LumiaAvatarView, 'legacy'>, string> = {
@@ -161,14 +161,14 @@ export function requestLumiaAvatarMotion(id: string): boolean {
     setLumiaAvatarView('bust-vrm') // Face & body gesture must remain visible.
   }
   const sequence = snapshot.sequence + 1
-  snapshot = { ...snapshot, sequence, motion: { sequence, id, kind: 'play' } }
+  snapshot = { ...snapshot, sequence, motion: { sequence, id, kind: 'play', sentAt: Date.now() } }
   notify()
   return true
 }
 
 export function resumeLumiaAvatarMotion(): void {
   const sequence = snapshot.sequence + 1
-  snapshot = { ...snapshot, sequence, motion: { sequence, id: null, kind: 'auto' } }
+  snapshot = { ...snapshot, sequence, motion: { sequence, id: null, kind: 'auto', sentAt: Date.now() } }
   notify()
 }
 
