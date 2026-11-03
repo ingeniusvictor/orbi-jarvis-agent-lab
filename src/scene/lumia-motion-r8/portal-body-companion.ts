@@ -241,6 +241,13 @@ export class R8BodyCompanion {
       loop:Boolean(config.loop),repetitions:config.repetitions||1,
       headAuthored:id==='no' && result.matched.some((name:string)=>name==='head'||name==='neck'),
     }
+    if(id==='no' || id==='clapping'){
+      console.info('[lumia:ph047] QA authoring/retarget:',
+        id,'matched bones:',result.matched.join(','),
+        'FBX clip seconds:',entry.clip.duration,
+        'head/neck authored:',entry.headAuthored,
+        'This reports track mapping, not visual fidelity.')
+    }
     this.cache.set(id,entry)
     return entry
   }
@@ -381,14 +388,19 @@ export class R8BodyCompanion {
 
 
     const semantic=this.semantic.step(dt,{speaking:speechAudible}) as SemanticPose
-    for(const [name,value] of Object.entries(semantic.body)){
-      const axis=name.at(-1)?.toUpperCase()
-      const boneName=name.slice(0,-1)
-      const bone=this.rig.bodyBones.get(boneName)
-      if(!bone || !axis || !Number.isFinite(value) || Math.abs(value)<1e-7)continue
-      this.euler.set(axis==='X'?value:0,axis==='Y'?value:0,axis==='Z'?value:0)
-      this.q.setFromEuler(this.euler)
-      bone.quaternion.multiply(this.q)
+    // The owner-requested FBX pose owns its joints until the clip ends.
+    // Semantic voice overlays on the SAME arms previously pulled hands
+    // apart during Clapping and distorted the authored No gesture.
+    if(!this.explicitClipId) {
+      for(const [name,value] of Object.entries(semantic.body)){
+        const axis=name.at(-1)?.toUpperCase()
+        const boneName=name.slice(0,-1)
+        const bone=this.rig.bodyBones.get(boneName)
+        if(!bone || !axis || !Number.isFinite(value) || Math.abs(value)<1e-7)continue
+        this.euler.set(axis==='X'?value:0,axis==='Y'?value:0,axis==='Z'?value:0)
+        this.q.setFromEuler(this.euler)
+        bone.quaternion.multiply(this.q)
+      }
     }
     // R8 semantic gestures only when the actual TTS text is audibly playing.
     if(semantic.kind && semantic.kind!==this.semanticGestureUsed && speechAudible &&
