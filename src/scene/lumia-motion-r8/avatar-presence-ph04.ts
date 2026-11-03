@@ -254,5 +254,5 @@ export function respondToLumiaAvatarAction(action: LumiaAvatarAction): string {
       shortList.join(', ') +
       '. Para ejecutarlas necesito que sus archivos estén instalados y sean compatibles con el avatar.'
   }
-  return 'Mi presencia habitual es solo rostro, para que se vean bien mis ojos y expresiones. También puedo mostrar medio cuerpo y cuerpo completo con un catálogo de diecisiete animaciones Motion R8. Los gestos acompañan mi conversación y puedo intentar un movimiento cuando me lo pidas, si su archivo local es compatible.'
+  return 'Mi presencia habitual es solo rostro, para que se vean bien mis ojos y expresiones. Como avatar virtual, también puedo mostrar medio cuerpo y cuerpo completo con un catálogo de diecisiete animaciones Motion R8. Los gestos acompañan mi conversación y puedo intentar un movimiento cuando me lo pidas, si su archivo local es compatible.'
 }
