@@ -37,6 +37,7 @@ import { isGenericReplyForQuestion, safeClarificationForQuestion } from './orbia
 import { isComplexVoicePrompt, COMPLEX_VOICE_INSTRUCTION } from './orbia/complex-voice-intent.mjs'
 import { rc03GroundedReply, RC03_VOICE_GROUNDING_INSTRUCTION } from './orbia/grounded-claims-rc03.mjs'
 import { rc04TranslationCapabilityReply, RC04_TRANSLATION_FACTS } from './orbia/translation-capabilities-rc04.mjs'
+import { buildLumiaSkillRegistry, isSkillRegistryInquiry, skillRegistryReply } from './orbia/skill-registry-skill01.mjs'
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
@@ -307,8 +308,11 @@ export async function streamOllama({
   // without inventing weather measurements or pretending to control the PC.
   // This path preserves the existing bridge onText/done/history contract and
   // avoids a needless model call. All other requests go to Qwen as before.
-  const translationCapability = rc04Pilot && !image
-    ? rc04TranslationCapabilityReply({ prompt }) : null
+  const skillPilot = process.env.ORBIA_LUMIA_SKILL_REGISTRY === '1'
+  const registryReply = skillPilot && !image && isSkillRegistryInquiry(prompt)
+    ? skillRegistryReply({ prompt, registry: buildLumiaSkillRegistry() }) : null
+  const translationCapability = registryReply || (rc04Pilot && !image
+    ? rc04TranslationCapabilityReply({ prompt }) : null)
   const grounded = translationCapability ||
     (rc03Pilot && !image ? rc03GroundedReply({ prompt, history }) : null)
   if (grounded) {
