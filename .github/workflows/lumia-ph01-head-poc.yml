@@ -2,7 +2,7 @@ name: LUMIA PH-01 - Portal Head POC
 on:
   push:
     branches:
-      - feat/lumia-ph01-portal-head-vrm
+      - feat/lumia-ph01-portal-head-rc03-20261103
   pull_request:
 
 permissions:
@@ -22,6 +22,12 @@ jobs:
         run: npm ci
       - name: Compile portal
         run: npm run build
+      - name: Lint certificado RC-03 + integracion PH-01
+        run: npm run lint
+      - name: Certificar regresiones RC-02 y RC-03
+        run: |
+          node scripts/certify-lumia-response-relevance-rc02.mjs
+          node scripts/certify-lumia-grounded-claims-rc03.mjs
       - name: Certify PH01 head routing and voice events
         run: node scripts/certify-lumia-head-ph01.mjs
       - name: Verify legacy avatar still certified
