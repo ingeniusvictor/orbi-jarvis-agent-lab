@@ -47,6 +47,10 @@ export function LumiaPortalHead({ drive, avatarView }: {
   const showBody = avatarView === 'bust-vrm' || avatarView === 'body-vrm' || showNeck
   const clipEnabled = showBody &&
     new URLSearchParams(window.location.search).get('lumiaR8') !== 'procedural'
+  // Raw VRM0 retarget is constrained for a calm conversational presentation.
+  // Only opt-in expressive QA removes the pose envelope; procedural rollback
+  // remains unchanged.
+  const safePose = new URLSearchParams(window.location.search).get('lumiaR8') !== 'expressive'
   const fullBody = avatarView === 'body-vrm'
   const bust = avatarView === 'bust-vrm'
   // Align face centre with the centre of the holographic rings. In the
@@ -58,8 +62,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
     [gltf, ph02, showNeck, showBody],
   )
   const body = useMemo(
-    () => showBody ? new R8BodyCompanion(rig, { allowClips: clipEnabled }) : null,
-    [rig, showBody, clipEnabled],
+    () => showBody ? new R8BodyCompanion(rig, { allowClips: clipEnabled, safePose }) : null,
+    [rig, showBody, clipEnabled, safePose],
   )
   useEffect(() => () => { body?.dispose() }, [body])
   // The view switch is a React remount; replay a newly authorised gesture

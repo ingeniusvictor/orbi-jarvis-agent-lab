@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
+import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
 
 type VrmBind = { mesh: number; index: number; weight?: number }
 type VrmGroup = { name?: string; presetName?: string; binds?: VrmBind[] }
@@ -39,7 +40,24 @@ export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck
   const parser = gltf.parser as unknown as ParserInfo
   const vrm = parser.json?.extensions?.VRM
   if (!vrm) throw new Error('LUMIA PH01: se esperaba un VRM 0.x con extensión VRM.')
+  // GLTFLoader caches the original glTF across presentation remounts. In
+  // PH-03, animating its bones in one view polluted the rest pose of the next
+  // view, causing cumulative deformations. Clone the complete skinned rig and
+  // pair original nodes with their clones to preserve parser associations.
+  const scene = cloneSkeleton(gltf.scene) as THREE.Group
+  const originalNodes: THREE.Object3D[] = []
+  const clonedNodes: THREE.Object3D[] = []
+  gltf.scene.traverse((node) => originalNodes.push(node))
+  scene.traverse((node) => clonedNodes.push(node))
+  if (originalNodes.length !== clonedNodes.length) {
+    throw new Error('LUMIA PH04.2: no coincide la jerarquía del clon VRM.')
+  }
+  const clonedAssociations = new Map<THREE.Object3D, { meshes?: number; nodes?: number }>()
   const associations = parser.associations
+  for (let i = 0; i < originalNodes.length; i++) {
+    const association = associations?.get(originalNodes[i])
+    if (association) clonedAssociations.set(clonedNodes[i], association)
+  }
   const nodes = new Map<number, THREE.Object3D>()
   const meshes = new Map<number, THREE.Mesh[]>()
   const visibleMeshes: THREE.Mesh[] = []
@@ -48,8 +66,8 @@ export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck
   const neckClipPlane = options.showNeck ? new THREE.Plane(new THREE.Vector3(0, 1, 0), 1.4) : null
   const neckMeshes: THREE.Mesh[] = []
 
-  gltf.scene.traverse((node) => {
-    const association = associations?.get(node)
+  scene.traverse((node) => {
+    const association = clonedAssociations.get(node)
     if (typeof association?.nodes === 'number') nodes.set(association.nodes, node)
     const mesh = node as THREE.Mesh
     if (!(mesh as THREE.Mesh & { isMesh?: boolean }).isMesh) return
@@ -106,7 +124,7 @@ export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck
     const ref = vrm.humanoid?.humanBones?.find((entry) => entry.bone === name)
     if (!ref) return null
     return nodes.get(ref.node)
-      ?? gltf.scene.getObjectByName(parser.json?.nodes?.[ref.node]?.name ?? '')
+      ?? scene.getObjectByName(parser.json?.nodes?.[ref.node]?.name ?? '')
       ?? null
   }
   const bodyBones = new Map<string, THREE.Object3D>()
@@ -132,7 +150,7 @@ export function prepareLumiaHead(gltf: GLTF, options: { ph02?: boolean; showNeck
 
   // Animated face and hair remain in the same original skinned hierarchy.
   return {
-    scene: gltf.scene, head: bone('head'), neck: bone('neck'),
+    scene, head: bone('head'), neck: bone('neck'),
     leftEye: bone('leftEye'), rightEye: bone('rightEye'),
     expressions, meshes, visibleMeshes, neckClipPlane, neckMeshes, bodyBones,
   }
