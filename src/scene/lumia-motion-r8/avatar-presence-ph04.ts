@@ -168,13 +168,16 @@ export function subscribeAvatarPresence(listener: () => void): () => void {
   return () => { listeners.delete(listener) }
 }
 
-export function setLumiaAvatarView(view: LumiaAvatarView): boolean {
+// A tab has its own in-memory React store. Synchronize ONLY approved view
+// changes across tabs on this origin. Do not transmit voice, chat, memory,
+// animations, user identity or other data. Never echo received events.
+const channel = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
+  ? new BroadcastChannel('lumia:ph04-views:v1') : null
+function applyLumiaAvatarView(view: LumiaAvatarView, broadcast: boolean): boolean {
   if (!viewKeys.has(view)) return false
   if (typeof window !== 'undefined') {
     const url = new URL(window.location.href)
     url.searchParams.set('lumiaAvatar', view)
-    // Experimental clipping and PH-01 baseline flags must not leak into a
-    // later owner-selected presentation.
     url.searchParams.delete('lumiaNeck')
     url.searchParams.delete('lumiaHeadQA')
     window.history.replaceState(window.history.state, '', url.toString())
@@ -182,8 +185,17 @@ export function setLumiaAvatarView(view: LumiaAvatarView): boolean {
   if (snapshot.view !== view) {
     snapshot = { ...snapshot, view, sequence: snapshot.sequence + 1 }
     notify()
+    if (broadcast) channel?.postMessage({ kind: 'view', view })
   }
   return true
+}
+channel?.addEventListener('message', (event: MessageEvent) => {
+  const message = event.data
+  if (!message || message.kind !== 'view' || !viewKeys.has(message.view)) return
+  applyLumiaAvatarView(message.view as LumiaAvatarView, false)
+})
+export function setLumiaAvatarView(view: LumiaAvatarView): boolean {
+  return applyLumiaAvatarView(view, true)
 }
 
 export function requestLumiaAvatarMotion(id: string): boolean {
