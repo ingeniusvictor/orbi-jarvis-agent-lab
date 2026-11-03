@@ -38,6 +38,45 @@ const viewCommands:Array<[string,string]> = [
 for(const [said,expected] of viewCommands) {
   assert.deepEqual(parseLumiaAvatarAction(said),{kind:'view',view:expected},said)
 }
+
+// PH-04.1 — Exact physical ASUS transcripts, 3 Nov 2026 09:40–09:42.
+// These previously fell through to Qwen, which falsely claimed no avatar UI.
+const asusVoiceCommands:Array<[string,string]> = [
+  ['Lumi, puedes cambiar la vista a la vista de corrup completo.', 'body-vrm'],
+  ['puedes cambiar la vista a la vista de corrup completo', 'body-vrm'],
+  ['Necesito que cambias a la vista de cuerpo completo.', 'body-vrm'],
+  ['necesito que cambias a la vista de cuerpo completo', 'body-vrm'],
+  ['Lumi, necesito que cambies a la vista de cuerpo completo', 'body-vrm'],
+  ['Lumi, ¿podrías cambiarme a la vista de cuerpo completo?', 'body-vrm'],
+  ['Lumi, por favor cambia a la vista de cuerpo completo', 'body-vrm'],
+  ['Lumi, puedes cambiar a medio cuerpo', 'bust-vrm'],
+  ['Lumi, necesito que cambies a solo rostro', 'head-vrm'],
+  ['Lumi, quiero que cambies a la vista principal', 'bust-vrm'],
+]
+for (const [said,view] of asusVoiceCommands) {
+  assert.deepEqual(parseLumiaAvatarAction(said), {kind:'view',view}, 'ASUS STT: '+said)
+}
+const ambiguousViewTranscripts=[
+  'Solo quiero probar que puedas cambiar entre la vista cuerpo completo y la vista de...',
+  'Lumi, puedes cambiar entre las tres vistas',
+  'Lumi, cambia la vista',
+  'Lumi, cambia entre el rostro y el cuerpo completo',
+]
+for (const said of ambiguousViewTranscripts) {
+  const action=parseLumiaAvatarAction(said)
+  assert.ok(action?.kind !== 'view', 'Ambiguous STT must not move avatar: '+said)
+}
+for (const unrelated of [
+  'Lumi, no cambies a cuerpo completo',
+  'Lumi, necesito saber cómo cambiar la vista',
+  'Lumi, ¿puedes explicarme cómo cambiar la vista en Blender?',
+  'Ayer pude cambiar la vista a cuerpo completo',
+  'Mi hijo dijo que cambies la vista a medio cuerpo',
+  'Lumi, ¿puedes cambiar los parámetros de mi sistema?',
+]) {
+  const action=parseLumiaAvatarAction(unrelated)
+  assert.ok(action?.kind !== 'view', 'Do not perform unrequested or external-system changes: '+unrelated)
+}
 const gestureCommands:Array<[string,string]> = [
   ['Lumi, haz un saludo','waving'],
   ['Lumi, salúdame','waving'],
