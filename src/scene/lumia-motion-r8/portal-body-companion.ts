@@ -232,7 +232,14 @@ export class R8BodyCompanion {
     if (guided) this.demoClipId=clip.id
     this.blend.capture([...this.rig.bodyBones.values()],.44)
     const action=this.activeMixer.clipAction(clip.clip)
-    action.reset().setLoop(clip.loop?THREE.LoopRepeat:THREE.LoopOnce,clip.repetitions)
+    // Waving repeats twice and Clapping three times in the original R8
+    // catalog. THREE.LoopOnce ignores repetition counts: choose LoopRepeat
+    // for those finite author-approved repeats, and wait for 'finished'.
+    const repeat = clip.loop || clip.repetitions > 1
+    action.reset().setLoop(
+      repeat ? THREE.LoopRepeat : THREE.LoopOnce,
+      clip.loop ? Infinity : clip.repetitions,
+    )
     action.clampWhenFinished=!clip.loop
     action.enabled=true
     action.setEffectiveWeight(1)
