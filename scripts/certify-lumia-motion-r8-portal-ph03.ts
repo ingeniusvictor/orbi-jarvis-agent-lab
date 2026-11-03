@@ -18,7 +18,9 @@ for(const [name,item] of Object.entries(manifest.clips) as Array<[string,{bytes:
   // R8 source manifest has a 56-hex prefix for Waving.fbx (not a full 64-digit SHA).
   // The installer ALSO verifies the full 64-digit archive SHA-256 before reading clips.
   const sourceHashLength = name === 'Waving.fbx' ? 56 : 64
-  assert.ok(item.bytes>0&&new RegExp('^[a-f0-9]{'+sourceHashLength+'}
+  const hashCharsValid = [...item.sha256].every(c => '0123456789abcdef'.includes(c))
+  assert.ok(item.bytes > 0 && item.sha256.length === sourceHashLength && hashCharsValid,
+    'R8 checksum digest/prefix and byte count present: '+name)
   assert.ok(Object.values(animationLibrary).some((s:any)=>s.file===name&&
     s.path.startsWith('/models/lumia-motion/clips/')),'All 17 R8 files local '+name)
 }
