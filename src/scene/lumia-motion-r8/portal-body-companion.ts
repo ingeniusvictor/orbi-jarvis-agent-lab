@@ -21,6 +21,7 @@ import { PoseTransition } from './pose-transition.js'
 import { retargetMixamoUpperBody } from './mixamo-retarget.js'
 import { animationLibrary } from './motion-library-catalog.js'
 import { boundR8BodyPose } from './pose-guard-ph042'
+import { guidedDemoSnapshot } from './avatar-demo-ph045'
 
 type MotionState = 'idle' | 'listening' | 'thinking' | 'speaking'
 const LOWER_BODY_BONES = [
@@ -301,7 +302,7 @@ export class R8BodyCompanion {
     }
     // R8 semantic gestures only when the actual TTS text is audibly playing.
     if(semantic.kind && semantic.kind!==this.semanticGestureUsed && speechAudible &&
-       this.elapsed>=this.manualUntil){
+       this.elapsed>=this.manualUntil && !guidedDemoSnapshot().active){
       this.semanticGestureUsed=semantic.kind
       const mapping:Record<string,string>={
         greet:'waving',affirm:'happy',deny:'no',explain:'pointinggesture',
@@ -316,7 +317,8 @@ export class R8BodyCompanion {
       boundR8BodyPose(this.rig.bodyBones, this.proceduralBase,
         this.manualUntil > this.elapsed, this.fullBodySafe)
     }
-    if(this.allowClips && !this.pending && this.elapsed>=this.manualUntil){
+    if(this.allowClips && !this.pending && this.elapsed>=this.manualUntil &&
+       !guidedDemoSnapshot().active){
       const intent=this.director.decide({
         now:this.elapsed,state,activeId:this.activeId,
         active:Boolean(this.activeId),pending:Boolean(this.pending),
