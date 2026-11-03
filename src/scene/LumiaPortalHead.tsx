@@ -3,7 +3,7 @@ import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import * as THREE from 'three'
 import { useStore } from '../store'
-import { R8BodyCompanion, isR8ClipEnabled } from './lumia-motion-r8/portal-body-companion'
+import { R8BodyCompanion } from './lumia-motion-r8/portal-body-companion'
 import { avatarPresenceSnapshot, subscribeAvatarPresence, type LumiaAvatarView } from './lumia-motion-r8/avatar-presence-ph04'
 import type { Drive } from './Scene'
 import {
