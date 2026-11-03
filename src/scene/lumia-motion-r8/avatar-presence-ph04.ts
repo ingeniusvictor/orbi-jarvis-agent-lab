@@ -18,6 +18,8 @@ export type LumiaAvatarAction =
   | { kind: 'list-motions' }
   | { kind: 'describe' }
   | { kind: 'status' }
+  | { kind: 'demo' }
+  | { kind: 'demo-stop' }
 
 export type LumiaAvatarSnapshot = {
   view: LumiaAvatarView
@@ -49,6 +51,19 @@ export function avatarViewLabel(view: LumiaAvatarView): string {
 export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null {
   const said = fold(prompt).replace(/^(?:(?:hola|oye|hey)\s+)?(?:lumi|lumia|lo mi)\s+/, '')
   if (!said) return null
+
+  // A live demo needs explicit owner intent and an avatar-related target.
+  // Distinguish "puedes hacer una demostración de tus animaciones" from
+  // explaining the concept of animation or changing an Ollama model.
+  if (/^(?:para|deten|detiene|cancela|termina|finaliza|detenme|para ya)\s+(?:(?:la|mi|tu|esta)\s+)?(?:demostracion|demo|recorrido)\b/.test(said)) {
+    return { kind: 'demo-stop' }
+  }
+  const demoPrompt = /^(?:(?:puedes|podrias|me puedes|me podrias)\s+)?(?:hacer|hacerme|mostrar|mostrarme|realizar|iniciar|comenzar|activar|dar|haz|hazme|hace|muestra|muestrame|realiza|inicia|comienza|activa|dame)\s+(?:(?:una|la|tu|tus)\s+)?(?:demostracion|demo|recorrido)\b/.test(said) ||
+    /^(?:quiero ver|quiero que hagas|me gustaria ver)\s+(?:(?:una|la)\s+)?(?:demostracion|demo|recorrido)\b/.test(said) ||
+    /^(?:muestrame|ensename|demuestra)\s+(?:tus|las)\s+(?:animaciones|movimientos|gestos)\b/.test(said)
+  if (demoPrompt && /\b(?:animaciones|movimientos|gestos|expresiones|emociones|avatar|vrm|cuerpo|capacidades|habilidades)\b/.test(said)) {
+    return { kind: 'demo' }
+  }
 
   // Read-only questions are allowed and never cause a view or gesture change.
   if (/^(?:que|cuales|cuantas|como|dime|cuentame|comentame|explicame)\b/.test(said)) {
@@ -88,13 +103,13 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   // rostro". This may be treated as a command, but NOT as a command embedded
   // inside a longer discussion or third-party quotation.
   const shorthand = /^(?:vista|bista|version)\s+(?:(?:de|a|la|solo)\s+){0,2}(?:solo\s+rostro|rostro|medio\s+cuerpo|cuerpo\s+intermedio|cuerpo\s+completo|corrup\s+completo)\s*(?:por\s+favor)?$/.test(said)
-  const directChange = /^(?:ahora\s+)?(?:por\s+favor\s+)?(?:(?:me\s+)?(?:puedes|podrias|podria)\s+)?(?:cambia|cambio|cambiame|cambiar|cambiarme|cambias|cambies|cambiate|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero\s+verte|dejame\s+verte|vuelve|regresa|retorna)\b/.test(said)
+  const directChange = /^(?:ahora\s+)?(?:por\s+favor\s+)?(?:(?:me\s+)?(?:puedes|podrias|podria)\s+)?(?:cambia|cambio|cambiame|cambiar|cambiarme|cambias|cambies|cambiate|activa|activame|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero\s+verte|dejame\s+verte|vuelve|regresa|retorna)\b/.test(said)
   const requestedChange = /^(?:necesito|quiero|quisiera|me\s+gustaria)\s+que\s+(?:(?:me|te)\s+)?(?:cambia|cambias|cambies|cambiaras|cambiar)\b/.test(said)
 
   if (viewContext && (shorthand || directChange || requestedChange)) {
     const wantsHead = /\b(?:solo\s+(?:(?:el|la|a)\s+)?(?:rostro|cara|cabeza)|solo\s+la\s+cara|la\s+cabeza|el\s+rostro|cara\s+solamente|primer\s+plano)\b/.test(said)
     const wantsFull = /\b(?:cuerpo|corrup|corpo|curpo|preto)\s+(?:completo|entero)\b|\b(?:de\s+pies\s+a\s+cabeza|vista\s+completa)\b/.test(said)
-    const wantsBust = /\b(?:medio\s+cuerpo|mitad\s+del\s+cuerpo|cuerpo\s+intermedio|vista\s+intermedia|busto)\b/.test(said)
+    const wantsBust = /\b(?:medio\s+cuerpo|cuerpo\s+medio|mitad\s+del\s+cuerpo|cuerpo\s+intermedio|vista\s+intermedia|busto)\b/.test(said)
     const wantsDefault = /\b(?:vista\s+principal|vista\s+predeterminada|vista\s+por\s+defecto|vista\s+normal)\b/.test(said)
     const targets = [
       ...(wantsHead ? ['head-vrm'] : []),
@@ -235,6 +250,12 @@ export function respondToLumiaAvatarAction(action: LumiaAvatarAction): string {
     const catalog = motionCatalog.find((entry) => entry.id === action.id)
     if (!catalog || !requestLumiaAvatarMotion(action.id)) return 'Ese movimiento no está registrado en Motion R8.'
     return 'Voy a intentar el movimiento ' + catalog.label + '. Si el archivo no está disponible, continuaré con mi postura natural.'
+  }
+  if (action.kind === 'demo') {
+    return 'Puedo ofrecerte una demostración guiada de mis diecisiete movimientos Motion R8 y de mis expresiones faciales, si los archivos están disponibles.'
+  }
+  if (action.kind === 'demo-stop') {
+    return 'He detenido mi demostración y regresado al movimiento automático.'
   }
   if (action.kind === 'auto') {
     resumeLumiaAvatarMotion()

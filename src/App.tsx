@@ -24,6 +24,8 @@ import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { portalSpeechStart, portalSpeechPhrase, portalSpeechEnd, portalSpeechInterrupt } from './scene/lumia-head/portal-speech-events'
 import { parseLumiaAvatarAction, respondToLumiaAvatarAction } from './scene/lumia-motion-r8/avatar-presence-ph04'
+import { beginGuidedDemo, cancelGuidedDemo, cueGuidedDemoPhrase, endGuidedDemo, checkGuidedDemoAssets, guidedDemoScript } from './scene/lumia-motion-r8/avatar-demo-ph045'
+import { LumiaDemoIndicator } from './ui/LumiaDemoIndicator'
 
 import { resolveFollowupGuardMs } from './lib/followup-latency'
 import * as sfx from './lib/sfx'
@@ -163,6 +165,7 @@ export default function App() {
   const silence = () => {
     // Invalidate the visual voice session before TTS cancel() emits late events.
     portalSpeechInterrupt()
+    cancelGuidedDemo()
     speaker.current?.cancel()
     speaker.current = null
   }
@@ -220,6 +223,7 @@ export default function App() {
 
   const respond = async (said: string, image?: LocalVisualImage): Promise<void> => {
     const mine = ++turn.current
+    cancelGuidedDemo()
     const stale = () => mine !== turn.current
     const previousReply = activeReply.current
     if (previousReply) {
@@ -260,6 +264,7 @@ export default function App() {
       if (!stale()) {
         store.getState().pushSpokenSegment(turnId, phrase)
         portalSpeechPhrase(turnId, phrase.text)
+        cueGuidedDemoPhrase(turnId, phrase.text)
       }
     })
     speaker.current = spk
@@ -275,7 +280,23 @@ export default function App() {
       // Never parse background transcripts or unapproved wake segments here.
       const avatarAction = AVATAR_PH04_ENABLED && !image
         ? parseLumiaAvatarAction(said) : null
-      const { text } = avatarAction
+      const { text } = avatarAction?.kind === 'demo'
+        ? { text: await (async () => {
+            const assets = await checkGuidedDemoAssets()
+            if (stale()) return ''
+            if (!assets.available) {
+              return 'Todavía no puedo iniciar la demostración completa. ' +
+                'Faltan archivos locales Motion R8, por ejemplo: ' +
+                assets.missing.slice(0, 3).join(', ') +
+                '. Verifica la instalación de los diecisiete FBX.'
+            }
+            if (new URLSearchParams(window.location.search).get('lumiaR8') === 'procedural') {
+              return 'Para demostrar las diecisiete animaciones necesito el modo R8 normal, no el modo procedural de respaldo.'
+            }
+            beginGuidedDemo(turnId)
+            return guidedDemoScript()
+          })() }
+        : avatarAction
         ? { text: respondToLumiaAvatarAction(avatarAction) }
         : await ask(said, history.current, {
         onText: (delta) => {
@@ -363,6 +384,7 @@ export default function App() {
     } finally {
       if (!stale()) {
         portalSpeechEnd(turnId)
+        endGuidedDemo(turnId)
         if (activeReply.current === turnId) activeReply.current = null
         speaker.current = null
         sfx.duck(false)
@@ -1276,6 +1298,13 @@ export default function App() {
   return (
     <>
       <Scene />
+      {AVATAR_PH04_ENABLED && <LumiaDemoIndicator onStop={() => {
+        if (activeReply.current) {
+          store.getState().updateTurn(activeReply.current, {status: 'interrupted', finishedAt: Date.now()})
+          activeReply.current = null
+        }
+        goDormant()
+      }} />}
       <Hud />
       <Boot />
       <Diagnostics />

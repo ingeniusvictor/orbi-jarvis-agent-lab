@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import * as THREE from 'three'
 import { useStore } from '../store'
 import { R8BodyCompanion } from './lumia-motion-r8/portal-body-companion'
+import { currentGuidedFaceExpression } from './lumia-motion-r8/avatar-demo-ph045'
 import { avatarPresenceSnapshot, subscribeAvatarPresence, type LumiaAvatarView } from './lumia-motion-r8/avatar-presence-ph04'
 import type { Drive } from './Scene'
 import {
@@ -13,7 +14,7 @@ import {
   isPh02Presentation, isNeckPreviewEnabled, calculateHeadMotion,
 } from './lumia-head/head-presentation-ph02'
 import {
-  LUMIA_PORTAL_SPEECH_EVENT, type PortalSpeechEvent,
+  LUMIA_PORTAL_SPEECH_EVENT, portalSpeechSnapshot, type PortalSpeechEvent,
 } from './lumia-head/portal-speech-events'
 
 /**
@@ -116,6 +117,16 @@ export function LumiaPortalHead({ drive, avatarView }: {
   }), [])
 
   useEffect(() => {
+    // Guided demo transitions body -> face while Kokoro may still be speaking.
+    // Restore the audio session for the freshly mounted rig: otherwise the
+    // component would miss 'start' and discard the next 'phrase'.
+    const playing = portalSpeechSnapshot()
+    if (playing.turnId) {
+      speech.current = {
+        active: true, id: playing.turnId, text: playing.phrase,
+        phraseStarted: playing.phraseStartedAt,
+      }
+    }
     const move = (event: PointerEvent) => {
       pointer.current.x = THREE.MathUtils.clamp(
         (event.clientX / Math.max(1, window.innerWidth)) * 2 - 1, -1, 1,
@@ -234,7 +245,15 @@ export function LumiaPortalHead({ drive, avatarView }: {
       values[vowel] = 0.18 + 0.48 * Math.abs(Math.sin(elapsed * 9.8))
     }
     if (phase === 'thinking' || phase === 'tooling') values.fun = 0.09
-    if (speakingAudio) values.joy = 0.05
+    const demoExpression = currentGuidedFaceExpression()
+    if (speakingAudio && !demoExpression) values.joy = 0.05
+    // VRM0 standard facial presets are previewed only during the explicit
+    // authorized guided demo. Keep vowel visemes and blink in parallel, and
+    // never invent morph targets not exposed by the owner's VRM.
+    if (avatarView === 'head-vrm' && demoExpression &&
+        demoExpression !== 'neutral' && rig.expressions.has(demoExpression)) {
+      values[demoExpression] = 0.78
+    }
     setHeadExpressions(rig, values)
   })
 

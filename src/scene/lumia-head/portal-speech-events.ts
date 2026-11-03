@@ -11,6 +11,14 @@ export type PortalSpeechEvent =
   | { kind: 'end'; turnId: string; reason: 'complete' | 'interrupted' }
 
 let activeTurn: string | null = null
+let currentPhrase = ''
+let currentPhraseStartedAt = 0
+
+/** Allows a VRM that remounts mid-phrase to recover the active lip-sync. */
+export function portalSpeechSnapshot(): { turnId: string | null; phrase: string; phraseStartedAt: number } {
+  return { turnId: activeTurn, phrase: currentPhrase, phraseStartedAt: currentPhraseStartedAt }
+}
+
 
 function emit(detail: PortalSpeechEvent): void {
   if (typeof window === 'undefined') return
@@ -23,18 +31,24 @@ export function portalSpeechStart(turnId: string): void {
     emit({ kind: 'end', turnId: activeTurn, reason: 'interrupted' })
   }
   activeTurn = turnId
+  currentPhrase = ''
+  currentPhraseStartedAt = performance.now() / 1000
   emit({ kind: 'start', turnId })
 }
 
 /** Called from onPhraseStart; text is what is *actually* being played. */
 export function portalSpeechPhrase(turnId: string, text: string): void {
   if (activeTurn !== turnId) return
+  currentPhrase = text
+  currentPhraseStartedAt = performance.now() / 1000
   emit({ kind: 'phrase', turnId, text })
 }
 
 export function portalSpeechEnd(turnId: string, reason: 'complete' | 'interrupted' = 'complete'): void {
   if (activeTurn !== turnId) return
   activeTurn = null
+  currentPhrase = ''
+  currentPhraseStartedAt = 0
   emit({ kind: 'end', turnId, reason })
 }
 
