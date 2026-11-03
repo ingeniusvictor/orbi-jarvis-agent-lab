@@ -85,8 +85,6 @@ export class R8BodyCompanion {
   private explicitLoopTarget=0
   private explicitLoops=0
   private minClapHandDistance=Number.POSITIVE_INFINITY
-  private demoLoopCount=0
-  private demoLoopTarget=0
   private readonly allowClips:boolean
   private readonly safePose:boolean
   private readonly fullBodySafe:boolean
