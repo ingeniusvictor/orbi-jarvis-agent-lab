@@ -245,11 +245,11 @@ export function LumiaPortalHead({ drive, avatarView }: {
       values[vowel] = 0.18 + 0.48 * Math.abs(Math.sin(elapsed * 9.8))
     }
     if (phase === 'thinking' || phase === 'tooling') values.fun = 0.09
-    if (speakingAudio) values.joy = 0.05
+    const demoExpression = currentGuidedFaceExpression()
+    if (speakingAudio && !demoExpression) values.joy = 0.05
     // VRM0 standard facial presets are previewed only during the explicit
     // authorized guided demo. Keep vowel visemes and blink in parallel, and
     // never invent morph targets not exposed by the owner's VRM.
-    const demoExpression = currentGuidedFaceExpression()
     if (avatarView === 'head-vrm' && demoExpression &&
         demoExpression !== 'neutral' && rig.expressions.has(demoExpression)) {
       values[demoExpression] = 0.78
