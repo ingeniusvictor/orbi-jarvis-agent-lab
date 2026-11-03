@@ -39,7 +39,7 @@ const fold = (text: string): string => String(text ?? '')
 
 export function resolveAvatarView(search = '', enabled = false): LumiaAvatarView {
   const requested = new URLSearchParams(search).get('lumiaAvatar') as LumiaAvatarView | null
-  return requested && viewKeys.has(requested) ? requested : enabled ? 'bust-vrm' : 'legacy'
+  return requested && viewKeys.has(requested) ? requested : enabled ? 'head-vrm' : 'legacy'
 }
 
 export function avatarViewLabel(view: LumiaAvatarView): string {
@@ -94,16 +94,20 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   if (viewContext && (shorthand || directChange || requestedChange)) {
     const wantsHead = /\b(?:solo\s+(?:(?:el|la|a)\s+)?(?:rostro|cara|cabeza)|solo\s+la\s+cara|la\s+cabeza|el\s+rostro|cara\s+solamente|primer\s+plano)\b/.test(said)
     const wantsFull = /\b(?:cuerpo|corrup|corpo|curpo|preto)\s+(?:completo|entero)\b|\b(?:de\s+pies\s+a\s+cabeza|vista\s+completa)\b/.test(said)
-    const wantsBust = /\b(?:medio\s+cuerpo|mitad\s+del\s+cuerpo|cuerpo\s+intermedio|vista\s+intermedia|busto|vista\s+principal|vista\s+predeterminada|vista\s+por\s+defecto|vista\s+normal)\b/.test(said)
+    const wantsBust = /\b(?:medio\s+cuerpo|mitad\s+del\s+cuerpo|cuerpo\s+intermedio|vista\s+intermedia|busto)\b/.test(said)
+    const wantsDefault = /\b(?:vista\s+principal|vista\s+predeterminada|vista\s+por\s+defecto|vista\s+normal)\b/.test(said)
     const targets = [
       ...(wantsHead ? ['head-vrm'] : []),
       ...(wantsFull ? ['body-vrm'] : []),
       ...(wantsBust ? ['bust-vrm'] : []),
     ] as Array<Exclude<LumiaAvatarView, 'legacy'>>
-    // "visual original" is ambiguous (legacy GLB vs. native bust); ask, never
-    // guess. Likewise, never execute a truncated or multi-target command.
-    if (targets.length !== 1) return { kind: 'list-views' }
-    return { kind: 'view', view: targets[0] }
+    // Explicitly named modes take precedence over "vista principal" in
+    // statements such as "cambia la vista principal a medio cuerpo".
+    // Two explicit destinations are ambiguous and must never trigger a change.
+    if (targets.length === 1) return { kind: 'view', view: targets[0] }
+    if (targets.length > 1) return { kind: 'list-views' }
+    if (wantsDefault) return { kind: 'view', view: 'head-vrm' }
+    return { kind: 'list-views' }
   }
 
   // A request about "visual original" with no unambiguous destination must
@@ -242,7 +246,7 @@ export function respondToLumiaAvatarAction(action: LumiaAvatarAction): string {
       '. No he cambiado nada con esa frase. Si quieres otra vista, dime cuál: solo rostro, medio cuerpo o cuerpo completo.'
   }
   if (action.kind === 'list-views') {
-    return 'Sí, puedo cambiar entre tres vistas: solo rostro, medio cuerpo y cuerpo completo. Mi vista principal es medio cuerpo, con mi rostro centrado en los aros. Dime cuál quieres que active.'
+    return 'Sí, tengo tres vistas: solo rostro, medio cuerpo y cuerpo completo. Mi presentación habitual es solo rostro, centrada en los aros. También puedo mostrar mi cuerpo animado con Motion R8 en medio cuerpo o cuerpo completo. Dime cuál quieres que active.'
   }
   if (action.kind === 'list-motions') {
     const shortList = motionCatalog.map((item) => item.label)
@@ -250,5 +254,5 @@ export function respondToLumiaAvatarAction(action: LumiaAvatarAction): string {
       shortList.join(', ') +
       '. Para ejecutarlas necesito que sus archivos estén instalados y sean compatibles con el avatar.'
   }
-  return 'Dispongo de un avatar virtual con tres vistas intercambiables y un catálogo de diecisiete movimientos Motion R8. Mis gestos acompañan la conversación, y puedo intentar reproducir un movimiento concreto cuando me lo pidas. El funcionamiento de cada animación depende de su archivo local y compatibilidad.'
+  return 'Mi presencia habitual es solo rostro, para que se vean bien mis ojos y expresiones. Como avatar virtual, también puedo mostrar medio cuerpo y cuerpo completo con un catálogo de diecisiete animaciones Motion R8. Los gestos acompañan mi conversación y puedo intentar un movimiento cuando me lo pidas, si su archivo local es compatible.'
 }

@@ -191,6 +191,10 @@ export function LumiaComposer({
             }
           }}
         />
+        {/* PH-04.4: visual controls belong on the LEFT, before attachments.
+            Microphone and voice tools stay grouped on the RIGHT. */}
+        {avatarViewControl && <LumiaViewDock />}
+
         <button
           type="button"
           className={'lumia-composer-icon-button lumia-composer-attach' + (photo || audioFile ? ' is-attached' : '')}
@@ -212,8 +216,6 @@ export function LumiaComposer({
           onKeyDown={handleKey}
           onFocus={() => { if (mode === 'continuous') onModeChange('text') }}
         />
-
-        {avatarViewControl && <LumiaViewDock />}
 
         {recording && (
           <button
