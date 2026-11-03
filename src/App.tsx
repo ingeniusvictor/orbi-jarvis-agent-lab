@@ -22,6 +22,7 @@ import { ACTIVE_COMMAND_GRACE_MS, voiceModeForPhase } from './lib/voice-focus'
 import { shouldProtectWhisperCommandAtExpiry } from './lib/complex-voice-turn'
 import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
+import { portalSpeechStart, portalSpeechPhrase, portalSpeechEnd, portalSpeechInterrupt } from './scene/lumia-head/portal-speech-events'
 import { resolveFollowupGuardMs } from './lib/followup-latency'
 import * as sfx from './lib/sfx'
 import * as music from './lib/music'
@@ -157,6 +158,8 @@ export default function App() {
   }
 
   const silence = () => {
+    // Invalidate the visual voice session before TTS cancel() emits late events.
+    portalSpeechInterrupt()
     speaker.current?.cancel()
     speaker.current = null
   }
@@ -245,12 +248,16 @@ export default function App() {
       // First *actual playback*, not the request to Kokoro or model output.
       if (!stale()) {
         ttsDiag.firstAudioMs = Math.round(performance.now() - responseStartedAt)
+        portalSpeechStart(turnId)
         store.getState().updateTurn(turnId, {
           firstAudioAt: Date.now(), status: 'playing',
         })
       }
     }, (phrase) => {
-      if (!stale()) store.getState().pushSpokenSegment(turnId, phrase)
+      if (!stale()) {
+        store.getState().pushSpokenSegment(turnId, phrase)
+        portalSpeechPhrase(turnId, phrase.text)
+      }
     })
     speaker.current = spk
     sfx.duck(true)
@@ -345,6 +352,7 @@ export default function App() {
       store.getState().setError(failure)
     } finally {
       if (!stale()) {
+        portalSpeechEnd(turnId)
         if (activeReply.current === turnId) activeReply.current = null
         speaker.current = null
         sfx.duck(false)
@@ -399,7 +407,11 @@ export default function App() {
     // was already handled above through `trailing`. For a bare "Lumi", the
     // waking phase is deliberately GUARD so this acknowledgement cannot be
     // transcribed back as the user's next command.
-    const greeting = createSpeaker()
+    const greetId = 'greeting-' + newId()
+    const greeting = createSpeaker(
+      () => portalSpeechStart(greetId),
+      (phrase) => portalSpeechPhrase(greetId, phrase.text),
+    )
     speaker.current = greeting
     greeting.say(attention())
 
@@ -408,6 +420,7 @@ export default function App() {
     // are finished, otherwise "Aquí estoy" can become the next command.
     void (async () => {
       await greeting.end()
+      portalSpeechEnd(greetId)
       const guardMs = followupGuardMs()
       voiceDiag.postSpeechGuardMs = guardMs
       await new Promise((r) => setTimeout(r, guardMs))
@@ -780,12 +793,17 @@ export default function App() {
     // deliberate: the assistant says her own wake word ("Lumi"), and starting
     // SpeechRecognition first would let the microphone wake on her greeting.
     store.getState().setPhase('speaking')
-    const intro = createSpeaker()
+    const introId = 'intro-' + newId()
+    const intro = createSpeaker(
+      () => portalSpeechStart(introId),
+      (phrase) => portalSpeechPhrase(introId, phrase.text),
+    )
     speaker.current = intro
     intro.say(
       'Hola. Soy Lumia, la asistente inteligente principal de Orbia. Puedes llamarme Lumi. Estoy lista.',
     )
     await intro.end()
+    portalSpeechEnd(introId)
     speaker.current = null
 
     // Only the explicitly selected continuous mode opens local STT.
