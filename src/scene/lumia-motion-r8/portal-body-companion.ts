@@ -226,7 +226,10 @@ export class R8BodyCompanion {
   }
 
   private playReady(clip:ClipInfo):void {
+    const guided = this.demoClipId===clip.id
+    if (guided) this.demoClipId=null
     this.stopClip()
+    if (guided) this.demoClipId=clip.id
     this.blend.capture([...this.rig.bodyBones.values()],.44)
     const action=this.activeMixer.clipAction(clip.clip)
     action.reset().setLoop(clip.loop?THREE.LoopRepeat:THREE.LoopOnce,clip.repetitions)
