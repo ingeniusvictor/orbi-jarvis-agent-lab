@@ -155,7 +155,7 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
     [/\b(?:beso|besito|lanzar un beso)\b/, 'kiss'],
     [/\b(?:senalamiento directo|senalamiento simple|senalala con un dedo|senala con un dedo|pointing simple)\b/, 'pointing'],
     [/\b(?:senala|senalar|apunta|apuntar|pointing gesture)\b/, 'pointinggesture'],
-    [/\b(?:niega|negacion|di que no|gesto de no)\b/, 'no'],
+    [/\b(?:niega|negar|negacion|decir que no|di que no|gesto de no)\b/, 'no'],
     [/\b(?:pensar|pensando|reflexion|thinking)\b/, 'thinking'],
     [/\b(?:alegria|feliz|happy)\b/, 'happy'],
     [/\b(?:entusiasmo|emocionada|excited)\b/, 'excited'],
@@ -168,6 +168,11 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
     [/\b(?:escuchar|escuchando|head gesture)\b/, 'listening'],
     [/\b(?:revisar las manos|revisa tus manos|revisa las manos|unas|nails)\b/, 'nails'],
   ]
+  // The exact catalog-ID command always wins, including the literal ID 'no':
+  // "Lumi, ejecuta animación no" is unambiguous and allowed.
+  const exactClip = said.match(/^(?:ejecuta|reproduce|activa)\s+(?:(?:la|el|una|un)\s+)?(?:animacion|movimiento|gesto)\s+(?:de\s+)?([a-z0-9]+)$/)
+  if (exactClip && motionIds.has(exactClip[1])) return {kind:'motion',id:exactClip[1]}
+
   // PH-04.7 — Real owner STT in ASUS, 17:36–17:39:
   // "Muestramiento animación de aplaudir", "quiero ver TU animación",
   // "No lo mismo, lo que quiero es que me muestres la animación...".
@@ -177,7 +182,8 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   const singleRequest =
     /^(?:(?:mi|lumi|lumia)\s+)?(?:muestramiento|muestrame|mostrame|muestra|ensename|reproduce|ejecuta|quiero\s+ver|quisiera\s+ver|me\s+gustaria\s+ver|(?:me\s+)?puedes\s+(?:mostrar|mostrarme|reproducir)|quiero\s+que\s+(?:me\s+)?muestres|necesito\s+que\s+(?:me\s+)?muestres|no\s+(?:(?:lo\s+)?(?:mismo|mio)|alumnos)\s+lo\s+que\s+quiero\s+es\s+que\s+me\s+muestres)\b/.test(said)
   const actualAnimation = /\b(?:animacion|movimiento|gesto|fbx|motion\s+r8)\b/.test(said)
-  if (singleRequest && actualAnimation) {
+  if (singleRequest && actualAnimation &&
+      !/\b(?:como|crear|programar|css|blender|youtube|tutorial|html|internet|video)\b/.test(said)) {
     for (const [pattern, id] of motions) {
       if (pattern.test(said) && motionIds.has(id)) return {kind:'motion', id}
     }
@@ -190,8 +196,6 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   // All 17 catalog IDs are also directly addressable by their exact ID:
   // "Lumi, ejecuta animación pointing", "Lumi reproduce animación walking".
   // Never accept a free-form clip path or URL.
-  const exact = said.match(/^(?:ejecuta|reproduce|activa)\s+(?:(?:la|el|una|un)\s+)?(?:animacion|movimiento|gesto)\s+(?:de\s+)?([a-z0-9]+)$/)
-  if (exact && motionIds.has(exact[1])) return { kind: 'motion', id: exact[1] }
 
   for (const [pattern, id] of motions) {
     if (pattern.test(said) && motionIds.has(id)) return { kind: 'motion', id }
