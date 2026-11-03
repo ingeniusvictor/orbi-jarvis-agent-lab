@@ -1,0 +1,36 @@
+name: LUMIA PH-01 - Portal Head POC
+on:
+  push:
+    branches:
+      - feat/lumia-ph01-portal-head-vrm
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Locked dependencies
+        run: npm ci
+      - name: Compile portal
+        run: npm run build
+      - name: Certify PH01 head routing and voice events
+        run: node scripts/certify-lumia-head-ph01.mjs
+      - name: Verify legacy avatar still certified
+        run: node scripts/certify-lumia-avatar-asset.mjs
+      - name: Reject private VRM and Mixamo assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '\.(vrm|fbx|bundle)$'; then
+            echo "ERROR: assets privados versionados"
+            exit 1
+          fi

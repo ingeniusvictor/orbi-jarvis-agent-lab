@@ -31,3 +31,6 @@ public/models/lumia/lumia.glb
 
 # Local voice/model runtimes and weights. Never commit downloaded binaries/models.
 .local-runtime/
+
+# PH-01: VRM privado instalado solo localmente
+public/models/lumia-motion/*.vrm
