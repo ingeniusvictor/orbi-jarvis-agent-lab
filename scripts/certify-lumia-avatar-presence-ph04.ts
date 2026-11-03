@@ -12,6 +12,13 @@ import * as THREE from 'three'
 
 const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8')
 assert.equal(motionCatalog.length,17)
+for (const clip of motionCatalog) {
+  assert.deepEqual(
+    parseLumiaAvatarAction('Lumi, ejecuta animación '+clip.id),
+    {kind:'motion',id:clip.id},
+    'All 17 original R8 catalog IDs must be commandable: '+clip.id,
+  )
+}
 assert.equal(resolveAvatarView('',true),'bust-vrm','PH-04 native view MUST be middle body')
 assert.equal(resolveAvatarView('',false),'legacy','No opt-in means no visual behavior change')
 for(const view of ['head-vrm','bust-vrm','body-vrm','legacy'] as const) {
