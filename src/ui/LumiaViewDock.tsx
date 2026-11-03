@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   avatarPresenceSnapshot,
   setLumiaAvatarView,
@@ -7,47 +7,75 @@ import {
 } from '../scene/lumia-motion-r8/avatar-presence-ph04'
 
 const views = [
-  { key: 'head-vrm', label: 'ROSTRO', title: 'Solo rostro' },
-  { key: 'bust-vrm', label: 'MEDIO', title: 'Medio cuerpo · vista principal' },
-  { key: 'body-vrm', label: 'CUERPO', title: 'Cuerpo completo' },
+  { key: 'head-vrm', label: 'Solo rostro', symbol: '◉' },
+  { key: 'bust-vrm', label: 'Medio cuerpo', symbol: '◉' },
+  { key: 'body-vrm', label: 'Cuerpo completo', symbol: '◉' },
 ] as const
 
-/** Manual alternative to speaking commands, without reloading the browser. */
+/** PH-04.3: one compact avatar-view control inside the EXISTING chat dock. */
 export function LumiaViewDock() {
   const [view, setView] = useState<LumiaAvatarView>(() => avatarPresenceSnapshot().view)
-  useEffect(() => subscribeAvatarPresence(() => setView(avatarPresenceSnapshot().view)), [])
+  const [open, setOpen] = useState(false)
+  const container = useRef<HTMLDivElement>(null)
+  useEffect(() => subscribeAvatarPresence(() => {
+    setView(avatarPresenceSnapshot().view)
+    setOpen(false)
+  }), [])
+  useEffect(() => {
+    if (!open) return
+    const dismiss = (event: PointerEvent) => {
+      if (!container.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('pointerdown', dismiss)
+    window.addEventListener('keydown', escape)
+    return () => {
+      window.removeEventListener('pointerdown', dismiss)
+      window.removeEventListener('keydown', escape)
+    }
+  }, [open])
+
+  const active = views.find((item) => item.key === view)
   return (
-    <nav
-      aria-label="Vistas del avatar virtual de LUMIA"
-      style={{
-        position: 'fixed', right: '5.2%', top: '8.8rem', zIndex: 12,
-        display: 'flex', alignItems: 'center', gap: 5,
-        padding: '5px 7px', border: '1px solid rgba(83,235,255,.18)',
-        borderRadius: 14, background: 'rgba(1,14,22,.62)',
-        boxShadow: '0 0 18px rgba(5,140,160,.08)',
-      }}
-    >
-      {views.map((item) => {
-        const active = view === item.key
-        return (
-          <button
-            type="button"
-            key={item.key}
-            title={item.title}
-            aria-pressed={active}
-            onClick={() => setLumiaAvatarView(item.key)}
-            style={{
-              borderRadius: 9, cursor: 'pointer', padding: '5px 8px',
-              font: '600 9px ui-monospace, monospace', letterSpacing: '.12em',
-              border: '1px solid ' + (active ? 'rgba(82,225,246,.70)' : 'transparent'),
-              color: active ? '#b7f8ff' : '#5d929b',
-              background: active ? 'rgba(31,170,193,.14)' : 'transparent',
-            }}
-          >
-            {item.label}
-          </button>
-        )
-      })}
-    </nav>
+    <div className="lumia-avatar-view-picker" ref={container}>
+      <button
+        type="button"
+        className={'lumia-composer-icon-button lumia-avatar-view-trigger' + (open ? ' is-active' : '')}
+        aria-label={'Cambiar vista del avatar. Actual: ' + (active?.label ?? 'Avatar anterior')}
+        aria-expanded={open}
+        aria-haspopup="true"
+        title={'Vista del avatar · ' + (active?.label ?? 'Avatar anterior')}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.4" fill="none" opacity=".65" />
+          <circle cx="12" cy="9" r="3" stroke="currentColor" strokeWidth="1.3" fill="none" />
+          <path d="M5.5 19c.65-4.1 3.3-6.1 6.5-6.1s5.85 2 6.5 6.1" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open && (
+        <div className="lumia-avatar-view-options" role="group" aria-label="Selecciona la vista de LUMIA">
+          <span className="lumia-avatar-view-title">VISTA DEL AVATAR</span>
+          {views.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={'lumia-avatar-view-option' + (view === item.key ? ' is-selected' : '')}
+              aria-pressed={view === item.key}
+              onClick={() => {
+                setLumiaAvatarView(item.key)
+                setOpen(false)
+              }}
+            >
+              <span aria-hidden="true">{item.symbol}</span>
+              <span>{item.label}</span>
+              {view === item.key && <span className="lumia-avatar-view-check" aria-hidden="true">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
