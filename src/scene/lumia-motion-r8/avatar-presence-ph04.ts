@@ -250,7 +250,10 @@ export function setLumiaAvatarView(view: LumiaAvatarView): boolean {
 export function requestLumiaAvatarMotion(id: string): boolean {
   if (!motionIds.has(id)) return false
   if (snapshot.view === 'legacy' || snapshot.view === 'head-vrm') {
-    setLumiaAvatarView('bust-vrm') // Face & body gesture must remain visible.
+    // Legs must be visible for a full-body walking command; all other
+    // gesture requests use the established middle-body showcase.
+    const clip = motionCatalog.find((item) => item.id === id)
+    setLumiaAvatarView(clip?.fullBody ? 'body-vrm' : 'bust-vrm')
   }
   const sequence = snapshot.sequence + 1
   snapshot = { ...snapshot, sequence, motion: { sequence, id, kind: 'play', sentAt: Date.now() } }
