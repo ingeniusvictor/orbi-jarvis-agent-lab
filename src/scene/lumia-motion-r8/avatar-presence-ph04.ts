@@ -66,7 +66,9 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   // requests for a tour of *my* R8 animations, not video production.
   const demoCorrection = /^(?:no(?: [a-z]+){0,3} )?lo que quiero es que me des (?:una|la) demostracion de (?:tus|las) (?:animaciones|movimientos|gestos)\b/.test(said) ||
     /^(?:quiero|necesito) que me des (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said) ||
-    /^voy a hacer (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said)
+    /^voy a hacer (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said) ||
+    /^(?:mi\s+)?quiero que me des (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said) ||
+    /^no\s+(?:lo\s+mio|lo\s+mismo|alumnos)\s+lo que quiero es que me des (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said)
   if (demoCorrection || (demoPrompt && /\b(?:animaciones|movimientos|gestos|expresiones|emociones|avatar|vrm|cuerpo|capacidades|habilidades)\b/.test(said))) {
     return { kind: 'demo' }
   }
@@ -147,17 +149,9 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
     return { kind: 'auto' }
   }
 
-  const motionCommand = /^(?:haz|hace|ejecuta|realiza|activa|reproduce|pon|muestra|muestrame|saluda|saludame|aplaude|camina|senala|niega)\b/.test(said)
-  if (!motionCommand) return null
-  // All 17 catalog IDs are also directly addressable by their exact ID:
-  // "Lumi, ejecuta animación pointing", "Lumi reproduce animación walking".
-  // Never accept a free-form clip path or URL.
-  const exact = said.match(/^(?:ejecuta|reproduce|activa)\s+(?:(?:la|el|una|un)\s+)?(?:animacion|movimiento|gesto)\s+(?:de\s+)?([a-z0-9]+)$/)
-  if (exact && motionIds.has(exact[1])) return { kind: 'motion', id: exact[1] }
-
   const motions: Array<[RegExp, string]> = [
     [/\b(?:saluda|saludame|saludo|saludar|waving)\b/, 'waving'],
-    [/\b(?:aplaude|aplauso|aplaudir|clapping)\b/, 'clapping'],
+    [/\b(?:aplaude|aplauso|aplausos|aplaudir|clapping)\b/, 'clapping'],
     [/\b(?:beso|besito|lanzar un beso)\b/, 'kiss'],
     [/\b(?:senalamiento directo|senalamiento simple|senalala con un dedo|senala con un dedo|pointing simple)\b/, 'pointing'],
     [/\b(?:senala|senalar|apunta|apuntar|pointing gesture)\b/, 'pointinggesture'],
@@ -166,14 +160,39 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
     [/\b(?:alegria|feliz|happy)\b/, 'happy'],
     [/\b(?:entusiasmo|emocionada|excited)\b/, 'excited'],
     [/\b(?:sorpresa|sorprendida|surprised)\b/, 'surprised'],
-    [/\b(?:camina|caminar en circulo|paseo circular)\b/, 'walkingcircle'],
     [/\b(?:caminar en sitio|camina en sitio|caminar sin avanzar)\b/, 'walking'],
     [/\b(?:caminar hacia delante|camina hacia delante)\b/, 'walkingforward'],
+    [/\b(?:caminar en circulo|paseo circular|walk in circle)\b/, 'walkingcircle'],
     [/\b(?:hablar|conversacion|talking)\b/, 'talking'],
     [/\b(?:reposo|descanso|quieta|idle)\b/, 'idle'],
     [/\b(?:escuchar|escuchando|head gesture)\b/, 'listening'],
     [/\b(?:revisar las manos|revisa tus manos|revisa las manos|unas|nails)\b/, 'nails'],
   ]
+  // PH-04.7 — Real owner STT in ASUS, 17:36–17:39:
+  // "Muestramiento animación de aplaudir", "quiero ver TU animación",
+  // "No lo mismo, lo que quiero es que me muestres la animación...".
+  // These are playback requests for an installed asset, never HTML/CSS/video.
+  // Require a clear request AND a known catalog motion to avoid accidentally
+  // running a clip from a conceptual discussion with Qwen.
+  const singleRequest =
+    /^(?:(?:mi|lumi|lumia)\s+)?(?:muestramiento|muestrame|mostrame|muestra|ensename|reproduce|ejecuta|quiero\s+ver|quisiera\s+ver|me\s+gustaria\s+ver|(?:me\s+)?puedes\s+(?:mostrar|mostrarme|reproducir)|quiero\s+que\s+(?:me\s+)?muestres|necesito\s+que\s+(?:me\s+)?muestres|no\s+(?:(?:lo\s+)?(?:mismo|mio)|alumnos)\s+lo\s+que\s+quiero\s+es\s+que\s+me\s+muestres)\b/.test(said)
+  const actualAnimation = /\b(?:animacion|movimiento|gesto|fbx|motion\s+r8)\b/.test(said)
+  if (singleRequest && actualAnimation) {
+    for (const [pattern, id] of motions) {
+      if (pattern.test(said) && motionIds.has(id)) return {kind:'motion', id}
+    }
+    // Don't hallucinate or improvise an unknown animation name.
+    return {kind:'list-motions'}
+  }
+
+  const motionCommand = /^(?:haz|hace|ejecuta|realiza|activa|reproduce|pon|muestra|muestrame|saluda|saludame|aplaude|camina|senala|niega)\b/.test(said)
+  if (!motionCommand) return null
+  // All 17 catalog IDs are also directly addressable by their exact ID:
+  // "Lumi, ejecuta animación pointing", "Lumi reproduce animación walking".
+  // Never accept a free-form clip path or URL.
+  const exact = said.match(/^(?:ejecuta|reproduce|activa)\s+(?:(?:la|el|una|un)\s+)?(?:animacion|movimiento|gesto)\s+(?:de\s+)?([a-z0-9]+)$/)
+  if (exact && motionIds.has(exact[1])) return { kind: 'motion', id: exact[1] }
+
   for (const [pattern, id] of motions) {
     if (pattern.test(said) && motionIds.has(id)) return { kind: 'motion', id }
   }
