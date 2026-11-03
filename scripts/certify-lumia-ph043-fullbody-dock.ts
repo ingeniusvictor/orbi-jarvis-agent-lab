@@ -67,7 +67,7 @@ assert.doesNotMatch(app,/<LumiaViewDock \/>/,'Do not leave top-right floating vi
 assert.match(dock,/className="lumia-avatar-view-picker"/)
 assert.match(dock,/aria-label=\{'Cambiar vista del avatar/)
 assert.match(dock,/aria-expanded=\{open\}/)
-assert.match(dock,/onClick=\{\(\) => setLumiaAvatarView\(item\.key\)\}/)
+assert.match(dock,/onClick=\{\(\) => \{\s*setLumiaAvatarView\(item\.key\)/)
 assert.match(dock,/key: 'head-vrm'/)
 assert.match(dock,/key: 'bust-vrm'/)
 assert.match(dock,/key: 'body-vrm'/)
