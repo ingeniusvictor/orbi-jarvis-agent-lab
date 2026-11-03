@@ -316,7 +316,9 @@ export class R8BodyCompanion {
   }
   onSpeechEnd():void {
     this.semantic.end()
-    if(this.activeId==='talking')this.stopClip()
+    // During the owner-guided tour, "Talking.fbx" must complete its actual
+    // authored cycle even after the short narration has finished.
+    if(this.activeId==='talking' && !this.demoClipId)this.stopClip()
   }
 
   step(dt:number,phase:string,speechAudible:boolean):SemanticPose {
