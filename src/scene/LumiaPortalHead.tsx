@@ -69,7 +69,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
     if (!body) return
     const apply = () => {
       const command = avatarPresenceSnapshot().motion
-      if (!command || command.sequence <= lastMotionSequence.current) return
+      if (!command || command.sequence <= lastMotionSequence.current ||
+          Date.now() - command.sentAt > 1600) return
       lastMotionSequence.current = command.sequence
       if (command.kind === 'auto') body.resumeAutomatic()
       else if (command.id) body.requestManualClip(command.id)
