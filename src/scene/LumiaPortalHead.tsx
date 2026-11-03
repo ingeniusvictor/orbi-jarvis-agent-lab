@@ -3,6 +3,7 @@ import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import * as THREE from 'three'
 import { useStore } from '../store'
+import { R8BodyCompanion, isR8BodyMode, isR8ClipEnabled } from './lumia-motion-r8/portal-body-companion'
 import type { Drive } from './Scene'
 import {
   approximateVowel, prepareLumiaHead, setHeadExpressions,
@@ -24,6 +25,8 @@ const HEAD_CENTER_Y = 1.54 // measured on the user's approved VRM
 const HEAD_HEIGHT_M = 0.59 // optical face/hair framing; user can tune after QA
 const HEAD_FRACTION_PH01 = 0.54
 const HEAD_FRACTION_PH02 = 0.70
+const BUST_HEIGHT_M = 1.10
+const BODY_HEIGHT_M = 1.94
 
 type SpeechState = {
   active: boolean
@@ -37,8 +40,22 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
   const pivot = useRef<THREE.Group>(null)
   const ph02 = isPh02Presentation(window.location.search)
   const showNeck = isNeckPreviewEnabled(window.location.search)
+  const showBody = isR8BodyMode(window.location.search)
+  const clipEnabled = isR8ClipEnabled(window.location.search)
+  const avatarMode = new URLSearchParams(window.location.search).get('lumiaAvatar')
+  const fullBody = avatarMode === 'body-vrm'
+  const bust = avatarMode === 'bust-vrm'
+  const centerY = fullBody ? 0.99 : bust ? 1.28 : HEAD_CENTER_Y
   const gltf = useLoader(GLTFLoader, VRM_URL)
-  const rig = useMemo(() => prepareLumiaHead(gltf, { ph02, showNeck }), [gltf, ph02, showNeck])
+  const rig = useMemo(
+    () => prepareLumiaHead(gltf, { ph02, showNeck, showBody }),
+    [gltf, ph02, showNeck, showBody],
+  )
+  const body = useMemo(
+    () => showBody ? new R8BodyCompanion(rig, { allowClips: clipEnabled }) : null,
+    [rig, showBody, clipEnabled],
+  )
+  useEffect(() => () => { body?.dispose() }, [body])
   const viewport = useThree((state) => state.viewport)
   const gl = useThree((state) => state.gl)
 
@@ -88,9 +105,11 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
         if (!speech.current.active || speech.current.id !== data.turnId) return
         speech.current.text = data.text
         speech.current.phraseStarted = performance.now() / 1000
+        body?.onSpokenPhrase(data.text)
       } else if (data.kind === 'end' && speech.current.id === data.turnId) {
         speech.current.active = false
         speech.current.text = ''
+        body?.onSpeechEnd()
       }
     }
 
@@ -100,7 +119,7 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
       window.removeEventListener('pointermove', move)
       window.removeEventListener(LUMIA_PORTAL_SPEECH_EVENT, voiceEvent)
     }
-  }, [])
+  }, [body])
 
   useFrame((state, dt) => {
     if (!root.current) return
@@ -109,13 +128,16 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
     const k = 1 - Math.exp(-Math.min(dt, 0.05) * 6)
     const speakingAudio = speech.current.active
 
-    // The original ring and camera are left untouched.
+    // Independent optics: portrait, conversational bust and full-body
+    // companion share the SAME avatar rig and same Portal/HUD/TTS stack.
     const fit = Math.min(viewport.width, viewport.height)
-    const scale = (fit * (ph02 ? HEAD_FRACTION_PH02 : HEAD_FRACTION_PH01) / HEAD_HEIGHT_M) *
-      (1 + drive.level * 0.005)
+    const fraction = fullBody ? .84 : bust ? .70
+      : (ph02 ? HEAD_FRACTION_PH02 : HEAD_FRACTION_PH01)
+    const height = fullBody ? BODY_HEIGHT_M : bust ? BUST_HEIGHT_M : HEAD_HEIGHT_M
+    const scale = fit * fraction / height * (1 + drive.level * 0.005)
     root.current.scale.setScalar(scale)
     root.current.position.set(
-      0, Math.sin(t * 0.68) * 0.012 + (ph02 ? -0.035 : 0), 0.12,
+      0, Math.sin(t * 0.68) * 0.012 + (showBody ? -0.018 : ph02 ? -0.035 : 0), 0.12,
     )
     // Optional reveal uses the authentic body/neck mesh, clipped before the
     // shoulder. The clipping plane follows responsive scene scale.
@@ -129,10 +151,13 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
     const px = pointer.current.x
     const py = pointer.current.y
     const motion = calculateHeadMotion({ x: px, y: py, phase, seconds: t })
-    const headYaw = ph02 ? motion.headYaw
-      : -px * 0.095 * attention + Math.sin(t * 0.21) * 0.018
-    const headPitch = ph02 ? motion.headPitch
-      : py * 0.052 * attention + (phase === 'thinking' ? -0.028 : 0)
+    const semantic = body?.step(dt, phase, speakingAudio)
+    const headYaw = (ph02 ? motion.headYaw
+      : -px * 0.095 * attention + Math.sin(t * 0.21) * 0.018) +
+      (semantic?.head.yaw ?? 0)
+    const headPitch = (ph02 ? motion.headPitch
+      : py * 0.052 * attention + (phase === 'thinking' ? -0.028 : 0)) +
+      (semantic?.head.pitch ?? 0)
     const eyeYaw = ph02 ? motion.eyeYaw : -px * 0.20
     const eyePitch = ph02 ? motion.eyePitch : py * 0.13
     const applyBone = (node: THREE.Object3D | null, yaw: number, pitch: number, roll = 0) => {
@@ -144,9 +169,20 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
       temp.desired.copy(base).multiply(temp.delta)
       node.quaternion.slerp(temp.desired, k)
     }
-    if (ph02 && pivot.current) {
-      // A face-centred pivot always moves the rendered head/hair. The previous
-      // tiny humanoid-only rotations could be visually imperceptible.
+    if (showBody) {
+      // Body R8 controls torso and arms; facial bones remain independent.
+      // Rotate the actual head/neck gently and leave only a small whole-rig
+      // motion to the face-centred pivot, preventing stiff puppet movement.
+      applyBone(rig.head, headYaw * 0.88, headPitch * 0.85,
+        motion.roll + (semantic?.head.roll ?? 0))
+      applyBone(rig.neck, headYaw * 0.16, headPitch * 0.16)
+      if (pivot.current) {
+        temp.euler.set(headPitch * .12, headYaw * .12, motion.roll * .25, 'YXZ')
+        temp.delta.setFromEuler(temp.euler)
+        pivot.current.quaternion.slerp(temp.delta, k)
+      }
+    } else if (ph02 && pivot.current) {
+      // Original PH-02 portrait movement remains unchanged.
       temp.euler.set(headPitch, headYaw, motion.roll, 'YXZ')
       temp.delta.setFromEuler(temp.euler)
       pivot.current.quaternion.slerp(temp.delta, k)
@@ -174,7 +210,7 @@ export function LumiaPortalHead({ drive }: { drive: Drive }) {
   return (
     <group ref={root}>
       <group ref={pivot}>
-        <group rotation={[0, Math.PI, 0]} position={[0, -HEAD_CENTER_Y, 0]}>
+        <group rotation={[0, Math.PI, 0]} position={[0, -centerY, 0]}>
           <primitive object={rig.scene} />
         </group>
       </group>
