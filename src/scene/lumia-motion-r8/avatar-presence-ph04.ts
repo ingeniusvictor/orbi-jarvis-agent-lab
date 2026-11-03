@@ -78,7 +78,7 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   const viewInquiry = /^(?:solo\s+)?(?:quiero\s+probar|me\s+gustaria\s+probar|quisiera\s+probar|puedes\s+cambiar\s+entre|quiero\s+saber\s+si\s+(?:puedes|podrias)\s+cambiar|como\s+(?:cambio|cambiar)\s+(?:la\s+)?vista)\b/.test(said)
   if (viewContext && viewInquiry) return { kind: 'list-views' }
 
-  const directChange = /^(?:por\s+favor\s+)?(?:(?:me\s+)?(?:puedes|podrias|podria)\s+)?(?:cambia|cambiar|cambias|cambies|cambiate|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero\s+verte|dejame\s+verte|vuelve|regresa|retorna)\b/.test(said)
+  const directChange = /^(?:por\s+favor\s+)?(?:(?:me\s+)?(?:puedes|podrias|podria)\s+)?(?:cambia|cambiame|cambiar|cambiarme|cambias|cambies|cambiate|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero\s+verte|dejame\s+verte|vuelve|regresa|retorna)\b/.test(said)
   const requestedChange = /^(?:necesito|quiero|quisiera|me\s+gustaria)\s+que\s+(?:(?:me|te)\s+)?(?:cambia|cambias|cambies|cambiaras|cambiar)\b/.test(said)
   if (viewContext && (directChange || requestedChange)) {
     const wantsHead = /\b(?:solo\s+(?:el\s+)?rostro|solo\s+la\s+cara|solo\s+(?:la\s+)?cabeza|la\s+cabeza|el\s+rostro|cara\s+solamente|primer\s+plano)\b/.test(said)
