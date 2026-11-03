@@ -13,6 +13,7 @@ import { Core } from './Core'
 import { Particles } from './Particles'
 import { Orbits } from './Orbits'
 import { LumiaAvatar } from './LumiaAvatar'
+import { LumiaPortalHead } from './LumiaPortalHead'
 import { useStore, phaseColor, accentFor, type Phase } from '../store'
 
 /** Rings spin harder while JARVIS is working — reads as effort. */
@@ -124,6 +125,34 @@ class AvatarErrorBoundary extends Component<
   }
 }
 
+/**
+ * Head VRM POC is opt-in, so every existing user retains the approved GLB.
+ * The original R3F Canvas, HUD, AI and reactor are never replaced.
+ * Open ?lumiaAvatar=head-vrm to preview, ?lumiaAvatar=legacy to revert.
+ */
+const queryAvatarMode = new URLSearchParams(window.location.search).get('lumiaAvatar')
+const HEAD_VRM_ENABLED =
+  queryAvatarMode === 'head-vrm' ||
+  (queryAvatarMode !== 'legacy' && import.meta.env.VITE_LUMIA_AVATAR_MODE === 'head-vrm')
+
+class HeadVrmErrorBoundary extends Component<
+  { drive: Drive; children: ReactNode }, { failed: boolean }
+> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('[lumia:ph01] VRM Head failed; restoring legacy GLB', error)
+  }
+
+  render() {
+    return this.state.failed ? <LumiaAvatar drive={this.props.drive} /> : this.props.children
+  }
+}
+
 const STYLE_INDEX = { ring: 0, sphere: 1, wire: 2 } as const
 
 function Rig() {
@@ -210,9 +239,17 @@ function Rig() {
     <>
       <Core drive={drive} />
       <AvatarErrorBoundary>
-        <Suspense fallback={null}>
-          <LumiaAvatar drive={drive} />
-        </Suspense>
+        {HEAD_VRM_ENABLED ? (
+          <HeadVrmErrorBoundary drive={drive}>
+            <Suspense fallback={<LumiaAvatar drive={drive} />}>
+              <LumiaPortalHead drive={drive} />
+            </Suspense>
+          </HeadVrmErrorBoundary>
+        ) : (
+          <Suspense fallback={null}>
+            <LumiaAvatar drive={drive} />
+          </Suspense>
+        )}
       </AvatarErrorBoundary>
       <Particles drive={drive} />
       <Orbits />
