@@ -11,7 +11,7 @@ export function isNeckPreviewEnabled(search = '') {
     new URLSearchParams(search).get('lumiaNeck') === '1'
 }
 
-const clamp = (v, low, high) => Math.min(high, Math.max(low, v))
+const clamp = (v: number, low: number, high: number): number => Math.min(high, Math.max(low, v))
 
 export function calculateHeadMotion({ x = 0, y = 0, phase = 'dormant', seconds = 0 } = {}) {
   const px = clamp(Number(x) || 0,-1,1)
