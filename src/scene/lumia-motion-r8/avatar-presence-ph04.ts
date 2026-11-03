@@ -18,6 +18,8 @@ export type LumiaAvatarAction =
   | { kind: 'list-motions' }
   | { kind: 'describe' }
   | { kind: 'status' }
+  | { kind: 'demo' }
+  | { kind: 'demo-stop' }
 
 export type LumiaAvatarSnapshot = {
   view: LumiaAvatarView
@@ -49,6 +51,16 @@ export function avatarViewLabel(view: LumiaAvatarView): string {
 export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null {
   const said = fold(prompt).replace(/^(?:(?:hola|oye|hey)\s+)?(?:lumi|lumia|lo mi)\s+/, '')
   if (!said) return null
+
+  // PH-04.5 exact user request: a guided LIVE demonstration, not Qwen's
+  // generic answer about authoring 3D animations. Only explicit owner intents.
+  if (/^(?:para|deten|detiene|cancela|termina|finaliza|detenme|para ya)\\s+(?:(?:la|mi|tu|esta)\\s+)?(?:demostracion|demo|recorrido)\\b/.test(said)) {
+    return { kind: 'demo-stop' }
+  }
+  if (/^(?:(?:puedes|podrias|quiero que|me gustaria que|haz|hace|realiza|inicia|comienza|activa|muestrame|presenta|quiero ver)\\s+)*(?:(?:una|la|tu|tus)\\s+)?(?:demostracion|demo|recorrido)\\b/.test(said) &&
+      /\\b(?:animaciones|movimientos|gestos|expresiones|emociones|avatar|vrm|cuerpo|capacidades|habilidades|tus|tu|de)\\b/.test(said)) {
+    return { kind: 'demo' }
+  }
 
   // Read-only questions are allowed and never cause a view or gesture change.
   if (/^(?:que|cuales|cuantas|como|dime|cuentame|comentame|explicame)\b/.test(said)) {
@@ -235,6 +247,12 @@ export function respondToLumiaAvatarAction(action: LumiaAvatarAction): string {
     const catalog = motionCatalog.find((entry) => entry.id === action.id)
     if (!catalog || !requestLumiaAvatarMotion(action.id)) return 'Ese movimiento no está registrado en Motion R8.'
     return 'Voy a intentar el movimiento ' + catalog.label + '. Si el archivo no está disponible, continuaré con mi postura natural.'
+  }
+  if (action.kind === 'demo') {
+    return 'Puedo ofrecerte una demostración guiada de mis diecisiete movimientos Motion R8 y de mis expresiones faciales, si los archivos están disponibles.'
+  }
+  if (action.kind === 'demo-stop') {
+    return 'He detenido mi demostración y regresado al movimiento automático.'
   }
   if (action.kind === 'auto') {
     resumeLumiaAvatarMotion()
