@@ -259,7 +259,9 @@ export class R8BodyCompanion {
     this.applyProcedural(pose,presence)
     if (this.safePose && this.action) {
       for (const [name, node] of this.rig.bodyBones) {
-        this.proceduralBase.set(name, node.quaternion.clone())
+        const current = this.proceduralBase.get(name)
+        if (current) current.copy(node.quaternion)
+        else this.proceduralBase.set(name, node.quaternion.clone())
       }
     }
 
