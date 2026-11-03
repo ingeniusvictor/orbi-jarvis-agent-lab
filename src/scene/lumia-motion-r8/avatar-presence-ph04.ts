@@ -20,6 +20,7 @@ export type LumiaAvatarAction =
   | { kind: 'status' }
   | { kind: 'demo' }
   | { kind: 'demo-stop' }
+  | { kind: 'animation-info' }
 
 export type LumiaAvatarSnapshot = {
   view: LumiaAvatarView
@@ -61,8 +62,18 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   const demoPrompt = /^(?:(?:puedes|podrias|me puedes|me podrias)\s+)?(?:hacer|hacerme|mostrar|mostrarme|realizar|iniciar|comenzar|activar|dar|haz|hazme|hace|muestra|muestrame|realiza|inicia|comienza|activa|dame)\s+(?:(?:una|la|tu|tus)\s+)?(?:demostracion|demo|recorrido)\b/.test(said) ||
     /^(?:quiero ver|quiero que hagas|me gustaria ver)\s+(?:(?:una|la)\s+)?(?:demostracion|demo|recorrido)\b/.test(said) ||
     /^(?:muestrame|ensename|demuestra)\s+(?:tus|las)\s+(?:animaciones|movimientos|gestos)\b/.test(said)
-  if (demoPrompt && /\b(?:animaciones|movimientos|gestos|expresiones|emociones|avatar|vrm|cuerpo|capacidades|habilidades)\b/.test(said)) {
+  // Actual ASUS STT: polite corrections and "voy a hacer..." are narrow
+  // requests for a tour of *my* R8 animations, not video production.
+  const demoCorrection = /^(?:no(?: [a-z]+){0,3} )?lo que quiero es que me des (?:una|la) demostracion de (?:tus|las) (?:animaciones|movimientos|gestos)\b/.test(said) ||
+    /^(?:quiero|necesito) que me des (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said) ||
+    /^voy a hacer (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said)
+  if (demoCorrection || (demoPrompt && /\b(?:animaciones|movimientos|gestos|expresiones|emociones|avatar|vrm|cuerpo|capacidades|habilidades)\b/.test(said))) {
     return { kind: 'demo' }
+  }
+
+  if (/\b(?:motor de animaciones|generar (?:videos|animaciones)|crear (?:videos|animaciones)|hacer videos|videos cortos)\b/.test(said) &&
+      /^(?:no sabia|no se|sabia|entonces|es verdad|puedes|tienes|me puedes|que capacidad|como funciona|cuentame|explicame)\b/.test(said)) {
+    return { kind: 'animation-info' }
   }
 
   // Read-only questions are allowed and never cause a view or gesture change.
@@ -250,6 +261,9 @@ export function respondToLumiaAvatarAction(action: LumiaAvatarAction): string {
     const catalog = motionCatalog.find((entry) => entry.id === action.id)
     if (!catalog || !requestLumiaAvatarMotion(action.id)) return 'Ese movimiento no está registrado en Motion R8.'
     return 'Voy a intentar el movimiento ' + catalog.label + '. Si el archivo no está disponible, continuaré con mi postura natural.'
+  }
+  if (action.kind === 'animation-info') {
+    return 'Tengo un motor de reproducción Motion R8 integrado en mi avatar virtual: puedo mostrar diecisiete clips FBX locales y expresiones faciales compatibles. Eso no significa que pueda crear videos nuevos o generar nuevas animaciones por IA en esta instalación. El análisis de imágenes es una capacidad distinta y requiere un modelo visual compatible y una imagen proporcionada por ti.'
   }
   if (action.kind === 'demo') {
     return 'Puedo ofrecerte una demostración guiada de mis diecisiete movimientos Motion R8 y de mis expresiones faciales, si los archivos están disponibles.'
