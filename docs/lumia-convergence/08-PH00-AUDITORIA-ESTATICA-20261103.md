@@ -49,3 +49,12 @@ No hay aquí evidencia de que `createSpeaker` exponga hoy marcas precisas por pa
 
 ## Estado y siguiente acción
 **PH-00 auditoría estática PASS**; **PH-00 pruebas locales de Portal PENDIENTES**; **PH-01 sin iniciar**. Implementar el flag reversible únicamente después de congelar la referencia funcional y completar los tests.
+
+
+## Certificación CI verificada — actualización 2026-11-03
+
+**GitHub Actions PH-00 finalizó SUCCESS:** https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/41578651228
+
+Ejecución validada: `npm ci`, `npm run build`, `npm run certify:vrm`, `npm run certify:vrm:runtime`, `node scripts/certify-lumia-avatar-asset.mjs`. Todas las etapas del job `portal-static-baseline` completaron con éxito.
+
+**Nuevo estado:** PH-00 compilación y pruebas automatizadas **PASS**; PH-00 audio/micrófono, interfaz y rendimiento en ASUS **PENDIENTES**; PH-01 visual VRM **NO INICIADA**. Conservar la diferencia en cualquier resumen posterior.
