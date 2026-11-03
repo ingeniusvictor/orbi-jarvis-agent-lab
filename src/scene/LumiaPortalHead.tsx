@@ -212,12 +212,19 @@ export function LumiaPortalHead({ drive, avatarView }: {
       node.quaternion.slerp(temp.desired, k)
     }
     if (showBody) {
+      // No.fbx is a head/neck-led gesture in some authored Mixamo sets. Its
+      // original animation channel has priority over pointer tracking ONLY
+      // when this clip contains a compatible head or neck track. Otherwise
+      // retain the normal PH-02 face interaction.
+      const authoredNoHead = body?.authoredNoHeadActive ?? false
       // Body R8 controls torso and arms; facial bones remain independent.
       // Rotate the actual head/neck gently and leave only a small whole-rig
       // motion to the face-centred pivot, preventing stiff puppet movement.
-      applyBone(rig.head, headYaw * 0.88, headPitch * 0.85,
-        motion.roll + (semantic?.head.roll ?? 0))
-      applyBone(rig.neck, headYaw * 0.16, headPitch * 0.16)
+      if (!authoredNoHead) {
+        applyBone(rig.head, headYaw * 0.88, headPitch * 0.85,
+          motion.roll + (semantic?.head.roll ?? 0))
+        applyBone(rig.neck, headYaw * 0.16, headPitch * 0.16)
+      }
       if (pivot.current) {
         temp.euler.set(headPitch * .12, headYaw * .12, motion.roll * .25, 'YXZ')
         temp.delta.setFromEuler(temp.euler)
