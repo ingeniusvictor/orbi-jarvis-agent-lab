@@ -13,6 +13,7 @@ import {
 } from '../lib/visual-input'
 import type { LumiaInputMode } from '../lib/input-mode'
 import { LumiaViewDock } from './LumiaViewDock'
+import { LumiaMotionDock } from './LumiaMotionDock'
 import { TRANSLATION_CHOICES, validateTranslationAudioFile, type TranslationLanguage } from '../lib/translate'
 
 type Props = {
@@ -194,6 +195,10 @@ export function LumiaComposer({
         {/* PH-04.4: visual controls belong on the LEFT, before attachments.
             Microphone and voice tools stay grouped on the RIGHT. */}
         {avatarViewControl && <LumiaViewDock />}
+        {avatarViewControl && <LumiaMotionDock
+          busy={busy}
+          onDemo={() => onSend('Lumi, puedes hacer una demostración de tus animaciones')}
+        />}
 
         <button
           type="button"

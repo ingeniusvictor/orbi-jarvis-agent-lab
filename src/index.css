@@ -2798,6 +2798,106 @@ kbd {
   .lumia-avatar-view-option { padding: 8px 9px; }
 }
 
+/* PH-04.7: second-left animation catalog, grouped by local R8 function.
+ * Scroll stays inside popover and never changes the single-row composer.
+ */
+.lumia-motion-picker {z-index: 3}
+.lumia-motion-trigger {color: rgba(150,231,252,.93)}
+.lumia-motion-trigger.is-active,
+.lumia-motion-trigger:hover,
+.lumia-motion-trigger:focus-visible {
+  color: #d7feff;
+  border-color: rgba(121,238,255,.58);
+  background: rgba(28,153,191,.16);
+}
+.lumia-motion-options {
+  position: absolute;
+  z-index: 4;
+  bottom: calc(100% + 17px);
+  left: -42px;
+  display: flex;
+  flex-direction: column;
+  width: 265px;
+  max-width: min(86vw,295px);
+  padding: 10px;
+  border: 1px solid rgba(110,233,254,.45);
+  border-radius: 16px;
+  background: rgba(2,22,35,.975);
+  color: #c8f8ff;
+  box-shadow: 0 12px 36px rgba(0,0,0,.46), 0 0 20px rgba(4,170,210,.13);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.lumia-motion-menu-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px 11px;
+  color: rgba(166,235,252,.74);
+  letter-spacing: .09em;
+  font: 600 10px ui-monospace, monospace;
+}
+.lumia-motion-special,
+.lumia-motion-auto {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c9f7fc;
+  padding: 10px 12px;
+  border: 1px solid rgba(104,221,240,.28);
+  border-radius: 10px;
+  background: rgba(29,159,195,.16);
+  cursor: pointer;
+  font: 500 12px system-ui,sans-serif;
+  text-align: left;
+}
+.lumia-motion-special:hover,
+.lumia-motion-auto:hover,
+.lumia-motion-special:focus-visible,
+.lumia-motion-auto:focus-visible {
+  outline: 2px solid rgba(137,236,253,.62);
+  outline-offset: -2px;
+  background: rgba(37,183,218,.26);
+}
+.lumia-motion-auto {background: rgba(20,81,98,.25); margin-top: 7px}
+.lumia-motion-menu-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  max-height: min(48vh,380px);
+  margin-top: 6px;
+  scrollbar-color: rgba(96,209,235,.45) transparent;
+  scrollbar-width: thin;
+}
+.lumia-motion-group-title {
+  padding: 9px 10px 4px;
+  font: 600 9px ui-monospace,monospace;
+  letter-spacing: .11em;
+  color: rgba(151,214,233,.63);
+}
+.lumia-motion-option {width: 100%; min-height: 33px}
+.lumia-motion-play-icon {color: #80e5fb; width: 15px; text-align: center}
+.lumia-motion-footnote {
+  color: rgba(146,212,228,.55);
+  font: 10px system-ui,sans-serif;
+  padding: 9px 3px 3px;
+}
+.lumia-motion-warning {
+  position: absolute;
+  bottom: calc(100% + 13px);
+  left: 0;
+  min-width: 230px;
+  max-width: 300px;
+  padding: 9px 12px;
+  border: 1px solid rgba(243,186,118,.5);
+  border-radius: 10px;
+  color: #ffe6bf;
+  background: rgba(42,29,22,.96);
+  font: 11px system-ui,sans-serif;
+}
+@media (max-width: 650px) {
+  .lumia-motion-options {left: -48px; max-width: min(88vw,290px); padding: 7px}
+  .lumia-motion-menu-scroll {max-height: min(44vh,300px)}
+}
+
 /* UX-03 — Halo-aware response rail (ASUS reference 1761×831).
  * The avatar and orbit camera remain unchanged. Reserve the circle plus a
  * safety gutter in viewport units instead of clipping unreadable glyphs.

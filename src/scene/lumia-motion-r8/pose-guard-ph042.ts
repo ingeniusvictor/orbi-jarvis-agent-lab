@@ -36,15 +36,41 @@ export const R8_FULL_BODY_LIMITS = Object.freeze({
   leftToes: [0.08, 0.20], rightToes: [0.08, 0.20],
 } as const)
 
+/**
+ * PH-04.7: only two owner-observed clips need a less restrictive envelope.
+ * The ordinary R8 safe pose remains unchanged for the other fifteen FBX.
+ *
+ * Clapping needs the upper arms to meet at the body's center. These are
+ * angular limits, NOT a promise of palm contact: local FBX skinning and
+ * retarget must still be checked on ASUS.
+ */
+export const R8_AUTHORED_GESTURE_LIMITS = Object.freeze({
+  clapping: Object.freeze({
+    leftShoulder: [0.50, 0.90], rightShoulder: [0.50, 0.90],
+    leftUpperArm: [1.35, 1.85], rightUpperArm: [1.35, 1.85],
+    leftLowerArm: [1.65, 2.15], rightLowerArm: [1.65, 2.15],
+    leftHand: [0.85, 1.20], rightHand: [0.85, 1.20],
+  }),
+  no: Object.freeze({
+    leftShoulder: [0.30, 0.46], rightShoulder: [0.30, 0.46],
+    leftUpperArm: [0.44, 0.88], rightUpperArm: [0.44, 0.88],
+    leftLowerArm: [0.54, 0.95], rightLowerArm: [0.54, 0.95],
+  }),
+} as const)
+
 /** True if the original FBX pose was beyond the conservative envelope. */
 export function boundR8BodyPose(
   bones: Map<string, THREE.Object3D>,
   procedural: Map<string, THREE.Quaternion>,
   manual: boolean,
   fullBody = false,
+  clipId: string | null = null,
 ): number {
   let corrected = 0
   const limitsForView = fullBody ? R8_FULL_BODY_LIMITS : R8_POSE_LIMITS
+  const authored = (manual && clipId && Object.hasOwn(R8_AUTHORED_GESTURE_LIMITS, clipId))
+    ? R8_AUTHORED_GESTURE_LIMITS[clipId as keyof typeof R8_AUTHORED_GESTURE_LIMITS]
+    : null
   for (const [name, limits] of Object.entries(limitsForView)) {
     const node = bones.get(name)
     const base = procedural.get(name)
@@ -56,7 +82,11 @@ export function boundR8BodyPose(
       continue
     }
     const angle = base.angleTo(q)
-    const max = limits[manual ? 1 : 0]
+    const gesture = authored && Object.prototype.hasOwnProperty.call(authored, name)
+      ? (authored as unknown as Record<string, readonly [number, number]>)[name]
+      : null
+    // Only loosen the target joint, never weaken torso / hips / legs.
+    const max = gesture ? gesture[manual ? 1 : 0] : limits[manual ? 1 : 0]
     if (angle > max) {
       const target = q.clone()
       q.copy(base).slerp(target, max / angle).normalize()

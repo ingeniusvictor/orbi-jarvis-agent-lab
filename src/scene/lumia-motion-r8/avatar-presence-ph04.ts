@@ -66,7 +66,9 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   // requests for a tour of *my* R8 animations, not video production.
   const demoCorrection = /^(?:no(?: [a-z]+){0,3} )?lo que quiero es que me des (?:una|la) demostracion de (?:tus|las) (?:animaciones|movimientos|gestos)\b/.test(said) ||
     /^(?:quiero|necesito) que me des (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said) ||
-    /^voy a hacer (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said)
+    /^voy a hacer (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said) ||
+    /^(?:mi\s+)?quiero que me des (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said) ||
+    /^no\s+(?:lo\s+mio|lo\s+mismo|alumnos)\s+lo que quiero es que me des (?:una|la) demostracion de tus (?:animaciones|movimientos|gestos)\b/.test(said)
   if (demoCorrection || (demoPrompt && /\b(?:animaciones|movimientos|gestos|expresiones|emociones|avatar|vrm|cuerpo|capacidades|habilidades)\b/.test(said))) {
     return { kind: 'demo' }
   }
@@ -147,33 +149,54 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
     return { kind: 'auto' }
   }
 
-  const motionCommand = /^(?:haz|hace|ejecuta|realiza|activa|reproduce|pon|muestra|muestrame|saluda|saludame|aplaude|camina|senala|niega)\b/.test(said)
-  if (!motionCommand) return null
-  // All 17 catalog IDs are also directly addressable by their exact ID:
-  // "Lumi, ejecuta animación pointing", "Lumi reproduce animación walking".
-  // Never accept a free-form clip path or URL.
-  const exact = said.match(/^(?:ejecuta|reproduce|activa)\s+(?:(?:la|el|una|un)\s+)?(?:animacion|movimiento|gesto)\s+(?:de\s+)?([a-z0-9]+)$/)
-  if (exact && motionIds.has(exact[1])) return { kind: 'motion', id: exact[1] }
-
   const motions: Array<[RegExp, string]> = [
     [/\b(?:saluda|saludame|saludo|saludar|waving)\b/, 'waving'],
-    [/\b(?:aplaude|aplauso|aplaudir|clapping)\b/, 'clapping'],
+    [/\b(?:aplaude|aplauso|aplausos|aplaudir|clapping)\b/, 'clapping'],
     [/\b(?:beso|besito|lanzar un beso)\b/, 'kiss'],
     [/\b(?:senalamiento directo|senalamiento simple|senalala con un dedo|senala con un dedo|pointing simple)\b/, 'pointing'],
     [/\b(?:senala|senalar|apunta|apuntar|pointing gesture)\b/, 'pointinggesture'],
-    [/\b(?:niega|negacion|di que no|gesto de no)\b/, 'no'],
+    [/\b(?:niega|negar|negacion|decir que no|di que no|gesto de no)\b/, 'no'],
     [/\b(?:pensar|pensando|reflexion|thinking)\b/, 'thinking'],
     [/\b(?:alegria|feliz|happy)\b/, 'happy'],
     [/\b(?:entusiasmo|emocionada|excited)\b/, 'excited'],
     [/\b(?:sorpresa|sorprendida|surprised)\b/, 'surprised'],
-    [/\b(?:camina|caminar en circulo|paseo circular)\b/, 'walkingcircle'],
     [/\b(?:caminar en sitio|camina en sitio|caminar sin avanzar)\b/, 'walking'],
     [/\b(?:caminar hacia delante|camina hacia delante)\b/, 'walkingforward'],
+    [/\b(?:caminar en circulo|paseo circular|walk in circle)\b/, 'walkingcircle'],
     [/\b(?:hablar|conversacion|talking)\b/, 'talking'],
     [/\b(?:reposo|descanso|quieta|idle)\b/, 'idle'],
     [/\b(?:escuchar|escuchando|head gesture)\b/, 'listening'],
     [/\b(?:revisar las manos|revisa tus manos|revisa las manos|unas|nails)\b/, 'nails'],
   ]
+  // The exact catalog-ID command always wins, including the literal ID 'no':
+  // "Lumi, ejecuta animación no" is unambiguous and allowed.
+  const exactClip = said.match(/^(?:ejecuta|reproduce|activa)\s+(?:(?:la|el|una|un)\s+)?(?:animacion|movimiento|gesto)\s+(?:de\s+)?([a-z0-9]+)$/)
+  if (exactClip && motionIds.has(exactClip[1])) return {kind:'motion',id:exactClip[1]}
+
+  // PH-04.7 — Real owner STT in ASUS, 17:36–17:39:
+  // "Muestramiento animación de aplaudir", "quiero ver TU animación",
+  // "No lo mismo, lo que quiero es que me muestres la animación...".
+  // These are playback requests for an installed asset, never HTML/CSS/video.
+  // Require a clear request AND a known catalog motion to avoid accidentally
+  // running a clip from a conceptual discussion with Qwen.
+  const singleRequest =
+    /^(?:(?:mi|lumi|lumia)\s+)?(?:muestramiento|muestrame|mostrame|muestra|ensename|reproduce|ejecuta|quiero\s+ver|quisiera\s+ver|me\s+gustaria\s+ver|(?:me\s+)?puedes\s+(?:mostrar|mostrarme|reproducir)|quiero\s+que\s+(?:me\s+)?muestres|necesito\s+que\s+(?:me\s+)?muestres|no\s+(?:(?:lo\s+)?(?:mismo|mio)|alumnos)\s+lo\s+que\s+quiero\s+es\s+que\s+me\s+muestres)\b/.test(said)
+  const actualAnimation = /\b(?:animacion|movimiento|gesto|fbx|motion\s+r8)\b/.test(said)
+  if (singleRequest && actualAnimation &&
+      !/\b(?:como|crear|programar|css|blender|youtube|tutorial|html|internet|video)\b/.test(said)) {
+    for (const [pattern, id] of motions) {
+      if (pattern.test(said) && motionIds.has(id)) return {kind:'motion', id}
+    }
+    // Don't hallucinate or improvise an unknown animation name.
+    return {kind:'list-motions'}
+  }
+
+  const motionCommand = /^(?:haz|hace|ejecuta|realiza|activa|reproduce|pon|muestra|muestrame|saluda|saludame|aplaude|camina|senala|niega)\b/.test(said)
+  if (!motionCommand) return null
+  // All 17 catalog IDs are also directly addressable by their exact ID:
+  // "Lumi, ejecuta animación pointing", "Lumi reproduce animación walking".
+  // Never accept a free-form clip path or URL.
+
   for (const [pattern, id] of motions) {
     if (pattern.test(said) && motionIds.has(id)) return { kind: 'motion', id }
   }
@@ -231,7 +254,10 @@ export function setLumiaAvatarView(view: LumiaAvatarView): boolean {
 export function requestLumiaAvatarMotion(id: string): boolean {
   if (!motionIds.has(id)) return false
   if (snapshot.view === 'legacy' || snapshot.view === 'head-vrm') {
-    setLumiaAvatarView('bust-vrm') // Face & body gesture must remain visible.
+    // Legs must be visible for a full-body walking command; all other
+    // gesture requests use the established middle-body showcase.
+    const clip = motionCatalog.find((item) => item.id === id)
+    setLumiaAvatarView(clip?.fullBody ? 'body-vrm' : 'bust-vrm')
   }
   const sequence = snapshot.sequence + 1
   snapshot = { ...snapshot, sequence, motion: { sequence, id, kind: 'play', sentAt: Date.now() } }

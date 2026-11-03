@@ -28,7 +28,7 @@ const LOWER_BODY_BONES = [
   'leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg',
   'leftFoot','rightFoot','leftToes','rightToes',
 ] as const
-type ClipInfo = { clip: THREE.AnimationClip; id: string; loop: boolean; repetitions: number }
+type ClipInfo = { clip: THREE.AnimationClip; id: string; loop: boolean; repetitions: number; headAuthored: boolean }
 type BodyPose = Record<string, number>
 type SemanticPose = { head: {pitch:number;yaw:number;roll:number}; body:BodyPose; kind:string|null }
 const PROCEDURAL_BONES = [
@@ -81,8 +81,10 @@ export class R8BodyCompanion {
   private elapsed=0
   private manualUntil=0
   private demoClipId:string|null=null
-  private demoLoopCount=0
-  private demoLoopTarget=0
+  private explicitClipId:string|null=null
+  private explicitLoopTarget=0
+  private explicitLoops=0
+  private minClapHandDistance=Number.POSITIVE_INFINITY
   private readonly allowClips:boolean
   private readonly safePose:boolean
   private readonly fullBodySafe:boolean
@@ -104,20 +106,24 @@ export class R8BodyCompanion {
     this.applyProcedural(this.core.step(.001,this.config('idle')),
       this.presence.step(.001,this.presenceConfig('idle')))
     this.activeMixer.addEventListener('finished',()=>{
-      if(this.demoClipId && this.demoClipId===this.activeId) {
-        reportGuidedDemoClip(this.demoClipId,'finished')
+      if(this.explicitClipId && this.explicitClipId===this.activeId){
+        if(this.demoClipId) reportGuidedDemoClip(this.demoClipId,'finished')
+        this.explicitClipId=null
         this.demoClipId=null
         this.manualUntil=0
       }
       if(!this.activeLoop) this.stopClip()
     })
     this.activeMixer.addEventListener('loop',()=>{
-      if(!this.demoClipId || !this.activeLoop ||
-          this.demoClipId!==this.activeId) return
-      this.demoLoopCount++
-      if(this.demoLoopCount>=this.demoLoopTarget){
-        reportGuidedDemoClip(this.demoClipId,'finished')
+      // A requested idle/walking/talking loop must play complete loops even
+      // outside the guided tutorial. It is never cut by a fixed timer.
+      if(!this.explicitClipId || !this.activeLoop ||
+          this.explicitClipId!==this.activeId) return
+      this.explicitLoops++
+      if(this.explicitLoops>=this.explicitLoopTarget){
+        if(this.demoClipId) reportGuidedDemoClip(this.demoClipId,'finished')
         this.demoClipId=null
+        this.explicitClipId=null
         this.manualUntil=0
         this.stopClip()
       }
@@ -127,6 +133,13 @@ export class R8BodyCompanion {
   get boneCount() {return this.rest.size}
   get clipStatus() {return {active:this.activeId,pending:this.pending,failed:[...this.failed]}}
   get clipCount() {return Object.keys(animationLibrary).length}
+  get authoredNoHeadActive():boolean {
+    return this.activeId==='no' && Boolean(this.cache.get('no')?.headAuthored)
+  }
+  get clappingHandDistance():number|null {
+    return Number.isFinite(this.minClapHandDistance)
+      ? this.minClapHandDistance : null
+  }
 
   private config(behavior:MotionState) {
     return {
@@ -165,11 +178,15 @@ export class R8BodyCompanion {
   }
 
   private stopClip():void {
-    if (this.demoClipId) {
-      reportGuidedDemoClip(this.demoClipId,'cancelled')
-      this.demoClipId=null
-      this.manualUntil=0
+    if (this.demoClipId) reportGuidedDemoClip(this.demoClipId,'cancelled')
+    if(this.activeId==='clapping' && Number.isFinite(this.minClapHandDistance)){
+      console.info('[lumia:ph047] QA clapping minimum wrist-center distance (VRM world units):',
+        this.minClapHandDistance.toFixed(3),
+        '(el contacto real de las palmas requiere revisión visual ASUS)')
     }
+    this.demoClipId=null
+    this.explicitClipId=null
+    this.manualUntil=0
     if(!this.action)return
     this.blend.capture([...this.rig.bodyBones.values()],.44)
     this.action.stop()
@@ -215,11 +232,19 @@ export class R8BodyCompanion {
     const result=retargetMixamoUpperBody(asset,shim,THREE,{
       fullBody:Boolean(config.fullBody),
       includeHips:Boolean(config.includeHips),
-      includeHead:false, // preserve tested PH-02 eye/head tracking
+      includeHead:id==='no', // Only No.fbx may drive authored head/neck rotation
     })
     const entry={
       id,clip:this.retargetRawPose(result.clip),
       loop:Boolean(config.loop),repetitions:config.repetitions||1,
+      headAuthored:id==='no' && result.matched.some((name:string)=>name==='head'||name==='neck'),
+    }
+    if(id==='no' || id==='clapping'){
+      console.info('[lumia:ph047] QA authoring/retarget:',
+        id,'matched bones:',result.matched.join(','),
+        'FBX clip seconds:',entry.clip.duration,
+        'head/neck authored:',entry.headAuthored,
+        'This reports track mapping, not visual fidelity.')
     }
     this.cache.set(id,entry)
     return entry
@@ -227,9 +252,15 @@ export class R8BodyCompanion {
 
   private playReady(clip:ClipInfo):void {
     const guided = this.demoClipId===clip.id
-    if (guided) this.demoClipId=null
+    const explicit = this.explicitClipId===clip.id
+    if(guided) this.demoClipId=null
+    if(explicit) this.explicitClipId=null
     this.stopClip()
-    if (guided) this.demoClipId=clip.id
+    if(guided) this.demoClipId=clip.id
+    if(explicit){
+      this.explicitClipId=clip.id
+      this.manualUntil=Number.POSITIVE_INFINITY
+    }
     this.blend.capture([...this.rig.bodyBones.values()],.44)
     const action=this.activeMixer.clipAction(clip.clip)
     // Waving repeats twice and Clapping three times in the original R8
@@ -258,22 +289,24 @@ export class R8BodyCompanion {
       if(this.pending!==id || (!manual && this.lastState!==stateAtRequest) ||
          (manual && this.elapsed>=this.manualUntil))return
       this.playReady(clip)
-      if (manual && this.demoClipId===id) {
-        this.demoLoopCount=0
-        this.demoLoopTarget=clip.loop
-          ? (clip.clip.duration < 3 ? 2 : 1) : 0
-        reportGuidedDemoClip(id,'started',clip.clip.duration,
-          clip.loop?this.demoLoopTarget:clip.repetitions)
-        console.info('[lumia:ph046] R8 clip started, actual seconds:',
-          id,clip.clip.duration,'cycles:',
-          clip.loop?this.demoLoopTarget:clip.repetitions)
+      if(manual && this.explicitClipId===id){
+        this.explicitLoops=0
+        this.explicitLoopTarget=clip.loop
+          ? (clip.clip.duration<3?2:1) : 0
+        if(this.demoClipId===id) reportGuidedDemoClip(id,'started',
+          clip.clip.duration,clip.loop?this.explicitLoopTarget:clip.repetitions)
+        console.info('[lumia:ph047] Owner gesture',id,
+          'FBX seconds:',clip.clip.duration,'cycles:',
+          clip.loop?this.explicitLoopTarget:clip.repetitions,
+          'head track:',clip.headAuthored)
       }
       this.director.commit(this.gestureToken,this.elapsed)
       console.info('[lumia:ph03] R8 animation:',id)
     }).catch((err:unknown)=>{
-      if(manual && this.demoClipId===id){
-        reportGuidedDemoClip(id,'failed')
+      if(manual && this.explicitClipId===id){
+        if(this.demoClipId===id) reportGuidedDemoClip(id,'failed')
         this.demoClipId=null
+        this.explicitClipId=null
         this.manualUntil=0
       }
       this.failed.add(id)
@@ -292,13 +325,14 @@ export class R8BodyCompanion {
     }
     this.pending=null // invalidate older asynchronous auto/gesture loading
     this.stopClip()
-    // PH-04.6: a real demo must NOT kill a clip after 7.5 seconds. Stop only
-    // when the actual FBX animation mixer reports finishing, or the owner
-    // cancels. Infinite-loop clips complete after 1 or 2 *real* cycles.
-    this.manualUntil=guided?Number.POSITIVE_INFINITY:this.elapsed+7.5
+    // PH-04.7: every explicitly requested clip (voice/button/demo) runs to
+    // its genuine FBX end, NOT a fixed 7.5 s. Loops stop at whole cycles.
+    this.manualUntil=Number.POSITIVE_INFINITY
     this.demoClipId=guided?id:null
-    this.demoLoopCount=0
-    this.demoLoopTarget=0
+    this.explicitClipId=id
+    this.explicitLoops=0
+    this.explicitLoopTarget=0
+    this.minClapHandDistance=Number.POSITIVE_INFINITY
     this.requestClip(id,true)
     return true
   }
@@ -318,7 +352,7 @@ export class R8BodyCompanion {
     this.semantic.end()
     // During the owner-guided tour, "Talking.fbx" must complete its actual
     // authored cycle even after the short narration has finished.
-    if(this.activeId==='talking' && !this.demoClipId)this.stopClip()
+    if(this.activeId==='talking' && !this.explicitClipId)this.stopClip()
   }
 
   step(dt:number,phase:string,speechAudible:boolean):SemanticPose {
@@ -350,15 +384,21 @@ export class R8BodyCompanion {
     if(this.action)this.activeMixer.update(dt)
     this.blend.step(dt)
 
+
     const semantic=this.semantic.step(dt,{speaking:speechAudible}) as SemanticPose
-    for(const [name,value] of Object.entries(semantic.body)){
-      const axis=name.at(-1)?.toUpperCase()
-      const boneName=name.slice(0,-1)
-      const bone=this.rig.bodyBones.get(boneName)
-      if(!bone || !axis || !Number.isFinite(value) || Math.abs(value)<1e-7)continue
-      this.euler.set(axis==='X'?value:0,axis==='Y'?value:0,axis==='Z'?value:0)
-      this.q.setFromEuler(this.euler)
-      bone.quaternion.multiply(this.q)
+    // The owner-requested FBX pose owns its joints until the clip ends.
+    // Semantic voice overlays on the SAME arms previously pulled hands
+    // apart during Clapping and distorted the authored No gesture.
+    if(!this.explicitClipId) {
+      for(const [name,value] of Object.entries(semantic.body)){
+        const axis=name.at(-1)?.toUpperCase()
+        const boneName=name.slice(0,-1)
+        const bone=this.rig.bodyBones.get(boneName)
+        if(!bone || !axis || !Number.isFinite(value) || Math.abs(value)<1e-7)continue
+        this.euler.set(axis==='X'?value:0,axis==='Y'?value:0,axis==='Z'?value:0)
+        this.q.setFromEuler(this.euler)
+        bone.quaternion.multiply(this.q)
+      }
     }
     // R8 semantic gestures only when the actual TTS text is audibly playing.
     if(semantic.kind && semantic.kind!==this.semanticGestureUsed && speechAudible &&
@@ -375,7 +415,23 @@ export class R8BodyCompanion {
     // this affects only the visible result and never changes the private FBX.
     if (this.safePose && this.action) {
       boundR8BodyPose(this.rig.bodyBones, this.proceduralBase,
-        this.manualUntil > this.elapsed, this.fullBodySafe)
+        this.manualUntil > this.elapsed, this.fullBodySafe,
+        this.manualUntil>this.elapsed ? this.activeId : null)
+    }
+    // Measure the VISIBLE post-guard wrist distance, not the unbounded FBX
+    // pose. This is diagnostic only: finger tips/palm contact require the
+    // owner's original skinned VRM for a definitive visual conclusion.
+    if(this.activeId==='clapping' && this.action){
+      const left=this.rig.bodyBones.get('leftHand')
+      const right=this.rig.bodyBones.get('rightHand')
+      if(left && right){
+        left.updateWorldMatrix(true,false)
+        right.updateWorldMatrix(true,false)
+        const distance=left.getWorldPosition(new THREE.Vector3())
+          .distanceTo(right.getWorldPosition(new THREE.Vector3()))
+        if(Number.isFinite(distance)) this.minClapHandDistance=
+          Math.min(this.minClapHandDistance,distance)
+      }
     }
     if(this.allowClips && !this.pending && this.elapsed>=this.manualUntil &&
        !guidedDemoSnapshot().active){
