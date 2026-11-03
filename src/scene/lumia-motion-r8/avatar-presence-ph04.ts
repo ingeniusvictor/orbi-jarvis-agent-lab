@@ -184,6 +184,13 @@ export function respondToLumiaAvatarAction(action: LumiaAvatarAction): string {
     return 'He cambiado mi presentación a ' + avatarViewLabel(action.view) + '.'
   }
   if (action.kind === 'motion') {
+    // Do not claim an FBX was even requested while the user deliberately
+    // selected procedural-only mode as a safe rollback.
+    if (typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('lumiaR8') === 'procedural') {
+      return 'Esta vista está en modo corporal procedural, sin archivos FBX. ' +
+        'Para reproducir una animación específica abre la vista de medio cuerpo normal, sin el parámetro procedural.'
+    }
     const catalog = motionCatalog.find((entry) => entry.id === action.id)
     if (!catalog || !requestLumiaAvatarMotion(action.id)) return 'Ese movimiento no está registrado en Motion R8.'
     return 'Voy a intentar el movimiento ' + catalog.label + '. Si el archivo no está disponible, continuaré con mi postura natural.'
