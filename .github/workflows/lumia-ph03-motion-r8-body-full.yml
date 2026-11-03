@@ -205,6 +205,18 @@ jobs:
       - name: PH-03 original Motion R8 procedural body and 17 private-clips contract
         run: npx tsx scripts/certify-lumia-motion-r8-portal-ph03.ts
 
+      - name: PH-03 Windows installer verification against synthetic verified ZIP
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'scripts/INSTALAR_LUMIA_MOTION_R8_BODY.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Format-List | Out-String | Write-Error; exit 1 }
+          ./scripts/certify-lumia-motion-r8-installer.ps1
+
       - name: Production build
         run: npm run build
 
