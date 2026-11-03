@@ -378,18 +378,7 @@ export class R8BodyCompanion {
     }
     if(this.action)this.activeMixer.update(dt)
     this.blend.step(dt)
-    if(this.activeId==='clapping' && this.action){
-      const left=this.rig.bodyBones.get('leftHand')
-      const right=this.rig.bodyBones.get('rightHand')
-      if(left && right){
-        left.updateWorldMatrix(true,false)
-        right.updateWorldMatrix(true,false)
-        const distance=left.getWorldPosition(new THREE.Vector3())
-          .distanceTo(right.getWorldPosition(new THREE.Vector3()))
-        if(Number.isFinite(distance)) this.minClapHandDistance=
-          Math.min(this.minClapHandDistance,distance)
-      }
-    }
+
 
     const semantic=this.semantic.step(dt,{speaking:speechAudible}) as SemanticPose
     for(const [name,value] of Object.entries(semantic.body)){
@@ -418,6 +407,21 @@ export class R8BodyCompanion {
       boundR8BodyPose(this.rig.bodyBones, this.proceduralBase,
         this.manualUntil > this.elapsed, this.fullBodySafe,
         this.manualUntil>this.elapsed ? this.activeId : null)
+    }
+    // Measure the VISIBLE post-guard wrist distance, not the unbounded FBX
+    // pose. This is diagnostic only: finger tips/palm contact require the
+    // owner's original skinned VRM for a definitive visual conclusion.
+    if(this.activeId==='clapping' && this.action){
+      const left=this.rig.bodyBones.get('leftHand')
+      const right=this.rig.bodyBones.get('rightHand')
+      if(left && right){
+        left.updateWorldMatrix(true,false)
+        right.updateWorldMatrix(true,false)
+        const distance=left.getWorldPosition(new THREE.Vector3())
+          .distanceTo(right.getWorldPosition(new THREE.Vector3()))
+        if(Number.isFinite(distance)) this.minClapHandDistance=
+          Math.min(this.minClapHandDistance,distance)
+      }
     }
     if(this.allowClips && !this.pending && this.elapsed>=this.manualUntil &&
        !guidedDemoSnapshot().active){
