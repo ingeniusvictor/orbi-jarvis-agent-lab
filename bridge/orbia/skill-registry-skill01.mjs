@@ -63,8 +63,8 @@ export function buildLumiaSkillRegistry({
     entry('avatar-presence', 'Avatar virtual animado', 'PH-04/Motion R8',
       enabled(env.ORBIA_LUMIA_AVATAR_PH04) ? 'experimental' : 'disabled',
       'Tres vistas locales: solo rostro como presentación principal; medio cuerpo y cuerpo completo para mostrar el cuerpo animado. ' +
-      'Puede cambiar de vista y solicitar gestos de un catálogo de 17 animaciones.',
-      'La naturalidad corporal y la reproducción real de cada FBX requieren prueba en ASUS y archivos privados compatibles. ' +
+      'Puede cambiar de vista, solicitar gestos y realizar una demostración guiada narrada de las 17 animaciones Motion R8 y expresiones faciales.',
+      'La demostración exige los 17 archivos FBX locales; los gestos y expresiones reales necesitan compatibilidad VRM y validación en ASUS. ' +
       'No controla aplicaciones ni archivos del equipo.',
       'local-ui+motion-catalog'),
     entry('translation-text', 'Traducción de texto', 'LT-01/LT-04Q',
