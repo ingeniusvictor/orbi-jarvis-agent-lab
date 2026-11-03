@@ -252,7 +252,10 @@ export class R8BodyCompanion {
     if(explicit) this.explicitClipId=null
     this.stopClip()
     if(guided) this.demoClipId=clip.id
-    if(explicit) this.explicitClipId=clip.id
+    if(explicit){
+      this.explicitClipId=clip.id
+      this.manualUntil=Number.POSITIVE_INFINITY
+    }
     this.blend.capture([...this.rig.bodyBones.values()],.44)
     const action=this.activeMixer.clipAction(clip.clip)
     // Waving repeats twice and Clapping three times in the original R8
