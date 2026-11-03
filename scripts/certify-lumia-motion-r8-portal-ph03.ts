@@ -105,5 +105,18 @@ assert.match(sceneCode,/HeadVrmErrorBoundary/)
 assert.match(adapter,/Boolean\(options\.showBody\)/)
 assert.match(gitignore,/public\/models\/lumia-motion\/clips\//)
 assert.match(launcher,/ORBIA_LUMIA_SKILL_REGISTRY=1/)
-assert.match(read('scripts/INSTALAR_LUMIA_MOTION_R8_BODY.ps1'),/Get-FileHash/)
+const installer = read('scripts/INSTALAR_LUMIA_MOTION_R8_BODY.ps1')
+assert.match(installer,/Get-FileHash/,'Original Motion R8 ZIP and extracted FBX must be hashed')
+assert.ok(installer.includes("$kitHash -ne $manifest.kitSha256"),
+  'Install only from the exact original R8 kit ZIP digest')
+assert.ok(installer.includes("$existingSha -ne $sha"),
+  'Existing files must match canonical extracted ZIP bytes; never overwrite differences')
+assert.ok(installer.includes("if ($sha -ne $expected)"),
+  '16 known complete individual FBX SHA-256 digests must be checked')
+assert.ok(installer.includes("$name -eq 'Waving.fbx'"),
+  'Only the single documented truncated legacy Waving digest is exempt')
+assert.ok(!installer.includes('StartsWith([string]$meta.sha256)'),
+  'Never trust an invalid/inconsistent Waving checksum prefix')
+assert.ok(installer.includes("$archive.Dispose()") && installer.includes('Remove-Item -LiteralPath $temp'),
+  'Close archive and clean staged temporary assets even on failure')
 console.log('PH-03 PASS: R8 original procedural arm pose, 17 private clips, speech gating, semantic motion and fallback')
