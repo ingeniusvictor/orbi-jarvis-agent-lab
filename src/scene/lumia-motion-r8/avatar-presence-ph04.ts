@@ -71,20 +71,28 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
     return { kind: 'list-views' }
   }
 
-  const toDefault = /^(?:vuelve|regresa|retorna|cambia|ponte|muestrate)\b/.test(said) &&
-    /\b(?:vista principal|vista predeterminada|vista por defecto|vista normal|medio cuerpo)\b/.test(said)
-  const change = /^(?:cambia|cambiate|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero verte|dejame verte|vuelve|regresa)\b/.test(said)
-  if (change) {
-    if (toDefault) return { kind: 'view', view: 'bust-vrm' }
-    if (/\b(?:solo rostro|solo la cara|solo cabeza|la cabeza|el rostro|cara solamente|primer plano)\b/.test(said)) {
-      return { kind: 'view', view: 'head-vrm' }
-    }
-    if (/\b(?:cuerpo completo|cuerpo entero|de pies a cabeza|vista completa)\b/.test(said)) {
-      return { kind: 'view', view: 'body-vrm' }
-    }
-    if (/\b(?:medio cuerpo|mitad del cuerpo|vista intermedia|busto)\b/.test(said)) {
-      return { kind: 'view', view: 'bust-vrm' }
-    }
+  // PH-04.1 field QA: Whisper can transcribe "cuerpo completo" as "corrup
+  // completo", and users naturally ask "puedes cambiar ..." or "necesito que
+  // cambias ...". Keep those narrow alternatives behind explicit view context.
+  const viewContext = /\b(?:vista|vistas|presentacion|rostro|cara|cabeza|cuerpo|corrup|corpo|curpo|busto)\b/.test(said)
+  const viewInquiry = /^(?:solo\s+)?(?:quiero\s+probar|me\s+gustaria\s+probar|quisiera\s+probar|puedes\s+cambiar\s+entre|quiero\s+saber\s+si\s+(?:puedes|podrias)\s+cambiar|como\s+(?:cambio|cambiar)\s+(?:la\s+)?vista)\b/.test(said)
+  if (viewContext && viewInquiry) return { kind: 'list-views' }
+
+  const directChange = /^(?:por\s+favor\s+)?(?:(?:me\s+)?(?:puedes|podrias|podria)\s+)?(?:cambia|cambiar|cambias|cambies|cambiate|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero\s+verte|dejame\s+verte|vuelve|regresa|retorna)\b/.test(said)
+  const requestedChange = /^(?:necesito|quiero|quisiera|me\s+gustaria)\s+que\s+(?:(?:me|te)\s+)?(?:cambia|cambias|cambies|cambiaras|cambiar)\b/.test(said)
+  if (viewContext && (directChange || requestedChange)) {
+    const wantsHead = /\b(?:solo\s+(?:el\s+)?rostro|solo\s+la\s+cara|solo\s+(?:la\s+)?cabeza|la\s+cabeza|el\s+rostro|cara\s+solamente|primer\s+plano)\b/.test(said)
+    const wantsFull = /\b(?:cuerpo|corrup|corpo|curpo)\s+(?:completo|entero)\b|\b(?:de\s+pies\s+a\s+cabeza|vista\s+completa)\b/.test(said)
+    const wantsBust = /\b(?:medio\s+cuerpo|mitad\s+del\s+cuerpo|vista\s+intermedia|busto|vista\s+principal|vista\s+predeterminada|vista\s+por\s+defecto|vista\s+normal)\b/.test(said)
+    const targets = [
+      ...(wantsHead ? ['head-vrm'] : []),
+      ...(wantsFull ? ['body-vrm'] : []),
+      ...(wantsBust ? ['bust-vrm'] : []),
+    ] as Array<Exclude<LumiaAvatarView, 'legacy'>>
+    // Do not arbitrarily choose when the user names multiple different views
+    // or Whisper truncates the command before its target. Ask instead.
+    if (targets.length !== 1) return { kind: 'list-views' }
+    return { kind: 'view', view: targets[0] }
   }
 
   if (/^(?:vuelve|regresa|retorna|deja|deten|para|desactiva)\b/.test(said) &&
@@ -200,7 +208,7 @@ export function respondToLumiaAvatarAction(action: LumiaAvatarAction): string {
     return 'He vuelto al modo de movimientos automáticos de Motion R8.'
   }
   if (action.kind === 'list-views') {
-    return 'Tengo tres vistas: solo rostro, medio cuerpo y cuerpo completo. Mi presentación predeterminada es medio cuerpo, con mi rostro centrado en los aros.'
+    return 'Sí, puedo cambiar entre tres vistas: solo rostro, medio cuerpo y cuerpo completo. Mi vista principal es medio cuerpo, con mi rostro centrado en los aros. Dime cuál quieres que active.'
   }
   if (action.kind === 'list-motions') {
     const shortList = motionCatalog.map((item) => item.label)
