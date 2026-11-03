@@ -300,15 +300,17 @@ export async function streamOllama({
   const complexVoice = process.env.ORBIA_LUMIA_COMPLEX_VOICE_VQ01 === '1' && isComplexVoicePrompt(prompt) && !image
   const rc03Pilot = process.env.ORBIA_LUMIA_RC03_GROUNDING === '1'
   const rc04Pilot = process.env.ORBIA_LUMIA_RC04_CAPABILITIES === '1'
+  const skillPilot = process.env.ORBIA_LUMIA_SKILL_REGISTRY === '1'
+  // Under SKILL-01, the registry is authoritative; suppress RC-04's older
+  // static capability paragraph so future switch changes cannot contradict it.
   const groundedSystemPrompt = systemPrompt +
     (rc03Pilot ? RC03_VOICE_GROUNDING_INSTRUCTION : '') +
-    (rc04Pilot ? RC04_TRANSLATION_FACTS : '')
+    (rc04Pilot && !skillPilot ? RC04_TRANSLATION_FACTS : '')
 
   // For an already-authorized voice turn, answer unsupported pilot claims
   // without inventing weather measurements or pretending to control the PC.
   // This path preserves the existing bridge onText/done/history contract and
   // avoids a needless model call. All other requests go to Qwen as before.
-  const skillPilot = process.env.ORBIA_LUMIA_SKILL_REGISTRY === '1'
   const registryReply = skillPilot && !image && isSkillRegistryInquiry(prompt)
     ? skillRegistryReply({ prompt, registry: buildLumiaSkillRegistry() }) : null
   const translationCapability = registryReply || (rc04Pilot && !image
