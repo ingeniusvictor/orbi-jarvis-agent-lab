@@ -10,6 +10,7 @@ import {
   R8_FULL_BODY_LIMITS,R8_AUTHORED_GESTURE_LIMITS,boundR8BodyPose,
 } from '../src/scene/lumia-motion-r8/pose-guard-ph042'
 import {R8BodyCompanion} from '../src/scene/lumia-motion-r8/portal-body-companion'
+import {mixamoBoneName} from '../src/scene/lumia-motion-r8/mixamo-retarget.js'
 
 const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8')
 assert.equal(motionCatalog.length,17)
@@ -107,6 +108,10 @@ boundR8BodyPose(bones,bases,true,true,'waving')
 assert.ok(bases.get('leftUpperArm')!.angleTo(
  bones.get('leftUpperArm')!.quaternion)<=R8_FULL_BODY_LIMITS.leftUpperArm[1]+1e-5,
  'Other clips retain safe arm limits')
+assert.equal(mixamoBoneName('mixamorig:Head'),'head')
+assert.equal(mixamoBoneName('mixamorig:Neck'),'neck')
+assert.equal(mixamoBoneName('mixamorigHead'),'head')
+assert.equal(mixamoBoneName('J_Bip_C_Head'),'head')
 assert.match(body,/includeHead:id==='no'/)
 assert.match(body,/get authoredNoHeadActive\(\)/)
 assert.match(portal,/const authoredNoHead = body\?\.authoredNoHeadActive/)
@@ -123,6 +128,11 @@ for(const name of ['hips','spine','chest','upperChest','head','neck',
 }
 const companion=new R8BodyCompanion({scene,bodyBones:rigBones} as any,
  {allowClips:true,safePose:true,fullBodySafe:true})
+for(const entry of motionCatalog) {
+  if(entry.id!=='clapping' && entry.id!=='no')
+    (companion as any).failed.add(entry.id)
+}
+// This synthetic CI test must not attempt browser FBX network requests.
 const clapping=new THREE.AnimationClip('ClappingSynthetic',4,[
  new THREE.QuaternionKeyframeTrack('leftUpperArm.quaternion',
   [0,4],[0,0,0,1,0,0,0,1]),
