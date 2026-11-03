@@ -112,6 +112,10 @@ export function isSkillRegistryInquiry(prompt) {
   const text = normalize(prompt)
   if (!text) return false
   if (/^(?:recuerda|recuerdame|guarda|memoriza|olvida|borra|elimina|traduce|traduceme|abre|ejecuta|instala|cambia|activa|desactiva)\b/.test(text)) return false
+  // Leave focused translation questions to RC-04: its exact limits and UI
+  // instructions are more useful than the generic inventory summary.
+  if (/\b(?:traduccion|traducciones|traducir|traductor|traduces|traduciendo|interpretacion)\b/.test(text) &&
+      /\b(?:audio|audios|texto|textos|idioma|idiomas)\b/.test(text)) return false
   return /\b(?:skills?|habilidades?|funciones?|capacidades?|memoria|recuerdos?|recordar|recuerdas|persistente)\b/.test(text) &&
     /\b(?:cuales?|que|como|tienes?|puedes?|esta|estan|activas?|disponibles?|habilitadas?|pendientes?|nuevas?|actualizadas?|lista|explica|cuentame|dime|comentame|sabes)\b/.test(text)
 }
