@@ -23,6 +23,8 @@ import { shouldProtectWhisperCommandAtExpiry } from './lib/complex-voice-turn'
 import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { portalSpeechStart, portalSpeechPhrase, portalSpeechEnd, portalSpeechInterrupt } from './scene/lumia-head/portal-speech-events'
+import { parseLumiaAvatarAction, respondToLumiaAvatarAction } from './scene/lumia-motion-r8/avatar-presence-ph04'
+import { LumiaViewDock } from './ui/LumiaViewDock'
 import { resolveFollowupGuardMs } from './lib/followup-latency'
 import * as sfx from './lib/sfx'
 import * as music from './lib/music'
@@ -91,6 +93,7 @@ const ACTIVE_COMMAND_GRACE_ENABLED = import.meta.env.VITE_LUMIA_ACTIVE_COMMAND_G
 const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INPUT === '1'
 const COMPLEX_VOICE_ENABLED = import.meta.env.VITE_LUMIA_COMPLEX_VOICE_VQ01 === '1'
 const MULTIMODAL_COMPOSER = import.meta.env.VITE_LUMIA_MULTIMODAL_COMPOSER === '1'
+const AVATAR_PH04_ENABLED = import.meta.env.VITE_LUMIA_AVATAR_PH04 === '1'
 
 // Owner-side opt-in only. The browser recognizer remains at the certified hold.
 // Never start listening before the actual synthesized-output echo tail expires.
@@ -267,7 +270,14 @@ export default function App() {
     let filled = false
 
     try {
-      const { text } = await ask(said, history.current, {
+      // PH-04 handles only a small whitelist of authorized avatar commands.
+      // Everything else keeps the certified Qwen/Whisper/Kokoro route.
+      // Never parse background transcripts or unapproved wake segments here.
+      const avatarAction = AVATAR_PH04_ENABLED && !image
+        ? parseLumiaAvatarAction(said) : null
+      const { text } = avatarAction
+        ? { text: respondToLumiaAvatarAction(avatarAction) }
+        : await ask(said, history.current, {
         onText: (delta) => {
           if (stale()) return
           if (!started) {
@@ -1266,6 +1276,7 @@ export default function App() {
   return (
     <>
       <Scene />
+      {AVATAR_PH04_ENABLED && <LumiaViewDock />}
       <Hud />
       <Boot />
       <Diagnostics />
