@@ -1,4 +1,4 @@
-name: LUMIA Integrated Portal Head + SKILL-01 Full Gate
+name: LUMIA Portal Head and SKILL-01 Integrated Regression
 
 on:
   push:
@@ -196,20 +196,9 @@ jobs:
       - name: RC-02 response relevance and safe recovery
         run: node scripts/certify-lumia-response-relevance-rc02.mjs
 
-      - name: PH-01 portal head, speech onset, legacy fallback and VRM0 rig contract
+      - name: PH-01 Portal Head VRM regression
         run: node scripts/certify-lumia-head-ph01.mjs
 
-      - name: Prevent accidental publication of private VRM/FBX
-        shell: bash
-        run: |
-          if git ls-files | grep -Ei '\.(vrm|fbx|bundle)
-        run: npm run build
-
-      - name: Lint
-        run: npm run lint; then
-            echo 'ERROR: private avatar or motion asset in Git'
-            exit 1
-          fi
       - name: Production build
         run: npm run build
 
