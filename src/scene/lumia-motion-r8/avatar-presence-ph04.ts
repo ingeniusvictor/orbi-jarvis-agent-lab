@@ -54,11 +54,11 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
 
   // PH-04.5 exact user request: a guided LIVE demonstration, not Qwen's
   // generic answer about authoring 3D animations. Only explicit owner intents.
-  if (/^(?:para|deten|detiene|cancela|termina|finaliza|detenme|para ya)\\s+(?:(?:la|mi|tu|esta)\\s+)?(?:demostracion|demo|recorrido)\\b/.test(said)) {
+  if (/^(?:para|deten|detiene|cancela|termina|finaliza|detenme|para ya)\s+(?:(?:la|mi|tu|esta)\s+)?(?:demostracion|demo|recorrido)\b/.test(said)) {
     return { kind: 'demo-stop' }
   }
-  if (/^(?:(?:puedes|podrias|quiero que|me gustaria que|haz|hace|realiza|inicia|comienza|activa|muestrame|presenta|quiero ver)\\s+)*(?:(?:una|la|tu|tus)\\s+)?(?:demostracion|demo|recorrido)\\b/.test(said) &&
-      /\\b(?:animaciones|movimientos|gestos|expresiones|emociones|avatar|vrm|cuerpo|capacidades|habilidades|tus|tu|de)\\b/.test(said)) {
+  if (/^(?:(?:puedes|podrias|quiero que|me gustaria que|haz|hace|realiza|inicia|comienza|activa|muestrame|presenta|quiero ver)\s+)*(?:(?:una|la|tu|tus)\s+)?(?:demostracion|demo|recorrido)\b/.test(said) &&
+      /\b(?:animaciones|movimientos|gestos|expresiones|emociones|avatar|vrm|cuerpo|capacidades|habilidades|tus|tu|de)\b/.test(said)) {
     return { kind: 'demo' }
   }
 
