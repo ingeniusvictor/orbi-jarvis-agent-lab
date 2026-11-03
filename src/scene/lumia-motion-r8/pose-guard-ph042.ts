@@ -39,7 +39,8 @@ export function boundR8BodyPose(
     const angle = base.angleTo(q)
     const max = limits[manual ? 1 : 0]
     if (angle > max) {
-      q.copy(base).slerp(q, max / angle).normalize()
+      const target = q.clone()
+      q.copy(base).slerp(target, max / angle).normalize()
       corrected++
     }
   }
