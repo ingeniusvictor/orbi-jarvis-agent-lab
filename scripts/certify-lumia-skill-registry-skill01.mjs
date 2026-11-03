@@ -83,6 +83,7 @@ assert.equal(isSkillRegistryInquiry('Lumi, ¿qué habilidades tienes actualmente
 assert.equal(isSkillRegistryInquiry('Lumi, ¿puedes recordar lo que hablamos ayer?'),true)
 assert.equal(isSkillRegistryInquiry('¿Qué funciones tienes deshabilitadas?'),true)
 assert.equal(isSkillRegistryInquiry('¿Qué habilidades nuevas has recibido?'),true)
+assert.equal(isSkillRegistryInquiry('Lumi, coméntame sobre tus capacidades para traducir audios y texto.'),false,'Focused translation must use detailed RC-04 guidance')
 for (const request of [
   'Lumi como estas','Traduce esto al inglés','Lumi, abre el navegador',
   'Lumi, memoriza mi contraseña','Borra todos mis archivos',
