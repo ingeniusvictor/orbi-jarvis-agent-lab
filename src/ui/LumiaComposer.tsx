@@ -12,6 +12,7 @@ import {
   type LocalVisualImage,
 } from '../lib/visual-input'
 import type { LumiaInputMode } from '../lib/input-mode'
+import { LumiaViewDock } from './LumiaViewDock'
 import { TRANSLATION_CHOICES, validateTranslationAudioFile, type TranslationLanguage } from '../lib/translate'
 
 type Props = {
@@ -21,6 +22,7 @@ type Props = {
   busy: boolean
   visionAvailable: boolean
   translationAvailable: boolean
+  avatarViewControl?: boolean
   onTranslate: (text: string, source: TranslationLanguage, target: TranslationLanguage) => void
   onTranslateAudio: (file: File, source: TranslationLanguage, target: TranslationLanguage) => Promise<void>
   onModeChange: (mode: LumiaInputMode) => void
@@ -84,7 +86,7 @@ function DockIcon({ name }: { name: IconName }) {
 }
 
 export function LumiaComposer({
-  available, mode, recording, busy, visionAvailable, translationAvailable, onTranslate, onTranslateAudio,
+  available, mode, recording, busy, visionAvailable, translationAvailable, avatarViewControl = false, onTranslate, onTranslateAudio,
   onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
@@ -210,6 +212,8 @@ export function LumiaComposer({
           onKeyDown={handleKey}
           onFocus={() => { if (mode === 'continuous') onModeChange('text') }}
         />
+
+        {avatarViewControl && <LumiaViewDock />}
 
         {recording && (
           <button

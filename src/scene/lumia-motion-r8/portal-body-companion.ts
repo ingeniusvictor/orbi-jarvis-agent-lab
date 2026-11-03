@@ -23,6 +23,10 @@ import { animationLibrary } from './motion-library-catalog.js'
 import { boundR8BodyPose } from './pose-guard-ph042'
 
 type MotionState = 'idle' | 'listening' | 'thinking' | 'speaking'
+const LOWER_BODY_BONES = [
+  'leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg',
+  'leftFoot','rightFoot','leftToes','rightToes',
+] as const
 type ClipInfo = { clip: THREE.AnimationClip; id: string; loop: boolean; repetitions: number }
 type BodyPose = Record<string, number>
 type SemanticPose = { head: {pitch:number;yaw:number;roll:number}; body:BodyPose; kind:string|null }
@@ -77,12 +81,14 @@ export class R8BodyCompanion {
   private manualUntil=0
   private readonly allowClips:boolean
   private readonly safePose:boolean
+  private readonly fullBodySafe:boolean
   private readonly rig:HeadRig
 
-  constructor(rig:HeadRig,{allowClips=false,safePose=true}:{allowClips?:boolean;safePose?:boolean}={}) {
+  constructor(rig:HeadRig,{allowClips=false,safePose=true,fullBodySafe=false}:{allowClips?:boolean;safePose?:boolean;fullBodySafe?:boolean}={}) {
     this.rig=rig
     this.allowClips=allowClips
     this.safePose=safePose
+    this.fullBodySafe=fullBodySafe
     this.activeMixer=new THREE.AnimationMixer(rig.scene)
     for(const [name,bone] of rig.bodyBones) this.rest.set(name,bone.quaternion.clone())
     // The full R8 viewer also performs a short warm-up BEFORE the first frame
@@ -113,6 +119,16 @@ export class R8BodyCompanion {
   }
 
   private applyProcedural(base:BodyPose,presence:{offsets:BodyPose}):void {
+    // In full-body mode the procedural driver does not animate legs. Reset
+    // them to the original VRM0 bind pose every frame, so a previous FBX clip
+    // cannot leave an ankle or knee permanently twisted when it finishes.
+    if (this.fullBodySafe && this.safePose) {
+      for (const name of LOWER_BODY_BONES) {
+        const node=this.rig.bodyBones.get(name)
+        const rest=this.rest.get(name)
+        if (node && rest) node.quaternion.copy(rest)
+      }
+    }
     const extra=presence.offsets ?? {}
     for(const name of PROCEDURAL_BONES) {
       const bone=this.rig.bodyBones.get(name)
@@ -298,7 +314,7 @@ export class R8BodyCompanion {
     // this affects only the visible result and never changes the private FBX.
     if (this.safePose && this.action) {
       boundR8BodyPose(this.rig.bodyBones, this.proceduralBase,
-        this.manualUntil > this.elapsed)
+        this.manualUntil > this.elapsed, this.fullBodySafe)
     }
     if(this.allowClips && !this.pending && this.elapsed>=this.manualUntil){
       const intent=this.director.decide({

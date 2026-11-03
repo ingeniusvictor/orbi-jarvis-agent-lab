@@ -19,14 +19,33 @@ export const R8_POSE_LIMITS = Object.freeze({
   upperChest: [0.20, 0.32], hips: [0.12, 0.24],
 } as const)
 
+/** Stricter presentation when legs and hips are visible in full-body view.
+ * The raw VRM0/FBX retarget has not been fully validated in the user's ASUS.
+ * Smaller upper-body deltas and bounded leg joints avoid exaggerated poses.
+ */
+export const R8_FULL_BODY_LIMITS = Object.freeze({
+  leftShoulder: [0.12, 0.30], rightShoulder: [0.12, 0.30],
+  leftUpperArm: [0.22, 0.65], rightUpperArm: [0.22, 0.65],
+  leftLowerArm: [0.30, 0.75], rightLowerArm: [0.30, 0.75],
+  leftHand: [0.24, 0.55], rightHand: [0.24, 0.55],
+  spine: [0.09, 0.20], chest: [0.12, 0.24],
+  upperChest: [0.10, 0.22], hips: [0.08, 0.16],
+  leftUpperLeg: [0.14, 0.40], rightUpperLeg: [0.14, 0.40],
+  leftLowerLeg: [0.18, 0.47], rightLowerLeg: [0.18, 0.47],
+  leftFoot: [0.13, 0.30], rightFoot: [0.13, 0.30],
+  leftToes: [0.08, 0.20], rightToes: [0.08, 0.20],
+} as const)
+
 /** True if the original FBX pose was beyond the conservative envelope. */
 export function boundR8BodyPose(
   bones: Map<string, THREE.Object3D>,
   procedural: Map<string, THREE.Quaternion>,
   manual: boolean,
+  fullBody = false,
 ): number {
   let corrected = 0
-  for (const [name, limits] of Object.entries(R8_POSE_LIMITS)) {
+  const limitsForView = fullBody ? R8_FULL_BODY_LIMITS : R8_POSE_LIMITS
+  for (const [name, limits] of Object.entries(limitsForView)) {
     const node = bones.get(name)
     const base = procedural.get(name)
     if (!node || !base) continue
