@@ -36,6 +36,7 @@ import { isStaleModelReply } from './orbia/stale-answer-guard.mjs'
 import { isGenericReplyForQuestion, safeClarificationForQuestion } from './orbia/response-relevance-rc02.mjs'
 import { isComplexVoicePrompt, COMPLEX_VOICE_INSTRUCTION } from './orbia/complex-voice-intent.mjs'
 import { rc03GroundedReply, RC03_VOICE_GROUNDING_INSTRUCTION } from './orbia/grounded-claims-rc03.mjs'
+import { rc04TranslationCapabilityReply, RC04_TRANSLATION_FACTS } from './orbia/translation-capabilities-rc04.mjs'
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
@@ -297,13 +298,19 @@ export async function streamOllama({
   const model = getActiveModel()
   const complexVoice = process.env.ORBIA_LUMIA_COMPLEX_VOICE_VQ01 === '1' && isComplexVoicePrompt(prompt) && !image
   const rc03Pilot = process.env.ORBIA_LUMIA_RC03_GROUNDING === '1'
-  const groundedSystemPrompt = systemPrompt + (rc03Pilot ? RC03_VOICE_GROUNDING_INSTRUCTION : '')
+  const rc04Pilot = process.env.ORBIA_LUMIA_RC04_CAPABILITIES === '1'
+  const groundedSystemPrompt = systemPrompt +
+    (rc03Pilot ? RC03_VOICE_GROUNDING_INSTRUCTION : '') +
+    (rc04Pilot ? RC04_TRANSLATION_FACTS : '')
 
   // For an already-authorized voice turn, answer unsupported pilot claims
   // without inventing weather measurements or pretending to control the PC.
   // This path preserves the existing bridge onText/done/history contract and
   // avoids a needless model call. All other requests go to Qwen as before.
-  const grounded = rc03Pilot && !image ? rc03GroundedReply({ prompt, history }) : null
+  const translationCapability = rc04Pilot && !image
+    ? rc04TranslationCapabilityReply({ prompt }) : null
+  const grounded = translationCapability ||
+    (rc03Pilot && !image ? rc03GroundedReply({ prompt, history }) : null)
   if (grounded) {
     if (signal?.aborted) throw new Error('LUMIA request aborted')
     onText(grounded)
