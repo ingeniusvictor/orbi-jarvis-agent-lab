@@ -24,7 +24,7 @@ import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { portalSpeechStart, portalSpeechPhrase, portalSpeechEnd, portalSpeechInterrupt } from './scene/lumia-head/portal-speech-events'
 import { parseLumiaAvatarAction, respondToLumiaAvatarAction } from './scene/lumia-motion-r8/avatar-presence-ph04'
-import { beginGuidedDemo, cancelGuidedDemo, cueGuidedDemoPhrase, endGuidedDemo, checkGuidedDemoAssets, guidedDemoScript } from './scene/lumia-motion-r8/avatar-demo-ph045'
+import { LUMIA_GUIDED_DEMO_STEPS, beginGuidedDemo, cancelGuidedDemo, cueGuidedDemoPhrase, cueGuidedDemoStage, endGuidedDemo, checkGuidedDemoAssets, guidedDemoScript, guidedDemoSnapshot, waitForGuidedDemoClip } from './scene/lumia-motion-r8/avatar-demo-ph045'
 import { LumiaDemoIndicator } from './ui/LumiaDemoIndicator'
 
 import { resolveFollowupGuardMs } from './lib/followup-latency'
@@ -273,6 +273,7 @@ export default function App() {
 
     let started = false
     let filled = false
+    let guidedRun = false
 
     try {
       // PH-04 handles only a small whitelist of authorized avatar commands.
@@ -294,6 +295,7 @@ export default function App() {
               return 'Para demostrar las diecisiete animaciones necesito el modo R8 normal, no el modo procedural de respaldo.'
             }
             beginGuidedDemo(turnId)
+            guidedRun = true
             return guidedDemoScript()
           })() }
         : avatarAction
@@ -345,7 +347,7 @@ export default function App() {
         ttsDiag.firstTextMs = Math.round(performance.now() - responseStartedAt)
         s.updateTurn(turnId, { text, firstTextAt: Date.now(), status: 'generating' })
         s.setPhase('speaking')
-        spk.push(text)
+        if (!guidedRun) spk.push(text)
       }
 
       // The bridge keeps conversation state in its own session, so history is
@@ -358,7 +360,64 @@ export default function App() {
         }
       }
 
-      await spk.end()
+      if (guidedRun) {
+        // This is a scripted demonstration, NOT a fast conversational answer.
+        // Use one already-approved Kokoro speaker per stage. A stage begins
+        // only on audible playback, and the following stage waits for the
+        // real FBX mixer to finish all authored repetitions. The ordinary
+        // fast answer path above remains completely unchanged.
+        let hasPlayedAudio = false
+        for (const [index, step] of LUMIA_GUIDED_DEMO_STEPS.entries()) {
+          if (stale() || !guidedDemoSnapshot().active) return
+          let stageAudible = false
+          const stageSpeaker = createSpeaker(() => {
+            if (stale()) return
+            portalSpeechStart(turnId)
+            if (!hasPlayedAudio) {
+              hasPlayedAudio = true
+              ttsDiag.firstAudioMs = Math.round(performance.now() - responseStartedAt)
+              store.getState().updateTurn(turnId, {
+                firstAudioAt: Date.now(), status: 'playing',
+              })
+            }
+          }, (phrase) => {
+            if (stale()) return
+            store.getState().pushSpokenSegment(turnId, phrase)
+            portalSpeechPhrase(turnId, phrase.text)
+            if (!stageAudible) {
+              stageAudible = true
+              cueGuidedDemoStage(turnId, index)
+            }
+          })
+          speaker.current = stageSpeaker
+          stageSpeaker.push(step.speech)
+          await stageSpeaker.end()
+          if (stale() || !guidedDemoSnapshot().active) return
+          // Close lip-sync while the animation continues silently. The
+          // next sentence reopens the SAME approved audio turn.
+          portalSpeechEnd(turnId)
+          if (!stageAudible) {
+            console.warn('[lumia:ph046] Etapa sin audio audible, sin gesto:', index)
+            continue
+          }
+          if (step.motionId) {
+            const result = await waitForGuidedDemoClip(turnId, index)
+            if (stale() || !guidedDemoSnapshot().active) return
+            if (result.status !== 'finished') {
+              console.warn('[lumia:ph046] Movimiento no completado:',
+                step.motionId, result.status)
+            }
+          }
+          // Give the viewer a moment to appreciate the finished action or
+          // expression. This pause exists ONLY in the requested tutorial.
+          const restMs = step.type === 'motion' ? 850
+            : step.type === 'face' ? 1400
+            : step.type === 'transition' ? 700 : 350
+          await new Promise<void>((resolve) => setTimeout(resolve, restMs))
+        }
+      } else {
+        await spk.end()
+      }
       if (stale()) return
       if (!started && !text.trim()) {
         const note = 'El cerebro terminó sin generar texto de respuesta.'
