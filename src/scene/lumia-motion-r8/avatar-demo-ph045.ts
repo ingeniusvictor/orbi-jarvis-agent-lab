@@ -58,6 +58,14 @@ export const LUMIA_GUIDED_DEMO_STEPS: ReadonlyArray<GuidedDemoStep> = [
   { type: 'outro', speech: 'Esta fue mi demostración virtual. Puedes pedirme un gesto específico o cambiar de vista cuando quieras.', view: 'head-vrm' },
 ]
 
+export type GuidedClipResult = { status: 'finished' | 'failed' | 'cancelled' | 'timeout'; duration: number | null }
+type ClipLifecycle = {
+  id: string
+  status: 'queued' | 'started' | 'finished' | 'failed' | 'cancelled'
+  duration: number | null
+  cycles: number
+  waiters: Array<(result: GuidedClipResult) => void>
+}
 export type GuidedDemoSnapshot = {
   active: boolean
   completed: number
@@ -67,7 +75,12 @@ export type GuidedDemoSnapshot = {
 }
 const listeners = new Set<() => void>()
 const notify = () => { for (const listener of listeners) listener() }
-let active: {turnId:string;previous:LumiaAvatarView;step:number;expression:GuidedDemoStep['expression']|null} | null = null
+let active: {
+  turnId:string;previous:LumiaAvatarView;step:number
+  expression:GuidedDemoStep['expression']|null
+  clip:ClipLifecycle | null
+  failures: string[]
+} | null = null
 
 const normalize = (text:string) => String(text).normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -96,7 +109,7 @@ export function currentGuidedFaceExpression():GuidedDemoStep['expression'] | nul
 }
 export function beginGuidedDemo(turnId:string):void {
   if (active) endGuidedDemo(active.turnId)
-  active={turnId,previous:avatarPresenceSnapshot().view,step:-1,expression:null}
+  active={turnId,previous:avatarPresenceSnapshot().view,step:-1,expression:null,clip:null,failures:[]}
   setLumiaAvatarView('body-vrm')
   notify()
 }
@@ -106,17 +119,100 @@ export function cueGuidedDemoPhrase(turnId:string,playedText:string):void {
   const next=LUMIA_GUIDED_DEMO_STEPS.findIndex((step,i)=>
     i>active!.step && normalize(step.speech)===spoken)
   if (next<0)return // Do not animate from partial, synthetic or unplayed speech.
-  active.step=next
-  const step=LUMIA_GUIDED_DEMO_STEPS[next]
-  if(step.view && avatarPresenceSnapshot().view!==step.view) setLumiaAvatarView(step.view)
-  active.expression=step.expression??null
-  if(step.motionId)requestLumiaAvatarMotion(step.motionId)
-  if(step.type==='transition'||step.type==='face'||step.type==='outro')resumeLumiaAvatarMotion()
+  cueGuidedDemoStage(turnId,next)
+}
+
+/**
+ * One stage per speaker: never join 25 sentences into a single fast queue.
+ * The caller invokes this at the ACTUAL audible first phrase of this stage.
+ */
+export function cueGuidedDemoStage(turnId:string, index:number):void {
+  if (!active || active.turnId !== turnId || index <= active.step ||
+      index >= LUMIA_GUIDED_DEMO_STEPS.length) return
+  const step = LUMIA_GUIDED_DEMO_STEPS[index]
+  if (step.view && avatarPresenceSnapshot().view !== step.view) {
+    setLumiaAvatarView(step.view)
+  }
+  active.step = index
+  active.expression = step.expression ?? null
+  if (step.motionId) {
+    active.clip = {
+      id:step.motionId,status:'queued',duration:null,cycles:0,waiters:[],
+    }
+    requestLumiaAvatarMotion(step.motionId)
+  } else {
+    active.clip = null
+    if (step.type === 'transition' || step.type === 'face' ||
+        step.type === 'outro') resumeLumiaAvatarMotion()
+  }
   notify()
 }
+
+/** Body Companion reports actual FBX playback, not a guessed delay. */
+export function reportGuidedDemoClip(
+  id:string, status: 'started' | 'finished' | 'failed' | 'cancelled',
+  duration:number | null = null, cycles = 1,
+):void {
+  if (!active?.clip || active.clip.id !== id) return
+  const clip = active.clip
+  if (clip.status === 'finished' || clip.status === 'failed' ||
+      clip.status === 'cancelled') return
+  clip.status = status
+  if (Number.isFinite(duration) && duration !== null && duration > 0) {
+    clip.duration = duration
+    clip.cycles = cycles
+  }
+  if (status === 'failed') active.failures.push(id)
+  if (status === 'finished' || status === 'failed' || status === 'cancelled') {
+    const result:GuidedClipResult = {status,duration:clip.duration}
+    for (const wake of clip.waiters.splice(0)) wake(result)
+  }
+  notify()
+}
+
+/**
+ * Wait for the Three.js mixer finishing a genuine clip (or one/two natural
+ * cycles for infinite-loop catalog entries). Timers are failure watchdogs
+ * ONLY, not the animation duration or the driver of the tutorial.
+ */
+export function waitForGuidedDemoClip(turnId:string,index:number):Promise<GuidedClipResult> {
+  if (!active || active.turnId !== turnId ||
+      active.step !== index || !active.clip) {
+    return Promise.resolve({status:'cancelled',duration:null})
+  }
+  const clip = active.clip
+  if (clip.status === 'finished' || clip.status === 'failed' ||
+      clip.status === 'cancelled') {
+    return Promise.resolve({status:clip.status,duration:clip.duration})
+  }
+  return new Promise((resolve)=>{
+    let settled = false
+    let timer:ReturnType<typeof setTimeout> | undefined
+    const finish = (result:GuidedClipResult) => {
+      if (settled) return
+      settled=true
+      if (timer) clearTimeout(timer)
+      clip.waiters = clip.waiters.filter((item)=>item!==finish)
+      resolve(result)
+    }
+    clip.waiters.push(finish)
+    // A clip may be long; use its actual reported length once available.
+    // Reject a missing/hung FBX instead of waiting indefinitely.
+    const estimated = clip.duration && clip.cycles
+      ? clip.duration * clip.cycles * 1000 + 12000 : 30000
+    timer = setTimeout(()=>finish({status:'timeout',duration:clip.duration}),
+      Math.min(180000,Math.max(30000,estimated)))
+  })
+}
+
 export function endGuidedDemo(turnId:string):void {
   if(!active || active.turnId!==turnId)return
   const previous=active.previous
+  if (active.clip) {
+    for (const waiter of active.clip.waiters.splice(0)) {
+      waiter({status:'cancelled',duration:active.clip.duration})
+    }
+  }
   active=null
   resumeLumiaAvatarMotion()
   setLumiaAvatarView(previous)

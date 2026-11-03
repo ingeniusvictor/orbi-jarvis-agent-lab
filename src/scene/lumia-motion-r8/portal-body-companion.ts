@@ -21,7 +21,7 @@ import { PoseTransition } from './pose-transition.js'
 import { retargetMixamoUpperBody } from './mixamo-retarget.js'
 import { animationLibrary } from './motion-library-catalog.js'
 import { boundR8BodyPose } from './pose-guard-ph042'
-import { guidedDemoSnapshot } from './avatar-demo-ph045'
+import { guidedDemoSnapshot, reportGuidedDemoClip } from './avatar-demo-ph045'
 
 type MotionState = 'idle' | 'listening' | 'thinking' | 'speaking'
 const LOWER_BODY_BONES = [
@@ -80,6 +80,9 @@ export class R8BodyCompanion {
   private lastState:MotionState='idle'
   private elapsed=0
   private manualUntil=0
+  private demoClipId:string|null=null
+  private demoLoopCount=0
+  private demoLoopTarget=0
   private readonly allowClips:boolean
   private readonly safePose:boolean
   private readonly fullBodySafe:boolean
@@ -101,7 +104,23 @@ export class R8BodyCompanion {
     this.applyProcedural(this.core.step(.001,this.config('idle')),
       this.presence.step(.001,this.presenceConfig('idle')))
     this.activeMixer.addEventListener('finished',()=>{
+      if(this.demoClipId && this.demoClipId===this.activeId) {
+        reportGuidedDemoClip(this.demoClipId,'finished')
+        this.demoClipId=null
+        this.manualUntil=0
+      }
       if(!this.activeLoop) this.stopClip()
+    })
+    this.activeMixer.addEventListener('loop',()=>{
+      if(!this.demoClipId || !this.activeLoop ||
+          this.demoClipId!==this.activeId) return
+      this.demoLoopCount++
+      if(this.demoLoopCount>=this.demoLoopTarget){
+        reportGuidedDemoClip(this.demoClipId,'finished')
+        this.demoClipId=null
+        this.manualUntil=0
+        this.stopClip()
+      }
     })
   }
 
@@ -146,6 +165,11 @@ export class R8BodyCompanion {
   }
 
   private stopClip():void {
+    if (this.demoClipId) {
+      reportGuidedDemoClip(this.demoClipId,'cancelled')
+      this.demoClipId=null
+      this.manualUntil=0
+    }
     if(!this.action)return
     this.blend.capture([...this.rig.bodyBones.values()],.44)
     this.action.stop()
@@ -202,10 +226,20 @@ export class R8BodyCompanion {
   }
 
   private playReady(clip:ClipInfo):void {
+    const guided = this.demoClipId===clip.id
+    if (guided) this.demoClipId=null
     this.stopClip()
+    if (guided) this.demoClipId=clip.id
     this.blend.capture([...this.rig.bodyBones.values()],.44)
     const action=this.activeMixer.clipAction(clip.clip)
-    action.reset().setLoop(clip.loop?THREE.LoopRepeat:THREE.LoopOnce,clip.repetitions)
+    // Waving repeats twice and Clapping three times in the original R8
+    // catalog. THREE.LoopOnce ignores repetition counts: choose LoopRepeat
+    // for those finite author-approved repeats, and wait for 'finished'.
+    const repeat = clip.loop || clip.repetitions > 1
+    action.reset().setLoop(
+      repeat ? THREE.LoopRepeat : THREE.LoopOnce,
+      clip.loop ? Infinity : clip.repetitions,
+    )
     action.clampWhenFinished=!clip.loop
     action.enabled=true
     action.setEffectiveWeight(1)
@@ -224,9 +258,24 @@ export class R8BodyCompanion {
       if(this.pending!==id || (!manual && this.lastState!==stateAtRequest) ||
          (manual && this.elapsed>=this.manualUntil))return
       this.playReady(clip)
+      if (manual && this.demoClipId===id) {
+        this.demoLoopCount=0
+        this.demoLoopTarget=clip.loop
+          ? (clip.clip.duration < 3 ? 2 : 1) : 0
+        reportGuidedDemoClip(id,'started',clip.clip.duration,
+          clip.loop?this.demoLoopTarget:clip.repetitions)
+        console.info('[lumia:ph046] R8 clip started, actual seconds:',
+          id,clip.clip.duration,'cycles:',
+          clip.loop?this.demoLoopTarget:clip.repetitions)
+      }
       this.director.commit(this.gestureToken,this.elapsed)
       console.info('[lumia:ph03] R8 animation:',id)
     }).catch((err:unknown)=>{
+      if(manual && this.demoClipId===id){
+        reportGuidedDemoClip(id,'failed')
+        this.demoClipId=null
+        this.manualUntil=0
+      }
       this.failed.add(id)
       console.warn('[lumia:ph03] FBX no disponible/compatible. Continúa pose corporal natural:',id,err)
     }).finally(()=>{
@@ -236,19 +285,28 @@ export class R8BodyCompanion {
   }
 
   /** Owner-authorized one-shot request; temporary priority over automatic R8. */
-  requestManualClip(id:string):boolean {
-    if (!this.allowClips || !animationLibrary[id] || this.failed.has(id)) return false
-    this.manualUntil=this.elapsed+7.5
+  requestManualClip(id:string, guided=false):boolean {
+    if (!this.allowClips || !animationLibrary[id] || this.failed.has(id)) {
+      if (guided) reportGuidedDemoClip(id,'failed')
+      return false
+    }
     this.pending=null // invalidate older asynchronous auto/gesture loading
     this.stopClip()
+    // PH-04.6: a real demo must NOT kill a clip after 7.5 seconds. Stop only
+    // when the actual FBX animation mixer reports finishing, or the owner
+    // cancels. Infinite-loop clips complete after 1 or 2 *real* cycles.
+    this.manualUntil=guided?Number.POSITIVE_INFINITY:this.elapsed+7.5
+    this.demoClipId=guided?id:null
+    this.demoLoopCount=0
+    this.demoLoopTarget=0
     this.requestClip(id,true)
     return true
   }
 
   resumeAutomatic():void {
-    this.manualUntil=0
     this.pending=null
     this.stopClip()
+    this.manualUntil=0
     this.director.postpone(this.elapsed,.2)
   }
 
@@ -258,7 +316,9 @@ export class R8BodyCompanion {
   }
   onSpeechEnd():void {
     this.semantic.end()
-    if(this.activeId==='talking')this.stopClip()
+    // During the owner-guided tour, "Talking.fbx" must complete its actual
+    // authored cycle even after the short narration has finished.
+    if(this.activeId==='talking' && !this.demoClipId)this.stopClip()
   }
 
   step(dt:number,phase:string,speechAudible:boolean):SemanticPose {

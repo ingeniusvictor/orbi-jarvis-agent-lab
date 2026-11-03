@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import * as THREE from 'three'
 import { useStore } from '../store'
 import { R8BodyCompanion } from './lumia-motion-r8/portal-body-companion'
-import { currentGuidedFaceExpression } from './lumia-motion-r8/avatar-demo-ph045'
+import { currentGuidedFaceExpression, guidedDemoSnapshot } from './lumia-motion-r8/avatar-demo-ph045'
 import { avatarPresenceSnapshot, subscribeAvatarPresence, type LumiaAvatarView } from './lumia-motion-r8/avatar-presence-ph04'
 import type { Drive } from './Scene'
 import {
@@ -78,7 +78,7 @@ export function LumiaPortalHead({ drive, avatarView }: {
           Date.now() - command.sentAt > 1600) return
       lastMotionSequence.current = command.sequence
       if (command.kind === 'auto') body.resumeAutomatic()
-      else if (command.id) body.requestManualClip(command.id)
+      else if (command.id) body.requestManualClip(command.id, guidedDemoSnapshot().active)
     }
     // The view may have switched in the same accepted voice command.
     const current = avatarPresenceSnapshot().motion
