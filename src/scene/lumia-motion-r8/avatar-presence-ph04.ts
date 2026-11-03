@@ -88,7 +88,7 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   // rostro". This may be treated as a command, but NOT as a command embedded
   // inside a longer discussion or third-party quotation.
   const shorthand = /^(?:vista|bista|version)\s+(?:(?:de|a|la|solo)\s+){0,2}(?:solo\s+rostro|rostro|medio\s+cuerpo|cuerpo\s+intermedio|cuerpo\s+completo|corrup\s+completo)\s*(?:por\s+favor)?$/.test(said)
-  const directChange = /^(?:ahora\s+)?(?:por\s+favor\s+)?(?:(?:me\s+)?(?:puedes|podrias|podria)\s+)?(?:cambia|cambiame|cambiar|cambiarme|cambias|cambies|cambiate|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero\s+verte|dejame\s+verte|vuelve|regresa|retorna)\b/.test(said)
+  const directChange = /^(?:ahora\s+)?(?:por\s+favor\s+)?(?:(?:me\s+)?(?:puedes|podrias|podria)\s+)?(?:cambia|cambio|cambiame|cambiar|cambiarme|cambias|cambies|cambiate|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero\s+verte|dejame\s+verte|vuelve|regresa|retorna)\b/.test(said)
   const requestedChange = /^(?:necesito|quiero|quisiera|me\s+gustaria)\s+que\s+(?:(?:me|te)\s+)?(?:cambia|cambias|cambies|cambiaras|cambiar)\b/.test(said)
 
   if (viewContext && (shorthand || directChange || requestedChange)) {
