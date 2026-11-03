@@ -20,6 +20,7 @@ import { SemanticMotionCore } from './semantic-motion.js'
 import { PoseTransition } from './pose-transition.js'
 import { retargetMixamoUpperBody } from './mixamo-retarget.js'
 import { animationLibrary } from './motion-library-catalog.js'
+import { boundR8BodyPose } from './pose-guard-ph042'
 
 type MotionState = 'idle' | 'listening' | 'thinking' | 'speaking'
 type ClipInfo = { clip: THREE.AnimationClip; id: string; loop: boolean; repetitions: number }
@@ -58,6 +59,7 @@ export class R8BodyCompanion {
   private readonly semantic = new SemanticMotionCore({enabled:true,intensity:48})
   private readonly blend = new PoseTransition(.44)
   private readonly rest = new Map<string,THREE.Quaternion>()
+  private readonly proceduralBase = new Map<string,THREE.Quaternion>()
   private readonly euler = new THREE.Euler(0,0,0,'XYZ')
   private readonly q = new THREE.Quaternion()
   private readonly qSample = new THREE.Quaternion()
@@ -74,11 +76,13 @@ export class R8BodyCompanion {
   private elapsed=0
   private manualUntil=0
   private readonly allowClips:boolean
+  private readonly safePose:boolean
   private readonly rig:HeadRig
 
-  constructor(rig:HeadRig,{allowClips=false}:{allowClips?:boolean}={}) {
+  constructor(rig:HeadRig,{allowClips=false,safePose=true}:{allowClips?:boolean;safePose?:boolean}={}) {
     this.rig=rig
     this.allowClips=allowClips
+    this.safePose=safePose
     this.activeMixer=new THREE.AnimationMixer(rig.scene)
     for(const [name,bone] of rig.bodyBones) this.rest.set(name,bone.quaternion.clone())
     // The full R8 viewer also performs a short warm-up BEFORE the first frame
@@ -253,6 +257,11 @@ export class R8BodyCompanion {
     const pose=this.core.step(dt,this.config(state))
     const presence=this.presence.step(dt,this.presenceConfig(state))
     this.applyProcedural(pose,presence)
+    if (this.safePose && this.action) {
+      for (const [name, node] of this.rig.bodyBones) {
+        this.proceduralBase.set(name, node.quaternion.clone())
+      }
+    }
 
     if (this.manualUntil>0 && this.elapsed>=this.manualUntil) {
       this.manualUntil=0
@@ -282,6 +291,12 @@ export class R8BodyCompanion {
       }
       const clip=mapping[semantic.kind]
       if(clip && (this.activeId==='talking'||!this.activeId))this.requestClip(clip)
+    }
+    // Cap retargeted upper-body extremes. PH-03 still plays genuine R8 clips;
+    // this affects only the visible result and never changes the private FBX.
+    if (this.safePose && this.action) {
+      boundR8BodyPose(this.rig.bodyBones, this.proceduralBase,
+        this.manualUntil > this.elapsed)
     }
     if(this.allowClips && !this.pending && this.elapsed>=this.manualUntil){
       const intent=this.director.decide({
