@@ -19,18 +19,18 @@ for (const clip of motionCatalog) {
     'All 17 original R8 catalog IDs must be commandable: '+clip.id,
   )
 }
-assert.equal(resolveAvatarView('',true),'bust-vrm','PH-04 native view MUST be middle body')
+assert.equal(resolveAvatarView('',true),'head-vrm','PH-04.4 native view MUST be solo rostro')
 assert.equal(resolveAvatarView('',false),'legacy','No opt-in means no visual behavior change')
 for(const view of ['head-vrm','bust-vrm','body-vrm','legacy'] as const) {
   assert.equal(resolveAvatarView('?lumiaAvatar='+view,true),view)
 }
-assert.equal(resolveAvatarView('?lumiaAvatar=invalid',true),'bust-vrm')
+assert.equal(resolveAvatarView('?lumiaAvatar=invalid',true),'head-vrm')
 assert.equal(avatarViewLabel('bust-vrm'),'medio cuerpo')
 
 const viewCommands:Array<[string,string]> = [
   ['Lumi, cambia a la vista solo rostro','head-vrm'],
   ['Lumi cambia a cuerpo completo','body-vrm'],
-  ['Lumi, vuelve a la vista principal','bust-vrm'],
+  ['Lumi, vuelve a la vista principal','head-vrm'],
   ['Lumi, ponte en medio cuerpo','bust-vrm'],
   ['Muéstrate de cuerpo completo','body-vrm'],
   ['Lumi, cambia a solo la cara','head-vrm'],
@@ -51,7 +51,7 @@ const asusVoiceCommands:Array<[string,string]> = [
   ['Lumi, por favor cambia a la vista de cuerpo completo', 'body-vrm'],
   ['Lumi, puedes cambiar a medio cuerpo', 'bust-vrm'],
   ['Lumi, necesito que cambies a solo rostro', 'head-vrm'],
-  ['Lumi, quiero que cambies a la vista principal', 'bust-vrm'],
+  ['Lumi, quiero que cambies a la vista principal', 'head-vrm'],
 ]
 for (const [said,view] of asusVoiceCommands) {
   assert.deepEqual(parseLumiaAvatarAction(said), {kind:'view',view}, 'ASUS STT: '+said)
@@ -171,4 +171,4 @@ assert.match(launch,/VITE_LUMIA_AVATAR_PH04=1/)
 assert.match(launch,/ORBIA_LUMIA_AVATAR_PH04=1/)
 assert.match(launch,/JARVIS_ALLOW_WRITES=0/)
 assert.match(skill,/entry\('avatar-presence'/)
-console.log('PH-04 PASS: native bust, three reversible views, authorized voice actions, 17 catalog motions, no OS/reload, intact lip sync')
+console.log('PH-04 PASS: native face, three reversible views, authorized voice actions, 17 catalog motions, no OS/reload, intact lip sync')
