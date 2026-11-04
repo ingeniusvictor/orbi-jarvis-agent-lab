@@ -26,6 +26,8 @@ export function walkStageTarget(
   progress: number,
 ): WalkStagePose {
   const p=clamp(progress)
+  // Keep the exact rest pose at the first frame (avoid -0 diagnostics).
+  if (p===0) return zero()
   if(id==='walkingforward') {
     const advance=smooth((p-.05)/.90)
     return {
