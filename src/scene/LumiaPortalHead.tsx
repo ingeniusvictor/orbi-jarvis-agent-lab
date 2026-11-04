@@ -43,6 +43,7 @@ export function LumiaPortalHead({ drive, avatarView }: {
 }) {
   const root = useRef<THREE.Group>(null)
   const pivot = useRef<THREE.Group>(null)
+  const walkStageGroup = useRef<THREE.Group>(null)
   const ph02 = isPh02Presentation(window.location.search)
   const showNeck = isNeckPreviewEnabled(window.location.search)
   const showBody = avatarView === 'bust-vrm' || avatarView === 'body-vrm' || showNeck
@@ -53,6 +54,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
   // remains unchanged.
   const safePose = new URLSearchParams(window.location.search).get('lumiaR8') !== 'expressive'
   const fullBody = avatarView === 'body-vrm'
+  // QA rollback: &lumiaWalk=legacy reproduces PH-04.7 in-place behavior.
+  const walkStageEnabled = new URLSearchParams(window.location.search).get('lumiaWalk') !== 'legacy'
   const bust = avatarView === 'bust-vrm'
   // Align face centre with the centre of the holographic rings. In the
   // screenshot the old bust centre (1.28) lifted the face too high.
@@ -63,8 +66,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
     [gltf, ph02, showNeck, showBody],
   )
   const body = useMemo(
-    () => showBody ? new R8BodyCompanion(rig, { allowClips: clipEnabled, safePose, fullBodySafe: fullBody }) : null,
-    [rig, showBody, clipEnabled, safePose, fullBody],
+    () => showBody ? new R8BodyCompanion(rig, { allowClips: clipEnabled, safePose, fullBodySafe: fullBody, walkStageEnabled }) : null,
+    [rig, showBody, clipEnabled, safePose, fullBody, walkStageEnabled],
   )
   useEffect(() => () => { body?.dispose() }, [body])
   // The view switch is a React remount; replay a newly authorised gesture
@@ -194,6 +197,11 @@ export function LumiaPortalHead({ drive, avatarView }: {
     const py = pointer.current.y
     const motion = calculateHeadMotion({ x: px, y: py, phase, seconds: t })
     const semantic = body?.step(dt, phase, speakingAudio)
+    if (walkStageGroup.current) {
+      const path = body?.walkStagePose
+      walkStageGroup.current.position.set(path?.x??0,0,path?.z??0)
+      walkStageGroup.current.rotation.y=path?.yaw??0
+    }
     const headYaw = (ph02 ? motion.headYaw
       : -px * 0.095 * attention + Math.sin(t * 0.21) * 0.018) +
       (semantic?.head.yaw ?? 0)
@@ -268,7 +276,9 @@ export function LumiaPortalHead({ drive, avatarView }: {
     <group ref={root}>
       <group ref={pivot}>
         <group rotation={[0, Math.PI, 0]} position={[0, -centerY, 0]}>
-          <primitive object={rig.scene} />
+          <group ref={walkStageGroup}>
+            <primitive object={rig.scene} />
+          </group>
         </group>
       </group>
     </group>

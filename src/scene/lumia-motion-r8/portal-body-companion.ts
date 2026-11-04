@@ -22,6 +22,7 @@ import { retargetMixamoUpperBody } from './mixamo-retarget.js'
 import { animationLibrary } from './motion-library-catalog.js'
 import { boundR8BodyPose } from './pose-guard-ph042'
 import { guidedDemoSnapshot, reportGuidedDemoClip } from './avatar-demo-ph045'
+import { WalkStage } from './walk-stage-ph048'
 
 type MotionState = 'idle' | 'listening' | 'thinking' | 'speaking'
 const LOWER_BODY_BONES = [
@@ -63,6 +64,7 @@ export class R8BodyCompanion {
   })
   private readonly semantic = new SemanticMotionCore({enabled:true,intensity:48})
   private readonly blend = new PoseTransition(.44)
+  private readonly walkStage = new WalkStage()
   private readonly rest = new Map<string,THREE.Quaternion>()
   private readonly proceduralBase = new Map<string,THREE.Quaternion>()
   private readonly euler = new THREE.Euler(0,0,0,'XYZ')
@@ -88,13 +90,15 @@ export class R8BodyCompanion {
   private readonly allowClips:boolean
   private readonly safePose:boolean
   private readonly fullBodySafe:boolean
+  private readonly walkStageEnabled:boolean
   private readonly rig:HeadRig
 
-  constructor(rig:HeadRig,{allowClips=false,safePose=true,fullBodySafe=false}:{allowClips?:boolean;safePose?:boolean;fullBodySafe?:boolean}={}) {
+  constructor(rig:HeadRig,{allowClips=false,safePose=true,fullBodySafe=false,walkStageEnabled=true}:{allowClips?:boolean;safePose?:boolean;fullBodySafe?:boolean;walkStageEnabled?:boolean}={}) {
     this.rig=rig
     this.allowClips=allowClips
     this.safePose=safePose
     this.fullBodySafe=fullBodySafe
+    this.walkStageEnabled=walkStageEnabled && fullBodySafe
     this.activeMixer=new THREE.AnimationMixer(rig.scene)
     for(const [name,bone] of rig.bodyBones) this.rest.set(name,bone.quaternion.clone())
     // The full R8 viewer also performs a short warm-up BEFORE the first frame
@@ -130,6 +134,7 @@ export class R8BodyCompanion {
     })
   }
 
+  get walkStagePose() {return this.walkStage.pose}
   get boneCount() {return this.rest.size}
   get clipStatus() {return {active:this.activeId,pending:this.pending,failed:[...this.failed]}}
   get clipCount() {return Object.keys(animationLibrary).length}
@@ -382,6 +387,8 @@ export class R8BodyCompanion {
       this.director.postpone(this.elapsed,.3)
     }
     if(this.action)this.activeMixer.update(dt)
+    this.walkStage.step(dt,this.activeId,this.action?.time??0,
+      this.action?.getClip().duration??0,this.walkStageEnabled)
     this.blend.step(dt)
 
 
@@ -453,5 +460,6 @@ export class R8BodyCompanion {
     this.pending=null
     this.activeMixer.stopAllAction()
     this.cache.clear()
+    this.walkStage.reset()
   }
 }
