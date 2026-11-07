@@ -55,7 +55,7 @@ export const followupVisionPrompt=(question:string,mode:VisionReplyMode):string=
   'Pregunta de seguimiento del usuario sobre LA MISMA fotografía adjunta nuevamente en este turno. '+
   'Observa la imagen ACTUAL de nuevo, no tomes la descripción anterior como sustituto de la fotografía. '+
   'Responde solamente a la pregunta actual, en una o dos frases; no repitas ni resumas la descripción anterior. ' +
-  'Si no puedes distinguir algo por nitidez o tamaño, dilo sin atribuirlo automáticamente a privacidad. No supongas que la cámara sigue activa. ' +
+  'Si no puedes distinguir algo por nitidez o tamaño, dilo sin atribuirlo automáticamente a privacidad. no supongas que la cámara sigue activa. ' +
   'Pregunta: '+question.trim()+'.'+visualSpatialFocus(question)+visualReliabilityInstruction(question)+visualModeInstruction(mode)
 
 function clean(value:string):string{
