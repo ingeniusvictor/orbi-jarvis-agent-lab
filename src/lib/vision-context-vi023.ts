@@ -34,11 +34,28 @@ export function visualSpatialFocus(question:string):string{
     'Comprueba el fondo de la imagen actual; no afirmes que no hay más objetos si se ven otros elementos.'
 }
 
+/**
+ * VISION-02.4.1: lightweight grounded-answer instructions for a small VLM.
+ * Never pretends a detector or a second pass has verified the image.
+ * Applies exclusively when actual JPEG bytes are attached to a request.
+ */
+export function visualReliabilityInstruction(question:string):string{
+  const q=clean(question)
+  const count=/\b(?:cuant[oa]s?|numero|cantidad|contar|cuenta|total|de pie|agachad[oa]s?|sentad[oa]s?)\b/.test(q)
+  const position=/\b(?:centro|central|medio|mitad|primero|ultimo|delante|detras|destras|atras|izquierda|derecha|segundo plano)\b/.test(q)
+  const detail=/\b(?:color|colores|camisa|ropa|logo|texto|letrero|sostiene|sostienen|bebida|mano|manos)\b/.test(q)
+  let instructions=' Mira de nuevo el JPEG adjunto y diferencia lo visible de las suposiciones. No afirmes acciones, objetos pequeños ni rasgos ilegibles por contexto social. '
+  if(count)instructions+=' Si cuentas personas u objetos, revisa cada figura una sola vez y distingue claramente las categorías solicitadas. Si las categorías cubren el total visible, verifica mentalmente que su suma coincide con el total; NO fuerces una cifra inventada para hacerla coincidir. Si alguien está parcialmente oculto o su postura es incierta, dilo y ofrece solo el conteo seguro. '
+  if(position)instructions+=' Resuelve la posición usando referencias visibles (por ejemplo, centro del grupo o primer plano); si hay varias personas que podrían ser la referida, pide una aclaración corta en vez de atribuir una prenda a alguien arbitrario. '
+  if(detail)instructions+=' Describe colores, logos y objetos únicamente si se distinguen en el JPEG; si no se ven con claridad, indica la incertidumbre sin inventar detalles. '
+  return instructions
+}
+
 export const followupVisionPrompt=(question:string,mode:VisionReplyMode):string=>
   'Pregunta de seguimiento del usuario sobre LA MISMA fotografía adjunta nuevamente en este turno. '+
   'Observa la imagen ACTUAL de nuevo, no tomes la descripción anterior como sustituto de la fotografía. '+
   'Responde exactamente a lo preguntado; no supongas que la cámara sigue activa. '+
-  'Pregunta: '+question.trim()+'.'+visualSpatialFocus(question)+visualModeInstruction(mode)
+  'Pregunta: '+question.trim()+'.'+visualSpatialFocus(question)+visualReliabilityInstruction(question)+visualModeInstruction(mode)
 
 function clean(value:string):string{
   return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
