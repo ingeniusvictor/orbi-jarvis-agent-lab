@@ -246,7 +246,7 @@ export default function App() {
 
   // -- one turn -------------------------------------------------------------
 
-  const respond = async (said: string, image?: LocalVisualImage, cameraRequested = false, fromCameraPreview = false): Promise<void> => {
+  const respond = async (said: string, image?: LocalVisualImage, cameraRequested = false, fromCameraPreview = false, forceVisualFollowUp = false): Promise<void> => {
     const mine = ++turn.current
     cancelGuidedDemo()
     const stale = () => mine !== turn.current
@@ -307,7 +307,18 @@ export default function App() {
       // An authorized still can answer later scene questions without opening
       // the webcam again. Explicit new-camera commands still start a new shot.
       const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested
-        ? visualSession.current.getForFollowUp(said) : null
+        ? forceVisualFollowUp
+          ? visualSession.current.getAuthorizedFrame()
+          : visualSession.current.getForFollowUp(said)
+        : null
+      // A newly attached file is a separate VI-01 image, not a follow-up
+      // to a prior camera still: never silently send the old camera photo.
+      if(image && !fromCameraPreview && !cameraRequested){
+        visualSession.current.clear()
+        setVisionContextReady(false)
+        setCameraStill(null)
+        setCameraPreviewOpen(false)
+      }
       const cameraIntent = CAMERA_VISION_VI02_ENABLED && !image && !visualFollowUp
         ? parseLumiaCameraIntent(said) : null
       let visualImage=image ?? visualFollowUp?.image
@@ -1391,6 +1402,14 @@ export default function App() {
     void respond('Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.',image,false,true)
   }
 
+  const submitVisualFollowUp = (text:string) => {
+    if(experimentOwner.current || !visualSession.current.hasAnalyzedFrame())return
+    if(store.getState().phase==='offline'||store.getState().phase==='boot')return
+    silence()
+    interrupt()
+    void respond(text,undefined,false,false,true)
+  }
+
   const submitWritten = (text: string, image?: LocalVisualImage) => {
     if (experimentOwner.current) return
     const phase = store.getState().phase
@@ -1534,7 +1553,7 @@ export default function App() {
           visualContextReady={visionContextReady}
           visualReplyMode={visionReplyMode}
           onVisualReplyModeChange={setVisionReplyMode}
-          onAskAboutStill={(question)=>submitWritten(question)}
+          onAskAboutStill={submitVisualFollowUp}
         />
       )}
       <Boot />
