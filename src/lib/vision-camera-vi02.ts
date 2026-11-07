@@ -28,7 +28,7 @@ export function parseLumiaCameraIntent(utterance:string):LumiaVisionIntent|null 
       /\b(?:no abras|no mires|sin encender|sin abrir)\b/.test(said)) return null
 
   const direct =
-    /^(?:(?:puedes|podrias|me puedes|me podrias|quiero que|necesito que|por favor)\s+)*(?:mira|mirame|mirar|observa|observame|observar|examina|examinar|ve|ver|revisa|revisar|analiza|analizar)\s+(?:esto|aqui|este objeto|esta cosa|esta etiqueta|este papel|esta carta|lo que tengo|lo que sostengo|lo que hay|lo que estoy mostrando|mi mano|mis manos|lo que esta frente a (?:mi|la camara))\b/.test(said) ||
+    /^(?:(?:puedes|podrias|me puedes|me podrias|quiero que|necesito que|por favor)\s+)*(?:mira|mires|mirame|mirar|observa|observes|observame|observar|examina|examines|examinar|ve|ver|revisa|revises|revisar|analiza|analices|analizar)\s+(?:esto|aqui|este objeto|esta cosa|esta etiqueta|este papel|esta carta|lo que tengo|lo que sostengo|lo que hay|lo que estoy mostrando|mi mano|mis manos|lo que esta frente a (?:mi|la camara))\b/.test(said) ||
     /^(?:(?:puedes|podrias|me puedes|me podrias)\s+)?(?:decirme|decir|identificar|leer|describir|explicar|analizar)\s+(?:que|qué|lo que)\s+(?:tengo|hay|ves|estoy mostrando)\b/.test(said) ||
     /^(?:que|cual|de que color)\s+(?:es|ves|tengo|hay|estoy sosteniendo|estoy mostrando)\b.*\b(?:mano|manos|camara|frente|sosteniendo|mostrando|objeto|esto)\b/.test(said) ||
     /^(?:que|cuales)\s+(?:ves|observas)\s+(?:(?:en|por|con)\s+)?(?:la camara|esto|aqui|frente a ti|frente a mi)\b/.test(said) ||
