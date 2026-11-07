@@ -13,6 +13,7 @@ import {
 } from '../lib/visual-input'
 import type { LumiaInputMode } from '../lib/input-mode'
 import { LumiaViewDock } from './LumiaViewDock'
+import { LumiaModelDock } from './LumiaModelDock'
 import { LumiaMotionDock } from './LumiaMotionDock'
 import { TRANSLATION_CHOICES, validateTranslationAudioFile, type TranslationLanguage } from '../lib/translate'
 
@@ -28,6 +29,8 @@ type Props = {
   onCaptureCamera?: () => void
   translationAvailable: boolean
   avatarViewControl?: boolean
+  modelSelectorAvailable?: boolean
+  modelControlBusy?: boolean
   onTranslate: (text: string, source: TranslationLanguage, target: TranslationLanguage) => void
   onTranslateAudio: (file: File, source: TranslationLanguage, target: TranslationLanguage) => Promise<void>
   onModeChange: (mode: LumiaInputMode) => void
@@ -98,7 +101,7 @@ function DockIcon({ name }: { name: IconName }) {
 }
 
 export function LumiaComposer({
-  available, mode, recording, busy, visionAvailable, cameraAvailable = false, cameraCapturing = false, cameraPreviewOpen = false, onCaptureCamera, translationAvailable, avatarViewControl = false, onTranslate, onTranslateAudio,
+  available, mode, recording, busy: inboundBusy, visionAvailable, cameraAvailable = false, cameraCapturing = false, cameraPreviewOpen = false, onCaptureCamera, translationAvailable, avatarViewControl = false, modelSelectorAvailable = false, modelControlBusy = false, onTranslate, onTranslateAudio,
   onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
@@ -106,6 +109,8 @@ export function LumiaComposer({
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [preparing, setPreparing] = useState(false)
   const [error, setError] = useState('')
+  const [modelChanging,setModelChanging] = useState(false)
+  const busy=inboundBusy||modelChanging
   const [translateEnabled, setTranslateEnabled] = useState(false)
   const [sourceLanguage, setSourceLanguage] = useState<TranslationLanguage>('zh')
   const [targetLanguage, setTargetLanguage] = useState<TranslationLanguage>('es')
@@ -203,6 +208,12 @@ export function LumiaComposer({
             }
           }}
         />
+        {/* AMR-02: accessible, local-only brain selector, never an audio/chat turn. */}
+        {modelSelectorAvailable && (
+          <LumiaModelDock disabled={modelControlBusy||busy||recording||preparing}
+            onBusyChange={setModelChanging}/>
+        )}
+
         {/* PH-04.4: visual controls belong on the LEFT, before attachments.
             Microphone and voice tools stay grouped on the RIGHT. */}
         {avatarViewControl && <LumiaViewDock />}
@@ -240,6 +251,7 @@ export function LumiaComposer({
         <textarea
           ref={textarea}
           className="lumia-composer-text"
+          disabled={modelChanging}
           aria-label="Escribe tu mensaje a LUMIA"
           placeholder={translateEnabled ? (audioFile ? 'Audio listo para traducir…' : 'Escribe o adjunta un audio para traducir…') : 'Pregunta algo a Lumi…'}
           rows={1}
@@ -355,7 +367,7 @@ export function LumiaComposer({
             </span>
           )}
           {recording && <span className="lumia-composer-mic-state">● GRABANDO · pulsa detener</span>}
-          {!recording && busy && <span className="lumia-composer-mic-state">TRANSCRIBIENDO LOCALMENTE…</span>}
+          {!recording && inboundBusy && <span className="lumia-composer-mic-state">TRANSCRIBIENDO LOCALMENTE…</span>}
           {preparing && translateEnabled && audioFile && <span className="lumia-composer-mic-state">AUDIO LOCAL · WHISPER + QWEN…</span>}
           {error && <span className="lumia-composer-error" role="alert">{error}</span>}
         </div>
