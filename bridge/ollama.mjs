@@ -672,6 +672,18 @@ export function attachOllamaSession(socket) {
 
   send({ type: 'ready', servers: ['ollama', 'orbi_local'] })
 
+  // AMR-02: reuse the voice-control inventory; no HTTP endpoint or download.
+  const modelSnapshot = (models) => ({
+    active: getActiveModel(),
+    installed: models,
+  })
+  const publishModelState = async () => {
+    const probe = await probeOllama()
+    if (!closed && probe.ok) send({ type: 'model_ui_state', ...modelSnapshot(probe.models) })
+  }
+  let modelUiBusy = false
+  void publishModelState()
+
   // The browser starts warming the bridge during the boot animation. Tell it
   // when the local model is genuinely ready so the first spoken question does
   // not race the cold-load path.
@@ -690,6 +702,57 @@ export function attachOllamaSession(socket) {
     if (msg.type === 'interrupt') {
       active?.abort()
       active = null
+      return
+    }
+
+    if (msg.type === 'model_ui') {
+      // Explicit dock action; never creates a chat turn or speaks a confirmation.
+      // Only exact installed Ollama tags are accepted.
+      const id = typeof msg.id === 'string' ? msg.id.slice(0, 100) : ''
+      if (!id) return
+      const reply = (ok, error, models) => {
+        if (!closed) send({
+          type: 'model_ui_result', id, ok,
+          ...(error ? { error } : {}),
+          ...modelSnapshot(models),
+        })
+      }
+      if (msg.action !== 'list' && msg.action !== 'switch') {
+        reply(false, 'Operación no admitida.', [])
+        return
+      }
+      if (modelUiBusy || (msg.action === 'switch' && active)) {
+        reply(false, 'LUMIA está ocupada. Termina la respuesta actual e inténtalo nuevamente.', [])
+        return
+      }
+      modelUiBusy = true
+      void (async () => {
+        let models = []
+        try {
+          const probe = await probeOllama()
+          if (!probe.ok) throw new Error('Ollama no está disponible.')
+          models = probe.models
+          if (msg.action === 'switch') {
+            const chosen = typeof msg.model === 'string' && msg.model.length <= 180 ? msg.model : ''
+            if (!chosen || !models.includes(chosen))
+              throw new Error('Ese modelo no está instalado en Ollama.')
+            if (chosen !== getActiveModel()) {
+              if (!await warmOllama(chosen))
+                throw new Error('No pude preparar el modelo; se mantiene el cerebro anterior.')
+              if (closed) return
+              if (active)
+                throw new Error('LUMIA comenzó a responder durante el cambio; inténtalo nuevamente.')
+              setActiveModel(chosen)
+            }
+          }
+          reply(true, '', models)
+          if (!closed) send({ type: 'model_ui_state', ...modelSnapshot(models) })
+        } catch (err) {
+          reply(false, String(err?.message ?? 'No se pudo cambiar de cerebro.'), models)
+        } finally {
+          modelUiBusy = false
+        }
+      })()
       return
     }
 
@@ -790,6 +853,7 @@ export function attachOllamaSession(socket) {
           if (closed || controller.signal.aborted) return
 
           appendConversationExchange(conversationId, prompt, answer)
+          if (probe.ok) send({ type: 'model_ui_state', ...modelSnapshot(probe.models) })
           send({ type: 'text', ask, delta: answer })
           send({
             type: 'done',
