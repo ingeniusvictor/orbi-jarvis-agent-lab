@@ -11,14 +11,19 @@
  */
 import {useEffect,useRef,useState} from 'react'
 import * as camera from '../lib/camera'
-import {prepareVisualCameraFrame,type LocalVisualImage} from '../lib/visual-input'
+import {prepareVisualCameraFrame,prepareVisualImage,type LocalVisualImage} from '../lib/visual-input'
 import {inspectCameraSignal,connectedOrVirtualCameraHint} from '../lib/vision-camera-signal-vi022'
 import type {VisionReplyMode} from '../lib/vision-context-vi023'
 
 type Props={
   live:boolean
+  fileMode:boolean
+  stillSource:'camera'|'file'
   still:LocalVisualImage|null
   onCaptured:(image:LocalVisualImage)=>void
+  onFileCaptured:(image:LocalVisualImage)=>void
+  onSelectFileMode:()=>void
+  onSelectCameraMode:()=>void
   onClose:()=>void
   onReopen:()=>void
   visualContextReady:boolean
@@ -28,10 +33,15 @@ type Props={
 }
 
 export function LumiaCameraViewfinder({
-  live,still,onCaptured,onClose,onReopen,
+  live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,onAskAboutStill,
 }:Props){
   const videoRef=useRef<HTMLVideoElement>(null)
+  const fileRef=useRef<HTMLInputElement>(null)
+  const fileRequest=useRef(0)
+  const [fileImage,setFileImage]=useState<LocalVisualImage|null>(null)
+  const [fileBusy,setFileBusy]=useState(false)
+  const [fileError,setFileError]=useState('')
   const releaseRef=useRef<(()=>void)|null>(null)
   const closeRef=useRef(onClose)
   closeRef.current=onClose
@@ -43,6 +53,30 @@ export function LumiaCameraViewfinder({
     camera.getLastCameraSource()?.label??'')
   const [signalWarning,setSignalWarning]=useState<string|null>(null)
   const [followupDraft,setFollowupDraft]=useState('')
+
+  useEffect(()=>()=>{fileRequest.current++},[])
+  useEffect(()=>{
+    if(fileMode)return
+    fileRequest.current++
+    setFileImage(null)
+    setFileBusy(false)
+    setFileError('')
+  },[fileMode])
+  const selectFile=async(file:File|null)=>{
+    const request=++fileRequest.current
+    setFileImage(null)
+    setFileError('')
+    if(!file)return
+    setFileBusy(true)
+    try{
+      const jpeg=await prepareVisualImage(file)
+      if(request===fileRequest.current)setFileImage(jpeg)
+    }catch(err){
+      if(request===fileRequest.current)setFileError(err instanceof Error?err.message:'No pude abrir la fotografía.')
+    }finally{
+      if(request===fileRequest.current)setFileBusy(false)
+    }
+  }
 
   useEffect(()=>{
     if(!live)return
@@ -138,12 +172,20 @@ export function LumiaCameraViewfinder({
         <span className="lumia-camera-viewfinder-title">LUMIA VISION</span>
         <span className={'lumia-camera-viewfinder-status'+(live?' is-live':' is-still')}>
           <span className="lumia-camera-viewfinder-dot" aria-hidden="true"/>
-          {live?'EN VIVO · SIN ANALIZAR':'FOTOGRAMA CAPTURADO'}
+          {live?'EN VIVO · SIN ANALIZAR':fileMode?'ARCHIVO LOCAL · SIN ANALIZAR':'FOTOGRAMA CAPTURADO'}
         </span>
         <button type="button" className="lumia-camera-viewfinder-close"
           aria-label="Cerrar visor y liberar cámara" title="Cerrar cámara"
           onClick={close}>×</button>
       </header>
+      <div className="lumia-vision-source-tabs" role="group" aria-label="Origen de imagen">
+        <button type="button" aria-pressed={live || (!fileMode && stillSource==='camera')}
+          className={live || (!fileMode && stillSource==='camera')?'is-selected':''}
+          onClick={onSelectCameraMode}>Cámara web</button>
+        <button type="button" aria-pressed={fileMode || (!live && stillSource==='file')}
+          className={fileMode || (!live && stillSource==='file')?'is-selected':''}
+          onClick={onSelectFileMode}>Cargar imagen</button>
+      </div>
       <div className="lumia-camera-source">
         {live ? (
           <>
@@ -167,7 +209,9 @@ export function LumiaCameraViewfinder({
           </>
         ) : null}
         <span className="lumia-camera-source-active" role="status">
-          Origen usado: {activeSource||'sin identificar'}
+          {fileMode || (!live && stillSource==='file')
+            ? 'Origen: archivo seleccionado manualmente · sin cámara'
+            : `Origen usado: ${activeSource||'sin identificar'}`}
         </span>
       </div>
       <div className="lumia-camera-reply-selector" role="group"
@@ -186,11 +230,20 @@ export function LumiaCameraViewfinder({
         {live ? (
           <video ref={videoRef} className="lumia-camera-viewfinder-video"
             muted playsInline autoPlay aria-label="Vista real de la webcam, sin espejo"/>
+        ) : fileMode && fileImage ? (
+          <img className="lumia-camera-viewfinder-frame"
+            src={`data:image/jpeg;base64,${fileImage.data}`}
+            alt="Vista previa de la fotografía seleccionada, aún sin enviar a Ollama"/>
         ) : still ? (
           <img className="lumia-camera-viewfinder-frame"
             src={`data:image/jpeg;base64,${still.data}`}
             alt="Fotograma exacto de la cámara utilizado en la solicitud visual de LUMIA"/>
         ) : null}
+        {fileMode&&!fileImage&&(
+          <span className="lumia-camera-viewfinder-placeholder" role="status">
+            {fileBusy?'Preparando fotografía local…':'Selecciona una imagen para previsualizarla antes de analizar.'}
+          </span>
+        )}
         {live&&!ready&&!error&&
           <span className="lumia-camera-viewfinder-placeholder" role="status">
             Solicitando permiso y preparando vista previa…
@@ -203,6 +256,20 @@ export function LumiaCameraViewfinder({
           <span/><span/><span/><span/>
         </div>
       </div>
+      {fileMode&&(
+        <section className="lumia-vision-file-controls" aria-label="Cargar fotografía local">
+          <input ref={fileRef} type="file"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            aria-label="Seleccionar imagen JPG PNG o WebP"
+            onChange={(event)=>{
+              const selected=event.currentTarget.files?.[0]??null
+              void selectFile(selected)
+              event.currentTarget.value=''
+            }}/>
+          <p>JPG, PNG o WEBP · máximo 12 MB · se convierte a JPEG localmente.</p>
+          {fileError&&<p className="lumia-vision-file-error" role="alert">{fileError}</p>}
+        </section>
+      )}
       {signalWarning&&live&&(
         <p className="lumia-camera-signal-warning" role="status">
           {signalWarning}
@@ -237,7 +304,19 @@ export function LumiaCameraViewfinder({
         </section>
       )}
       <footer className="lumia-camera-viewfinder-actions">
-        {live ? (
+        {fileMode ? (
+          <>
+            <span className="lumia-camera-viewfinder-help">
+              La foto solo se envía a Ollama al pulsar Analizar imagen. No se activa la webcam.
+            </span>
+            <button type="button" className="lumia-camera-viewfinder-primary"
+              disabled={!fileImage||fileBusy} onClick={()=>{if(fileImage)onFileCaptured(fileImage)}}>
+              Analizar imagen
+            </button>
+            <button type="button" className="lumia-camera-viewfinder-secondary"
+              onClick={close}>Cerrar</button>
+          </>
+        ) : live ? (
           <>
             <span className="lumia-camera-viewfinder-help">
               Encuadra el objeto. Nada se envía hasta capturar.
@@ -252,10 +331,10 @@ export function LumiaCameraViewfinder({
         ) : (
           <>
             <span className="lumia-camera-viewfinder-help">
-              Esto es lo que recibió LUMIA. La cámara ya se liberó.
+              Esto es lo que recibió LUMIA. No hay cámara activa.
             </span>
             <button type="button" className="lumia-camera-viewfinder-secondary"
-              onClick={onReopen}>Volver a encuadrar</button>
+              onClick={onReopen}>{stillSource==='file'?'Elegir otra imagen':'Volver a encuadrar'}</button>
             <button type="button" className="lumia-camera-viewfinder-secondary"
               onClick={close}>Cerrar imagen</button>
           </>
