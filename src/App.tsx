@@ -8,6 +8,7 @@ import { RealtimeTrial } from './ui/RealtimeTrial'
 import { AcousticLab } from './ui/AcousticLab'
 import { VisualInput } from './ui/VisualInput'
 import { LumiaComposer } from './ui/LumiaComposer'
+import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
 import type { LocalVisualImage } from './lib/visual-input'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
@@ -135,6 +136,8 @@ export default function App() {
   const [pushRecording, setPushRecording] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   const [cameraCapturing,setCameraCapturing] = useState(false)
+  const [cameraPreviewOpen,setCameraPreviewOpen] = useState(false)
+  const [cameraStill,setCameraStill] = useState<LocalVisualImage|null>(null)
   const cameraCaptureOwner = useRef<string|null>(null)
   const pushCapture = useRef<PushCapture | null>(null)
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -295,6 +298,12 @@ export default function App() {
         s.setLooking('VISIÓN LOCAL · UNA FOTO SOLICITADA')
         try {
           visualImage=await captureLumiaAuthorizedStill(stale)
+          if(!stale()){
+            // This is the precise JPEG that local Ollama will receive, NOT
+            // an imaginary live feed continuing after the shutter closes.
+            setCameraStill(visualImage)
+            setCameraPreviewOpen(false)
+          }
         } catch(err) {
           if(stale())return
           const detail=err instanceof Error ? err.message : String(err)
@@ -1280,12 +1289,37 @@ export default function App() {
     }
   }
 
+  // VISION-02.1: opening the camera is only a *preview*, not an AI request.
+  // The owner can align a label or face and then deliberately analyze a
+  // single frame. Camera remains local and has a 90-second preview expiry.
   const submitCamera = () => {
     if(!CAMERA_VISION_VI02_ENABLED || cameraCapturing || experimentOwner.current)return
     if(store.getState().phase==='offline'||store.getState().phase==='boot')return
+    if(cameraPreviewOpen){
+      setCameraPreviewOpen(false)
+      setCameraStill(null)
+      return
+    }
+    setCameraStill(null)
+    setCameraPreviewOpen(true)
+  }
+  const closeCameraViewfinder = () => {
+    setCameraPreviewOpen(false)
+    setCameraStill(null)
+  }
+  const recaptureCameraViewfinder = () => {
+    if(!CAMERA_VISION_VI02_ENABLED || cameraCapturing || experimentOwner.current)return
+    setCameraStill(null)
+    setCameraPreviewOpen(true)
+  }
+  const analyzeCameraViewfinderFrame = (image:LocalVisualImage) => {
+    // LumiaCameraViewfinder releases the live webcam lease synchronously
+    // BEFORE notifying us with these exact JPEG bytes.
+    setCameraPreviewOpen(false)
+    setCameraStill(image)
     silence()
     interrupt()
-    void respond('Lumi, mira esto',undefined,true)
+    void respond('Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.',image)
   }
 
   const submitWritten = (text: string, image?: LocalVisualImage) => {
@@ -1421,6 +1455,15 @@ export default function App() {
         goDormant()
       }} />}
       <Hud />
+      {CAMERA_VISION_VI02_ENABLED && (cameraPreviewOpen || cameraStill) && (
+        <LumiaCameraViewfinder
+          live={cameraPreviewOpen}
+          still={cameraStill}
+          onCaptured={analyzeCameraViewfinderFrame}
+          onClose={closeCameraViewfinder}
+          onReopen={recaptureCameraViewfinder}
+        />
+      )}
       <Boot />
       <Diagnostics />
       {MULTIMODAL_COMPOSER ? (
@@ -1432,6 +1475,7 @@ export default function App() {
           visionAvailable={usingBridge && import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1'}
           cameraAvailable={CAMERA_VISION_VI02_ENABLED}
           cameraCapturing={cameraCapturing}
+          cameraPreviewOpen={cameraPreviewOpen}
           onCaptureCamera={submitCamera}
           translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
           avatarViewControl={AVATAR_PH04_ENABLED}
