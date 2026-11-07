@@ -44,6 +44,8 @@ let holders = 0
  * while a different owner is holding a live webcam.
  */
 let preferredCameraDeviceId:string|null=null
+let lastCameraSource:{label:string;deviceId:string|null}|null=null
+export const getLastCameraSource=()=>lastCameraSource
 export const getPreferredCameraDeviceId=()=>preferredCameraDeviceId
 export const getCurrentCameraSource=()=>{
   const track=stream?.getVideoTracks()[0]
@@ -101,6 +103,11 @@ export async function holdCamera(): Promise<HTMLVideoElement> {
     el.srcObject = stream
     await el.play()
     video = el
+    const track=stream.getVideoTracks()[0]
+    if(track)lastCameraSource={
+      label:track.label || 'Cámara sin nombre',
+      deviceId:track.getSettings().deviceId || null,
+    }
     diag.open = true
     diag.lastError = ''
     return el
