@@ -85,6 +85,14 @@ export async function holdCamera(): Promise<HTMLVideoElement> {
     holders = Math.max(0, holders - 1)
     diag.holders = holders
     diag.lastError = String((err as Error)?.message ?? err)
+    // Permission may succeed yet el.play() can fail. Do not leave its
+    // MediaStream tracks active without a camera lease (privacy safeguard).
+    if(holders===0){
+      stream?.getTracks().forEach(track=>track.stop())
+      stream=null
+      if(video){video.pause();video.srcObject=null;video=null}
+      diag.open=false
+    }
     throw err
   }
 }
