@@ -3090,3 +3090,186 @@ kbd {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* VISION-02.1: local optical viewfinder next to holographic avatar.
+ * Preview is a real, unmirrored webcam feed with object-fit:contain;
+ * frozen still is the exact JPEG sent to the model (no crop/flip).
+ * No canvas redraw loop, camera processing, hidden recording or polling. */
+.lumia-camera-viewfinder {
+  position: fixed;
+  right: clamp(14px, 3.2vw, 56px);
+  top: clamp(96px, 16vh, 196px);
+  z-index: 23;
+  width: min(360px, 30vw);
+  min-width: 252px;
+  max-height: calc(100vh - 175px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid rgba(114, 226, 245, .55);
+  border-radius: 16px;
+  background: linear-gradient(152deg, rgba(4, 28, 41, .97), rgba(2, 14, 27, .97));
+  color: #d4faff;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .47),
+    inset 0 1px rgba(190, 254, 255, .1), 0 0 18px rgba(30, 196, 235, .15);
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  pointer-events: auto;
+}
+.lumia-camera-viewfinder-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 0 10px;
+  line-height: 1.1;
+}
+.lumia-camera-viewfinder-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  white-space: nowrap;
+}
+.lumia-camera-viewfinder-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: .035em;
+  color: #fbd3b8;
+  white-space: nowrap;
+}
+.lumia-camera-viewfinder-status.is-still {color: #a7e8f4}
+.lumia-camera-viewfinder-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #ffad83;
+  box-shadow: 0 0 10px rgba(255, 173, 131, .55);
+}
+.lumia-camera-viewfinder-status.is-still .lumia-camera-viewfinder-dot {
+  background: #60dff5;
+  box-shadow: 0 0 9px rgba(96, 223, 245, .4);
+}
+.lumia-camera-viewfinder-close {
+  width: 25px;
+  height: 25px;
+  flex: none;
+  border: 1px solid rgba(126, 225, 237, .3);
+  border-radius: 7px;
+  background: rgba(10, 76, 94, .25);
+  color: #c7f4ff;
+  cursor: pointer;
+  font: 21px/1 system-ui,sans-serif;
+}
+.lumia-camera-viewfinder-viewport {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  min-height: 150px;
+  overflow: hidden;
+  border: 1px solid rgba(119, 220, 245, .25);
+  border-radius: 10px;
+  background: #03090d;
+}
+.lumia-camera-viewfinder-video,
+.lumia-camera-viewfinder-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  transform: none !important;
+  /* No scaleX(-1): photo and real view must match exactly. */
+}
+.lumia-camera-viewfinder-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  padding: 15px;
+  color: #a3dce9;
+  font: 12px/1.5 system-ui,sans-serif;
+  text-align: center;
+  background: rgba(2, 14, 24, .9);
+}
+.lumia-camera-viewfinder-placeholder.is-error {color: #ffc9ba}
+.lumia-camera-viewfinder-corners {
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+}
+.lumia-camera-viewfinder-corners span {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(105, 232, 253, .74);
+  border-style: solid;
+}
+.lumia-camera-viewfinder-corners span:nth-child(1) {
+  left: 0; top: 0; border-width: 2px 0 0 2px;
+}
+.lumia-camera-viewfinder-corners span:nth-child(2) {
+  right: 0; top: 0; border-width: 2px 2px 0 0;
+}
+.lumia-camera-viewfinder-corners span:nth-child(3) {
+  left: 0; bottom: 0; border-width: 0 0 2px 2px;
+}
+.lumia-camera-viewfinder-corners span:nth-child(4) {
+  right: 0; bottom: 0; border-width: 0 2px 2px 0;
+}
+.lumia-camera-viewfinder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding-top: 10px;
+}
+.lumia-camera-viewfinder-help {
+  width: 100%;
+  color: rgba(165, 225, 236, .85);
+  font: 11px/1.4 system-ui,sans-serif;
+}
+.lumia-camera-viewfinder-primary,
+.lumia-camera-viewfinder-secondary {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(126, 232, 250, .4);
+  border-radius: 9px;
+  background: rgba(33, 169, 194, .16);
+  color: #e2fcff;
+  cursor: pointer;
+  font: 600 11px/1.2 system-ui,sans-serif;
+}
+.lumia-camera-viewfinder-primary {
+  flex: 1;
+  color: #021d2a;
+  background: #81e9f4;
+  border-color: #a7f4f9;
+}
+.lumia-camera-viewfinder-primary:disabled {opacity: .43;cursor: not-allowed}
+.lumia-camera-viewfinder-primary:hover:not(:disabled) {background: #b5f9ff}
+.lumia-camera-viewfinder-secondary:hover {background: rgba(60, 200, 231, .24)}
+.lumia-camera-viewfinder-primary:focus-visible,
+.lumia-camera-viewfinder-secondary:focus-visible,
+.lumia-camera-viewfinder-close:focus-visible {
+  outline: 2px solid #b8faff;
+  outline-offset: 2px;
+}
+@media (max-width: 780px) {
+  .lumia-camera-viewfinder {
+    top: max(70px, env(safe-area-inset-top));
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    min-width: 0;
+    max-height: calc(100vh - 154px);
+  }
+}
+@media (max-height: 520px) {
+  .lumia-camera-viewfinder {
+    top: 12px;
+    max-height: calc(100vh - 95px);
+  }
+  .lumia-camera-viewfinder-viewport {min-height: 80px}
+}
