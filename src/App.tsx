@@ -372,7 +372,19 @@ export default function App() {
             spk.say(forTool(name))
           }
         },
-      }, visualImage)
+      }, visualImage).catch((err:unknown) => {
+        if (!cameraIntent && !cameraRequested) throw err
+        if (stale()) throw err
+        // The camera may work while the selected Ollama model cannot process
+        // images. Never imply vision succeeded or produce a fake description.
+        console.warn('[lumia:vision02] Local visual inference unavailable:',
+          err instanceof Error ? err.name : 'unknown')
+        return {
+          text: 'Pude tomar la imagen, pero el modelo local no consiguió analizarla. ' +
+            'Comprueba que el modelo activo admite imágenes en Ollama.',
+          tools: [],
+        }
+      })
 
       if (stale()) return
 
