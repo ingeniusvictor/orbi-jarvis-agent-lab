@@ -71,8 +71,9 @@ assert.match(app, /store\.getState\(\)\.updateTurn\(turnId, \{\s*status: 'comple
 assert.match(app, /status: 'no-response'/)
 assert.match(app, /status: 'error', finishedAt: Date\.now\(\), errorNote: failure/)
 assert.match(app, /store\.getState\(\)\.appendToTurn\(turnId, delta\)/)
-assert.ok(app.indexOf("status: 'pending'") < app.indexOf('await ask(said'),
-  'Pending entry must appear before the model request begins.')
+const firstModelRequest = app.indexOf('await ask(')
+assert.ok(firstModelRequest > 0 && app.indexOf("status: 'pending'") < firstModelRequest,
+  'Pending entry must appear before any model request begins, including camera and photo routes.')
 
 console.log('LUMIA TL-01 timed two-lane transcript: PASS')
 console.log('40s model waits, first text, initial audio and per-turn failures are traceable: PASS')

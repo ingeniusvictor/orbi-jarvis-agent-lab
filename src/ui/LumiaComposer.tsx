@@ -22,6 +22,9 @@ type Props = {
   recording: boolean
   busy: boolean
   visionAvailable: boolean
+  cameraAvailable?: boolean
+  cameraCapturing?: boolean
+  onCaptureCamera?: () => void
   translationAvailable: boolean
   avatarViewControl?: boolean
   onTranslate: (text: string, source: TranslationLanguage, target: TranslationLanguage) => void
@@ -33,7 +36,7 @@ type Props = {
   onCancelRecording: () => void
 }
 
-type IconName = 'image' | 'audio' | 'mic' | 'wave' | 'send' | 'stop' | 'close' | 'cancel' | 'translate'
+type IconName = 'image' | 'audio' | 'mic' | 'wave' | 'send' | 'stop' | 'close' | 'cancel' | 'translate' | 'camera'
 function DockIcon({ name }: { name: IconName }) {
   const common = {
     width: 20, height: 20, viewBox: '0 0 24 24',
@@ -49,6 +52,13 @@ function DockIcon({ name }: { name: IconName }) {
   )
   if (name === 'audio') return (
     <svg {...common}><path d="M3 12v3m4-8v10m4-15v20m4-15v10m4-8v8m4-6v4" /></svg>
+  )
+  if (name === 'camera') return (
+    <svg {...common}>
+      <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" />
+      <circle cx="12" cy="13" r="3.3" />
+      <path d="M18 5v1" />
+    </svg>
   )
   if (name === 'image') return (
     <svg {...common}>
@@ -87,7 +97,7 @@ function DockIcon({ name }: { name: IconName }) {
 }
 
 export function LumiaComposer({
-  available, mode, recording, busy, visionAvailable, translationAvailable, avatarViewControl = false, onTranslate, onTranslateAudio,
+  available, mode, recording, busy, visionAvailable, cameraAvailable = false, cameraCapturing = false, onCaptureCamera, translationAvailable, avatarViewControl = false, onTranslate, onTranslateAudio,
   onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
@@ -208,6 +218,21 @@ export function LumiaComposer({
           disabled={(!translateEnabled && !visionAvailable) || preparing || busy || recording}
           onClick={() => (translateEnabled ? audioInput : photoInput).current?.click()}
         ><DockIcon name={translateEnabled ? 'audio' : 'image'} /></button>
+
+        {/* VISION-02: one user-clicked camera still; NEVER opens automatically. */}
+        {cameraAvailable && !translateEnabled && (
+          <button
+            type="button"
+            className={'lumia-composer-icon-button lumia-composer-camera' +
+              (cameraCapturing ? ' is-capturing' : '')}
+            aria-label={cameraCapturing ? 'Capturando una imagen puntual' : 'Capturar una imagen con la cámara'}
+            title={cameraCapturing
+              ? 'LUMIA está capturando una foto autorizada'
+              : 'Cámara · una foto local para LUMIA · se libera después'}
+            disabled={cameraCapturing || busy || preparing || recording || !available}
+            onClick={() => onCaptureCamera?.()}
+          ><DockIcon name="camera" /></button>
+        )}
 
         <textarea
           ref={textarea}

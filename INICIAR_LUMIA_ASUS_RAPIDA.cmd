@@ -28,6 +28,10 @@ rem ASUS only: 8 percent smaller face bust inside hologram rings; classic avatar
 set "VITE_LUMIA_FACE_SCALE=0.92"
 set "VITE_LUMIA_VISUAL_INPUT_VI01=1"
 set "ORBIA_LUMIA_VISION_ENABLED=1"
+rem VISION-02: only one owner-authorized camera snapshot, released before local Ollama analysis.
+rem Default off in other launchers. No background video/desktop capture.
+set "VITE_LUMIA_VISION_CAMERA_VI02=1"
+set "ORBIA_LUMIA_VISION_CAMERA_VI02=1"
 set "JARVIS_ALLOW_WRITES=0"
 set "ORBIA_REALTIME_EXPERIMENT=0"
 set "VITE_LUMIA_REALTIME_EXPERIMENT=0"
