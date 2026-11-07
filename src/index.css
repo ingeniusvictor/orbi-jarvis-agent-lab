@@ -3379,3 +3379,56 @@ kbd {
   .lumia-camera-followup-form input {flex:1 1 100%}
   .lumia-camera-followup-form button {width:100%}
 }
+
+/* VISION-02.4 — webcam or manual photo, one shared visual conversation. */
+.lumia-vision-source-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.lumia-vision-source-tabs button {
+  min-height: 34px;
+  border: 1px solid rgba(105,207,233,.38);
+  border-radius: 9px;
+  background: rgba(18,68,85,.31);
+  color: #bfebf4;
+  font: 600 11px/1.3 system-ui,sans-serif;
+  cursor: pointer;
+}
+.lumia-vision-source-tabs button.is-selected {
+  background: rgba(33,171,195,.31);
+  border-color: #84e7f7;
+  color: #f0ffff;
+}
+.lumia-vision-source-tabs button:focus-visible,
+.lumia-vision-file-controls input:focus-visible {
+  outline: 2px solid #b8faff;
+  outline-offset: 2px;
+}
+.lumia-vision-file-controls {margin-top: 9px}
+.lumia-vision-file-controls input[type="file"] {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid rgba(108,217,242,.4);
+  border-radius: 8px;
+  color: #d5f7ff;
+  background: rgba(7,34,51,.8);
+  font: 11px/1.4 system-ui,sans-serif;
+}
+.lumia-vision-file-controls input::file-selector-button {
+  border: 1px solid rgba(129,233,244,.55);
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: rgba(22,115,140,.37);
+  color: #ecfcff;
+  cursor: pointer;
+}
+.lumia-vision-file-controls p {
+  margin: 6px 0 0;
+  font: 10px/1.45 system-ui,sans-serif;
+  color: rgba(170,223,236,.8);
+}
+.lumia-vision-file-controls .lumia-vision-file-error {color:#ffc9ba}
