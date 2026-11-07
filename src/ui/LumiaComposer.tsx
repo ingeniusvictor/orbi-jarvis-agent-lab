@@ -36,7 +36,7 @@ type Props = {
   onCancelRecording: () => void
 }
 
-type IconName = 'camera' | 'image' | 'audio' | 'mic' | 'wave' | 'send' | 'stop' | 'close' | 'cancel' | 'translate'
+type IconName = 'image' | 'audio' | 'mic' | 'wave' | 'send' | 'stop' | 'close' | 'cancel' | 'translate' | 'camera'
 function DockIcon({ name }: { name: IconName }) {
   const common = {
     width: 20, height: 20, viewBox: '0 0 24 24',
