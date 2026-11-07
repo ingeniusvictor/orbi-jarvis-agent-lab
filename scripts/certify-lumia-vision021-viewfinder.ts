@@ -12,7 +12,7 @@ const workflow=read('.github/workflows/lumia-vision021-viewfinder.yml')
 // The owner opens a LIVE unprocessed view to align the webcam. The video
 // shown must use the SAME HTMLVideoElement that gets encoded to JPEG.
 assert.match(view,/className="lumia-camera-viewfinder-video"/)
-assert.match(view,/videoRef=\{videoRef\}/)
+assert.match(view,/ref=\{videoRef\}/)
 assert.match(view,/const video=videoRef\.current/)
 assert.match(view,/prepareVisualCameraFrame\(video\)/)
 assert.match(view,/video\.srcObject=source/)
