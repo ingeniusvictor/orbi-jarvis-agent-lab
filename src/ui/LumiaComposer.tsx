@@ -101,7 +101,7 @@ function DockIcon({ name }: { name: IconName }) {
 }
 
 export function LumiaComposer({
-  available, mode, recording, busy, visionAvailable, cameraAvailable = false, cameraCapturing = false, cameraPreviewOpen = false, onCaptureCamera, translationAvailable, avatarViewControl = false, modelSelectorAvailable = false, modelControlBusy = false, onTranslate, onTranslateAudio,
+  available, mode, recording, busy: inboundBusy, visionAvailable, cameraAvailable = false, cameraCapturing = false, cameraPreviewOpen = false, onCaptureCamera, translationAvailable, avatarViewControl = false, modelSelectorAvailable = false, modelControlBusy = false, onTranslate, onTranslateAudio,
   onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
@@ -110,7 +110,8 @@ export function LumiaComposer({
   const [preparing, setPreparing] = useState(false)
   const [error, setError] = useState('')
   const [modelChanging,setModelChanging] = useState(false)
-  const dockBusy=busy||modelChanging
+  const busy=inboundBusy||modelChanging
+  const dockBusy=busy
   const [translateEnabled, setTranslateEnabled] = useState(false)
   const [sourceLanguage, setSourceLanguage] = useState<TranslationLanguage>('zh')
   const [targetLanguage, setTargetLanguage] = useState<TranslationLanguage>('es')
@@ -278,7 +279,7 @@ export function LumiaComposer({
           aria-label={recording ? 'Detener y transcribir dictado' : 'Dictar mensaje por micrófono'}
           aria-pressed={recording}
           title={recording ? 'Detener grabación y transcribir' : 'Dictar una vez · pulsa para comenzar y terminar'}
-          disabled={dockBusy || preparing || translateEnabled}
+          disabled={busy || preparing || translateEnabled}
           onClick={toggleDictation}
         ><DockIcon name={recording ? 'stop' : 'mic'} /></button>
 
@@ -367,7 +368,7 @@ export function LumiaComposer({
             </span>
           )}
           {recording && <span className="lumia-composer-mic-state">● GRABANDO · pulsa detener</span>}
-          {!recording && busy && <span className="lumia-composer-mic-state">TRANSCRIBIENDO LOCALMENTE…</span>}
+          {!recording && inboundBusy && <span className="lumia-composer-mic-state">TRANSCRIBIENDO LOCALMENTE…</span>}
           {preparing && translateEnabled && audioFile && <span className="lumia-composer-mic-state">AUDIO LOCAL · WHISPER + QWEN…</span>}
           {error && <span className="lumia-composer-error" role="alert">{error}</span>}
         </div>
