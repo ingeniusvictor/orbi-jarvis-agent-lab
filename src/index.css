@@ -3273,3 +3273,51 @@ kbd {
   }
   .lumia-camera-viewfinder-viewport {min-height: 80px}
 }
+
+/* VISION-02.2 — inspect/choose the actual webcam source without changing
+ * the established hologram framing, microphone controls or camera consent. */
+.lumia-camera-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  color: rgba(181,236,244,.86);
+  font: 10px/1.35 system-ui,sans-serif;
+}
+.lumia-camera-source label {
+  font: 600 10px ui-monospace,monospace;
+  letter-spacing: .07em;
+}
+.lumia-camera-source select {
+  flex: 1 1 150px;
+  min-width: 0;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(128,230,250,.46);
+  border-radius: 8px;
+  outline: none;
+  background: #072233;
+  color: #ddf9ff;
+  font: 11px/1.4 system-ui,sans-serif;
+}
+.lumia-camera-source select:focus-visible {
+  border-color: #affcff;
+  outline: 2px solid rgba(137,236,253,.45);
+  outline-offset: 1px;
+}
+.lumia-camera-source select:disabled {opacity:.54;cursor:wait}
+.lumia-camera-source-active {
+  width: 100%;
+  color: rgba(175,233,245,.8);
+  overflow-wrap: anywhere;
+}
+.lumia-camera-signal-warning {
+  margin: 9px 0 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(246,189,109,.43);
+  border-radius: 9px;
+  background: rgba(74,48,17,.32);
+  color: #ffe8c5;
+  font: 11px/1.4 system-ui,sans-serif;
+}

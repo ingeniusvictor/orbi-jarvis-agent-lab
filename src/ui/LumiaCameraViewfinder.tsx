@@ -12,6 +12,7 @@
 import {useEffect,useRef,useState} from 'react'
 import * as camera from '../lib/camera'
 import {prepareVisualCameraFrame,type LocalVisualImage} from '../lib/visual-input'
+import {inspectCameraSignal,connectedOrVirtualCameraHint} from '../lib/vision-camera-signal-vi022'
 
 type Props={
   live:boolean
@@ -30,12 +31,18 @@ export function LumiaCameraViewfinder({
   closeRef.current=onClose
   const [ready,setReady]=useState(false)
   const [error,setError]=useState('')
+  const [devices,setDevices]=useState<Array<{deviceId:string;label:string}>>([])
+  const [deviceChoice,setDeviceChoice]=useState(camera.getPreferredCameraDeviceId()??'')
+  const [activeSource,setActiveSource]=useState(
+    camera.getLastCameraSource()?.label??'')
+  const [signalWarning,setSignalWarning]=useState<string|null>(null)
 
   useEffect(()=>{
     if(!live)return
     let cancelled=false
     let held=false
     let source:MediaStream|null=null
+    let inspectionTimer:ReturnType<typeof setTimeout>|null=null
     const video=videoRef.current
     const release=()=>{
       if(video && video.srcObject===source){
@@ -50,7 +57,11 @@ export function LumiaCameraViewfinder({
     releaseRef.current=release
     setReady(false)
     setError('')
+    setSignalWarning(null)
     void (async()=>{
+      // Changing a source never interrupts another owner of this shared
+      // webcam. The old viewfinder lease is released by effect cleanup.
+      camera.setPreferredCameraDeviceId(deviceChoice||null)
       await camera.holdCamera()
       held=true
       if(cancelled){release();return}
@@ -61,7 +72,21 @@ export function LumiaCameraViewfinder({
       video.srcObject=source
       await video.play()
       if(cancelled){release();return}
+      setActiveSource(camera.getCurrentCameraSource()?.label??'Cámara sin nombre')
       setReady(true)
+      try{
+        const detected=await camera.listCameraDevices()
+        if(!cancelled)setDevices(detected)
+      }catch{
+        // A working preview is useful even when enumeration is unavailable.
+      }
+      inspectionTimer=setTimeout(()=>{
+        if(cancelled || !video)return
+        const lowSignal=inspectCameraSignal(video)
+        const virtualHint=connectedOrVirtualCameraHint(
+          camera.getCurrentCameraSource()?.label??'')
+        setSignalWarning(lowSignal??virtualHint)
+      },850)
     })().catch((err:unknown)=>{
       release()
       if(!cancelled){
@@ -75,10 +100,11 @@ export function LumiaCameraViewfinder({
     return ()=>{
       cancelled=true
       window.clearTimeout(expiry)
+      if(inspectionTimer)clearTimeout(inspectionTimer)
       release()
       if(releaseRef.current===release)releaseRef.current=null
     }
-  },[live])
+  },[live,deviceChoice])
 
   const close=()=>{
     releaseRef.current?.()
@@ -111,6 +137,32 @@ export function LumiaCameraViewfinder({
           aria-label="Cerrar visor y liberar cámara" title="Cerrar cámara"
           onClick={close}>×</button>
       </header>
+      <div className="lumia-camera-source">
+        {live ? (
+          <>
+            <label htmlFor="lumia-camera-device">CÁMARA</label>
+            <select id="lumia-camera-device"
+              aria-label="Seleccionar cámara de LUMIA"
+              title="Cambiar entre webcam integrada, cámaras USB y cámaras virtuales"
+              value={deviceChoice}
+              disabled={!ready&&!error}
+              onChange={(event)=>{
+                setReady(false)
+                setDeviceChoice(event.target.value)
+              }}>
+              <option value="">Predeterminada de Windows</option>
+              {devices.map(device=>(
+                <option key={device.deviceId} value={device.deviceId}>
+                  {device.label}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : null}
+        <span className="lumia-camera-source-active" role="status">
+          Origen usado: {activeSource||'sin identificar'}
+        </span>
+      </div>
       <div className="lumia-camera-viewfinder-viewport">
         {live ? (
           <video ref={videoRef} className="lumia-camera-viewfinder-video"
@@ -132,6 +184,11 @@ export function LumiaCameraViewfinder({
           <span/><span/><span/><span/>
         </div>
       </div>
+      {signalWarning&&live&&(
+        <p className="lumia-camera-signal-warning" role="status">
+          {signalWarning}
+        </p>
+      )}
       <footer className="lumia-camera-viewfinder-actions">
         {live ? (
           <>
