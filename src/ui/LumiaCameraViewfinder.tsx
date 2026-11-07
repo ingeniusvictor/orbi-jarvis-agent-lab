@@ -237,7 +237,7 @@ export function LumiaCameraViewfinder({
         ) : still ? (
           <img className="lumia-camera-viewfinder-frame"
             src={`data:image/jpeg;base64,${still.data}`}
-            alt="Fotografía exacta utilizada en la solicitud visual de LUMIA"/>
+            alt="Fotograma exacto de la cámara utilizado en la solicitud visual de LUMIA"/>
         ) : null}
         {fileMode&&!fileImage&&(
           <span className="lumia-camera-viewfinder-placeholder" role="status">
