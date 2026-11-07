@@ -37,7 +37,7 @@ export function visualSpatialFocus(question:string):string{
 export const followupVisionPrompt=(question:string,mode:VisionReplyMode):string=>
   'Pregunta de seguimiento del usuario sobre LA MISMA fotografía adjunta nuevamente en este turno. '+
   'Observa la imagen ACTUAL de nuevo, no tomes la descripción anterior como sustituto de la fotografía. '+
-  'Responde exactamente a lo preguntado, sin suponer que la cámara sigue activa. '+
+  'Responde exactamente a lo preguntado; no supongas que la cámara sigue activa. '+
   'Pregunta: '+question.trim()+'.'+visualSpatialFocus(question)+visualModeInstruction(mode)
 
 function clean(value:string):string{
