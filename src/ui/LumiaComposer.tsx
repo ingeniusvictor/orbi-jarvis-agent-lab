@@ -111,7 +111,6 @@ export function LumiaComposer({
   const [error, setError] = useState('')
   const [modelChanging,setModelChanging] = useState(false)
   const busy=inboundBusy||modelChanging
-  const dockBusy=busy
   const [translateEnabled, setTranslateEnabled] = useState(false)
   const [sourceLanguage, setSourceLanguage] = useState<TranslationLanguage>('zh')
   const [targetLanguage, setTargetLanguage] = useState<TranslationLanguage>('es')
@@ -128,7 +127,7 @@ export function LumiaComposer({
   }
   const send = async () => {
     const text = draft.trim()
-    if ((!text && !photo && !audioFile) || preparing || dockBusy || recording) return
+    if ((!text && !photo && !audioFile) || preparing || busy || recording) return
     if (translateEnabled && (photo || sourceLanguage === targetLanguage || (audioFile && text))) {
       setError('Selecciona idiomas diferentes y envía el audio separado del texto.'); return
     }
@@ -211,7 +210,7 @@ export function LumiaComposer({
         />
         {/* AMR-02: accessible, local-only brain selector, never an audio/chat turn. */}
         {modelSelectorAvailable && (
-          <LumiaModelDock disabled={modelControlBusy||dockBusy||recording||preparing}
+          <LumiaModelDock disabled={modelControlBusy||busy||recording||preparing}
             onBusyChange={setModelChanging}/>
         )}
 
@@ -228,7 +227,7 @@ export function LumiaComposer({
           className={'lumia-composer-icon-button lumia-composer-attach' + (photo || audioFile ? ' is-attached' : '')}
           aria-label={translateEnabled ? (audioFile ? 'Cambiar audio para traducción' : 'Adjuntar audio para traducir') : (photo ? 'Cambiar fotografía adjunta' : 'Adjuntar imagen para LUMIA')}
           title={translateEnabled ? 'Adjuntar audio de WhatsApp para traducir' : visionAvailable ? 'Adjuntar foto JPG, PNG o WebP · análisis local' : 'Visión local no disponible'}
-          disabled={(!translateEnabled && !visionAvailable) || preparing || dockBusy || recording}
+          disabled={(!translateEnabled && !visionAvailable) || preparing || busy || recording}
           onClick={() => (translateEnabled ? audioInput : photoInput).current?.click()}
         ><DockIcon name={translateEnabled ? 'audio' : 'image'} /></button>
 
@@ -244,7 +243,7 @@ export function LumiaComposer({
               : cameraPreviewOpen
               ? 'Cerrar cámara y descartar vista previa'
               : 'Abrir encuadre en vivo; analiza solo cuando pulses Capturar'}
-            disabled={cameraCapturing || dockBusy || preparing || recording || !available}
+            disabled={cameraCapturing || busy || preparing || recording || !available}
             onClick={() => onCaptureCamera?.()}
           ><DockIcon name="camera" /></button>
         )}
@@ -289,7 +288,7 @@ export function LumiaComposer({
           aria-label={mode === 'continuous' ? 'Desactivar micrófono abierto' : 'Activar micrófono abierto'}
           aria-pressed={mode === 'continuous'}
           title={mode === 'continuous' ? 'Desactivar escucha continua' : 'Escucha continua · di Lumi para hablar'}
-          disabled={dockBusy || recording || preparing || translateEnabled}
+          disabled={busy || recording || preparing || translateEnabled}
           onClick={toggleContinuous}
         ><DockIcon name="wave" /></button>
 
@@ -299,7 +298,7 @@ export function LumiaComposer({
           aria-label={translateEnabled ? 'Desactivar LUMIA Translate' : 'Activar LUMIA Translate'}
           aria-pressed={translateEnabled}
           title={translateEnabled ? 'Volver al chat normal en español' : 'Activar traducción local por texto'}
-          disabled={!translationAvailable || recording || dockBusy || preparing}
+          disabled={!translationAvailable || recording || busy || preparing}
           onClick={() => {
             setError('')
             if (!translateEnabled) {
@@ -318,7 +317,7 @@ export function LumiaComposer({
           className="lumia-composer-send"
           aria-label="Enviar mensaje"
           title="Enviar · Enter"
-          disabled={preparing || dockBusy || recording || (!draft.trim() && !photo && !audioFile) ||
+          disabled={preparing || busy || recording || (!draft.trim() && !photo && !audioFile) ||
             (translateEnabled && (sourceLanguage === targetLanguage || (!!audioFile && !!draft.trim())))}
           onClick={() => void send()}
         ><DockIcon name="send" /></button>
@@ -344,7 +343,7 @@ export function LumiaComposer({
           </select>
         </div>
       )}
-      {(photo || audioFile || error || recording || dockBusy || preparing) && (
+      {(photo || audioFile || error || recording || busy || preparing) && (
         <div className="lumia-composer-feedback" aria-live="polite">
           {photo && (
             <span className="lumia-composer-photo">
