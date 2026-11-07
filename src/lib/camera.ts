@@ -38,6 +38,29 @@ let stream: MediaStream | null = null
 let video: HTMLVideoElement | null = null
 /** How many things currently need the camera. It closes at zero, not before. */
 let holders = 0
+/**
+ * VISION-02.2: source choice is an in-memory browser preference only.
+ * Never persist device identifiers, send them to Ollama, or change the source
+ * while a different owner is holding a live webcam.
+ */
+let preferredCameraDeviceId:string|null=null
+export const getPreferredCameraDeviceId=()=>preferredCameraDeviceId
+export const getCurrentCameraSource=()=>{
+  const track=stream?.getVideoTracks()[0]
+  return track ? {label:track.label || 'Cámara sin nombre',deviceId:track.getSettings().deviceId || null} : null
+}
+export async function listCameraDevices():Promise<Array<{deviceId:string;label:string}>>{
+  const devices=await navigator.mediaDevices.enumerateDevices()
+  return devices.filter(device=>device.kind==='videoinput' && device.deviceId)
+    .map(device=>({deviceId:device.deviceId,label:device.label || 'Cámara disponible'}))
+}
+/** The viewfinder releases its lease before requesting a new source. */
+export function setPreferredCameraDeviceId(id:string|null):void{
+  if(preferredCameraDeviceId===id)return
+  if(holders!==0 || stream)throw new Error(
+    'No puedo cambiar de cámara mientras otro módulo la utiliza. Cierra la cámara o desactiva el seguimiento de manos.')
+  preferredCameraDeviceId=id
+}
 
 export const diag = {
   open: false,
@@ -67,7 +90,9 @@ export async function holdCamera(): Promise<HTMLVideoElement> {
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 1280, height: 720, facingMode: 'user' },
+      video: preferredCameraDeviceId
+        ? { width:1280,height:720,deviceId:{exact:preferredCameraDeviceId} }
+        : { width:1280,height:720,facingMode:'user' },
     })
     const el = document.createElement('video')
     el.autoplay = true
