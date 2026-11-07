@@ -11,7 +11,7 @@ import { LumiaComposer } from './ui/LumiaComposer'
 import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
 import type { LocalVisualImage } from './lib/visual-input'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
-import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,type VisionReplyMode} from './lib/vision-context-vi023'
+import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode} from './lib/vision-context-vi023'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
 import {
@@ -397,6 +397,7 @@ export default function App() {
           : visualImage
           ? (cameraIntent || cameraRequested || fromCameraPreview
               ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
+              visualReliabilityInstruction(cameraIntent?.question ?? said) +
               visualModeInstruction(visionReplyMode)
           : said,
           history.current, {
