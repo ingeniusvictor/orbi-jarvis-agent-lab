@@ -129,6 +129,7 @@ const LEADING_NAME = new RegExp(`^(?:hey|hi|ok|okay|yo|oye|hola)?\\s*${NAME}\\b[
 export default function App() {
   const store = useStore
   const phase = useStore((s) => s.phase)
+  const connectedServers = useStore((s) => s.connected)
   const history = useRef<Msg[]>([])
   const [inputMode, setInputMode] = useState<LumiaInputMode>(
     initialLumiaInputMode(MULTIMODAL_COMPOSER),
@@ -1609,7 +1610,7 @@ export default function App() {
           onCaptureCamera={submitCamera}
           translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
           avatarViewControl={AVATAR_PH04_ENABLED}
-          modelSelectorAvailable={usingBridge && useStore.getState().connected.includes('ollama')}
+          modelSelectorAvailable={usingBridge && connectedServers.includes('ollama')}
           modelControlBusy={phase === 'thinking' || phase === 'tooling' || phase === 'speaking' || cameraCapturing}
           onTranslate={translateWritten}
           onTranslateAudio={translateAudioNote}
