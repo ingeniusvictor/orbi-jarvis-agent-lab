@@ -14,13 +14,31 @@ export type VisualReference='explicit'|'contextual'
 
 export const visualModeInstruction=(mode:VisionReplyMode):string=>
   mode==='breve'
-    ? ' Responde en español de forma breve, idealmente en una o dos frases y hasta 40 palabras. No inventes detalles.'
+    ? ' Responde en español de forma breve, idealmente en una o dos frases y hasta 40 palabras. Prioriza la pregunta concreta; evita introducciones, repetir la descripción inicial o enumerar detalles no solicitados. No inventes detalles.'
     : ' Responde en español con detalles útiles pero sin repetir información innecesaria. Explica qué no puedes distinguir.'
+
+/** VISION-02.3.1: a small, local instruction about spatial references.
+ * It is NOT a camera action or an object detector; Qwen must still inspect
+ * the actual attached JPEG rather than accept a guessed spatial inventory.
+ */
+export function visualSpatialFocus(question:string):string{
+  const q=clean(question)
+  const spatial=/\b(?:detras|destras|atras|tras|fondo|segundo plano|a la izquierda|a la derecha|al lado|encima|debajo|frente a|delante)\b/.test(q)
+  if(!spatial)return ''
+  const asksColor=/\b(?:color|colores|tonalidad)\b/.test(q)
+  return ' La pregunta contiene una referencia espacial. IDENTIFICA PRIMERO el objeto, persona o zona que está en la posición preguntada en el fotograma; '+
+    'no respondas hablando únicamente de la ropa u objetos de primer plano si preguntan qué hay detrás. '+
+    (asksColor
+      ? 'Después describe el color del elemento situado en esa posición, SOLO si puedes identificarlo; si no está claro a cuál elemento se refiere el color, pide una aclaración breve. '
+      : '')+
+    'Comprueba el fondo de la imagen actual; no afirmes que no hay más objetos si se ven otros elementos.'
+}
 
 export const followupVisionPrompt=(question:string,mode:VisionReplyMode):string=>
   'Pregunta de seguimiento del usuario sobre LA MISMA fotografía adjunta nuevamente en este turno. '+
-  'Observa la imagen actual, responde solo lo que permite ver y no supongas que la cámara sigue activa. '+
-  'Pregunta: '+question.trim()+'.'+visualModeInstruction(mode)
+  'Observa la imagen ACTUAL de nuevo, no tomes la descripción anterior como sustituto de la fotografía. '+
+  'Responde exactamente a lo preguntado, sin suponer que la cámara sigue activa. '+
+  'Pregunta: '+question.trim()+'.'+visualSpatialFocus(question)+visualModeInstruction(mode)
 
 function clean(value:string):string{
   return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -29,7 +47,7 @@ function clean(value:string):string{
 }
 const unrelated=/\b(?:hora|fecha|clima|temperatura|noticias|precio|internet|google|github|ollama|receta|codigo|programar|javascript|musica|youtube|juego|bateria|calendario|crear|generar|editar|modificar|exportar|guardar|compartir|enviar|subir|video|grabar)\b/
 const explicit=/\b(?:foto|fotografia|imagen|captura|fotograma|esa escena|esta escena|la escena|lo que viste|lo que observaste|lo que acabas de ver|la misma imagen|la misma foto|la foto anterior|esa foto)\b/
-const sceneWords=/\b(?:objeto|detras|fondo|adelante|arriba|abajo|izquierda|derecha|al lado|persona|personas|hombre|mujer|nino|nina|ninos|ropa|camiseta|vestimenta|colores|color|cabello|manos|mano|cara|rostro|ventana|pared|cortina|mesa|silla|habitacion|figura|letrero|etiqueta|texto|aparece|aparecen|sostiene|llevan|lleva|viste|hay|ahi|eso|ese|esa|aquello)\b/
+const sceneWords=/\b(?:objeto|detras|destras|atras|fondo|adelante|arriba|abajo|izquierda|derecha|al lado|persona|personas|hombre|mujer|nino|nina|ninos|ropa|camiseta|vestimenta|colores|color|cabello|manos|mano|cara|rostro|ventana|pared|cortina|mesa|silla|habitacion|figura|letrero|etiqueta|texto|aparece|aparecen|sostiene|llevan|lleva|viste|hay|ahi|eso|ese|esa|aquello)\b/
 const questionForm=/^(?:y\s+)?(?:que|cual|cuales|cuantos|cuantas|de que|en que|donde|como|quien|quienes|puedes|podrias|dime|describe|explicame|muestrame|identifica|lee|fijate|y)\b/
 
 /**
