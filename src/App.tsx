@@ -1609,6 +1609,8 @@ export default function App() {
           onCaptureCamera={submitCamera}
           translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
           avatarViewControl={AVATAR_PH04_ENABLED}
+          modelSelectorAvailable={usingBridge && useStore.getState().connected.includes('ollama')}
+          modelControlBusy={phase === 'thinking' || phase === 'tooling' || phase === 'speaking' || cameraCapturing}
           onTranslate={translateWritten}
           onTranslateAudio={translateAudioNote}
           onModeChange={switchInputMode}
