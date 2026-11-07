@@ -39,6 +39,8 @@ type Frame = {
   servers?: Array<string | { name?: string }>
   ok?: boolean
   voice?: VoiceRuntimeCapabilities
+  active?: string
+  installed?: string[]
 }
 
 /**
@@ -61,6 +63,79 @@ let connecting: Promise<WebSocket> | null = null
 /** Server names reported by the bridge, for the HUD readout. */
 let servers: string[] = []
 export const bridgeServers = () => servers
+
+/** AMR-02: ephemeral active model and installed tags; never a model download API. */
+export type LocalModelState = { active: string; installed: string[] }
+let localModels: LocalModelState | null = null
+const modelWatchers = new Set<(state: LocalModelState | null) => void>()
+export function watchLocalModels(fn: (state: LocalModelState | null) => void): () => void {
+  modelWatchers.add(fn)
+  fn(localModels)
+  return () => { modelWatchers.delete(fn) }
+}
+function publishLocalModels(state: LocalModelState | null): void {
+  localModels = state
+  for (const fn of modelWatchers) fn(state)
+}
+function readLocalModels(frame: Frame): LocalModelState | null {
+  if (typeof frame.active !== 'string' || !Array.isArray(frame.installed) ||
+    !frame.installed.every((x) => typeof x === 'string')) return null
+  return {
+    active: frame.active,
+    installed: [...new Set(frame.installed)].slice(0, 80),
+  }
+}
+
+/** Control protocol intentionally separate from speakable `ask` turns. */
+let modelUiSeq = 0
+export async function controlLocalModel(
+  action: 'list' | 'switch',
+  model?: string,
+): Promise<LocalModelState> {
+  const ws = await connect()
+  if (!servers.includes('ollama'))
+    throw new Error('El selector solo está disponible con Ollama local.')
+  const id = `model-ui-${++modelUiSeq}`
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const cleanup = () => {
+      ws.removeEventListener('message', onMessage)
+      ws.removeEventListener('close', onClose)
+      window.clearTimeout(timer)
+    }
+    const finish = (value?: LocalModelState, error?: string) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      if (error) reject(new Error(error))
+      else if (value) {
+        publishLocalModels(value)
+        resolve(value)
+      } else reject(new Error('Respuesta de modelos incompleta.'))
+    }
+    const onMessage = (event: MessageEvent) => {
+      let msg: Frame & { error?: string }
+      try { msg = JSON.parse(event.data as string) } catch { return }
+      if (msg.type !== 'model_ui_result' || msg.id !== id) return
+      if (msg.ok !== true) {
+        finish(undefined, msg.error || 'No se pudo cambiar de modelo.')
+        return
+      }
+      const state = readLocalModels(msg)
+      if (!state) finish(undefined, 'El bridge no entregó una lista válida.')
+      else finish(state)
+    }
+    const onClose = () => finish(undefined, 'Se desconectó Ollama durante la operación.')
+    const timer = window.setTimeout(() => finish(undefined, 'Ollama tardó demasiado en responder.'), 90_000)
+    ws.addEventListener('message', onMessage)
+    ws.addEventListener('close', onClose)
+    try {
+      ws.send(JSON.stringify({ type: 'model_ui', id, action, ...(model ? { model } : {}) }))
+    } catch (err) {
+      finish(undefined, err instanceof Error ? err.message : String(err))
+    }
+  })
+}
 
 /** The list arrives twice — once from config, once with live status — so the
  *  HUD subscribes rather than reading it a single time at boot. */
@@ -201,6 +276,9 @@ function dispatch(ws: WebSocket) {
         .filter(Boolean)
       onServers?.(servers)
       firstReady.resolve()
+    } else if (msg.type === 'model_ui_state') {
+      const state = readLocalModels(msg)
+      if (state) publishLocalModels(state)
     } else if (msg.type === 'model_ready') {
       // Success or failure both mean the warm-up attempt is finished. A failed
       // attempt must not hold the boot screen for the full timeout; the first
@@ -310,6 +388,7 @@ function connect(): Promise<WebSocket> {
       settle(new Error('The bridge closed the connection.'))
       if (socket === ws) {
         socket = null
+        publishLocalModels(null)
         onConnection?.('lost')
         scheduleReconnect()
       }
