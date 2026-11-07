@@ -37,7 +37,7 @@ export function inspectCameraSignal(video:HTMLVideoElement):string|null{
   }
 }
 export function connectedOrVirtualCameraHint(label:string):string|null{
-  if(/(?:phone|android|movil|m[oó]vil|virtual|connected camera|enlace m[oó]vil|camo|obs|droidcam)/i.test(label)){
+  if(/(?:phone|android|mobile|movil|m[oó]vil|virtual|connected camera|enlace m[oó]vil|camo|obs|droidcam)/i.test(label)){
     return 'Parece una cámara móvil o virtual. Si no ves el entorno, elige la webcam integrada.'
   }
   return null
