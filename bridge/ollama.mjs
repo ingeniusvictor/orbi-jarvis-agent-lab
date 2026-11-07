@@ -368,7 +368,10 @@ export async function streamOllama({
               'No inventes detalles, y no repitas teléfonos ni identificadores privados. ' +
               'Responde en español con frases naturales, breves y completas.',
           },
-          ...history,
+          // VISION-02.4.2: the authorized JPEG and current question are enough.
+          // Avoid echoing the previous photo description from text history.
+          // This changes ONLY image turns; text-only conversation below
+          // keeps its existing history and memory behavior.
           { role: 'user', content: prompt, images: [image.data] },
         ],
         stream: false,
