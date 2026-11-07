@@ -59,7 +59,7 @@ assert.match(app,/const \[cameraStill,setCameraStill\] = useState<LocalVisualIma
 assert.match(app,/setCameraStill\(visualImage\)/) // voice path
 assert.match(app,/const analyzeCameraViewfinderFrame = \(image:LocalVisualImage\) =>/)
 assert.match(app,/setCameraStill\(image\)/) // manual button
-assert.match(app,/void respond\('Lumi, describe exactamente lo que aparece en esta imagen.*',image\)/)
+assert.match(app,/void respond\('Lumi, describe exactamente lo que aparece en esta imagen.*',image,false,true\)/)
 assert.match(app,/<LumiaCameraViewfinder/)
 assert.match(app,/live=\{cameraPreviewOpen\}/)
 assert.match(app,/still=\{cameraStill\}/)

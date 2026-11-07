@@ -11,6 +11,7 @@ import { LumiaComposer } from './ui/LumiaComposer'
 import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
 import type { LocalVisualImage } from './lib/visual-input'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
+import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,type VisionReplyMode} from './lib/vision-context-vi023'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
 import {
@@ -138,7 +139,22 @@ export default function App() {
   const [cameraCapturing,setCameraCapturing] = useState(false)
   const [cameraPreviewOpen,setCameraPreviewOpen] = useState(false)
   const [cameraStill,setCameraStill] = useState<LocalVisualImage|null>(null)
+  const [visionReplyMode,setVisionReplyMode] = useState<VisionReplyMode>('breve')
+  const [visionContextReady,setVisionContextReady] = useState(false)
+  const visualSession = useRef(new EphemeralVisualContext())
+  const activeVisualReply = useRef<string|null>(null)
   const cameraCaptureOwner = useRef<string|null>(null)
+  // The captured JPEG is transient memory, never transcript/localStorage.
+  // This timer erases even an unattended frozen picture after five minutes.
+  useEffect(()=>{
+    if(!cameraStill)return
+    const expiry=window.setTimeout(()=>{
+      visualSession.current.clear()
+      setVisionContextReady(false)
+      setCameraStill(null)
+    },VISION_CONTEXT_TTL_MS)
+    return ()=>window.clearTimeout(expiry)
+  },[cameraStill])
   const pushCapture = useRef<PushCapture | null>(null)
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pushGeneration = useRef(0)
@@ -230,7 +246,7 @@ export default function App() {
 
   // -- one turn -------------------------------------------------------------
 
-  const respond = async (said: string, image?: LocalVisualImage, cameraRequested = false): Promise<void> => {
+  const respond = async (said: string, image?: LocalVisualImage, cameraRequested = false, fromCameraPreview = false, forceVisualFollowUp = false): Promise<void> => {
     const mine = ++turn.current
     cancelGuidedDemo()
     const stale = () => mine !== turn.current
@@ -288,11 +304,31 @@ export default function App() {
       // VISION-02: authorized one-shot camera frame. The camera lease is
       // released BEFORE local Ollama receives the JPEG; no background polling.
       // Ordinary voice-only turns never run this branch or pay its latency.
-      const cameraIntent = CAMERA_VISION_VI02_ENABLED && !image
+      // An authorized still can answer later scene questions without opening
+      // the webcam again. Explicit new-camera commands still start a new shot.
+      const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested
+        ? forceVisualFollowUp
+          ? visualSession.current.getAuthorizedFrame()
+          : visualSession.current.getForFollowUp(said)
+        : null
+      // A newly attached file is a separate VI-01 image, not a follow-up
+      // to a prior camera still: never silently send the old camera photo.
+      if(image && !fromCameraPreview && !cameraRequested){
+        visualSession.current.clear()
+        setVisionContextReady(false)
+        setCameraStill(null)
+        setCameraPreviewOpen(false)
+      }
+      const cameraIntent = CAMERA_VISION_VI02_ENABLED && !image && !visualFollowUp
         ? parseLumiaCameraIntent(said) : null
-      let visualImage=image
+      let visualImage=image ?? visualFollowUp?.image
+      let visualGeneration:number|null=null
+      let visualInferenceFailed=false
       let captureFailure=''
       if (cameraIntent || (cameraRequested && CAMERA_VISION_VI02_ENABLED)) {
+        visualSession.current.clear()
+        setVisionContextReady(false)
+        setCameraStill(null)
         cameraCaptureOwner.current=turnId
         setCameraCapturing(true)
         s.setLooking('VISIÓN LOCAL · UNA FOTO SOLICITADA')
@@ -320,6 +356,14 @@ export default function App() {
         }
         if(stale())return
       }
+      // Only an owner-clicked/voice-camera frame creates a reusable session.
+      // A photo uploaded through VI-01 remains one-shot unless explicitly
+      // captured by the existing camera viewer; no silent photo retention.
+      if(visualImage && !visualFollowUp &&
+         (cameraIntent || cameraRequested || fromCameraPreview)){
+        visualGeneration=visualSession.current.begin(visualImage)
+      }
+      if(visualImage) activeVisualReply.current=turnId
       const avatarAction = AVATAR_PH04_ENABLED && !visualImage && !captureFailure
         ? parseLumiaAvatarAction(said) : null
       const { text } = captureFailure
@@ -343,8 +387,13 @@ export default function App() {
           })() }
         : avatarAction
         ? { text: respondToLumiaAvatarAction(avatarAction) }
-        : await ask(cameraIntent || cameraRequested
-          ? cameraVisionPrompt(cameraIntent?.question ?? said) : said,
+        : await ask(visualFollowUp
+          ? followupVisionPrompt(said,visionReplyMode)
+          : visualImage
+          ? (cameraIntent || cameraRequested || fromCameraPreview
+              ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
+              visualModeInstruction(visionReplyMode)
+          : said,
           history.current, {
         onText: (delta) => {
           if (stale()) return
@@ -382,20 +431,26 @@ export default function App() {
           }
         },
       }, visualImage).catch((err:unknown) => {
-        if (!cameraIntent && !cameraRequested) throw err
+        if (!cameraIntent && !cameraRequested && !fromCameraPreview && !visualFollowUp) throw err
         if (stale()) throw err
-        // The camera may work while the selected Ollama model cannot process
-        // images. Never imply vision succeeded or produce a fake description.
-        console.warn('[lumia:vision02] Local visual inference unavailable:',
+        visualInferenceFailed=true
+        // Never claim visual understanding if Ollama rejected the image.
+        console.warn('[lumia:vision023] Local image inference unavailable:',
           err instanceof Error ? err.name : 'unknown')
         return {
-          text: 'Pude tomar la imagen, pero el modelo local no consiguió analizarla. ' +
-            'Comprueba que el modelo activo admite imágenes en Ollama.',
+          text: visualFollowUp
+            ? 'No pude volver a analizar esa fotografía. Inténtalo nuevamente o toma otra imagen.'
+            : 'Pude tomar la imagen, pero el modelo local no consiguió analizarla. ' +
+              'Comprueba que el modelo activo admite imágenes en Ollama.',
           tools: [],
         }
       })
 
       if (stale()) return
+      if(visualGeneration!==null && !visualInferenceFailed && text.trim() &&
+         visualSession.current.confirmAnalyzed(visualGeneration)){
+        setVisionContextReady(true)
+      }
 
       // Some providers return only the final text and no streaming deltas.
       // Capture it rather than misclassifying a successful answer as silence.
@@ -498,6 +553,7 @@ export default function App() {
       })
       store.getState().setError(failure)
     } finally {
+      if(activeVisualReply.current===turnId)activeVisualReply.current=null
       if (!stale()) {
         portalSpeechEnd(turnId)
         endGuidedDemo(turnId)
@@ -1296,20 +1352,40 @@ export default function App() {
     if(!CAMERA_VISION_VI02_ENABLED || cameraCapturing || experimentOwner.current)return
     if(store.getState().phase==='offline'||store.getState().phase==='boot')return
     if(cameraPreviewOpen){
-      setCameraPreviewOpen(false)
-      setCameraStill(null)
+      closeCameraViewfinder()
       return
     }
-    setCameraStill(null)
+    closeCameraViewfinder() // cancels any in-flight analysis of the old still
     setCameraPreviewOpen(true)
   }
   const closeCameraViewfinder = () => {
+    // Closing the viewer discards the image and revokes visual follow-ups.
+    // If Qwen is still using that image, interrupt that visual reply too.
+    if(activeVisualReply.current){
+      silence()
+      turn.current++
+      interrupt()
+      if(activeReply.current===activeVisualReply.current){
+        store.getState().updateTurn(activeReply.current,{
+          status:'interrupted',finishedAt:Date.now(),
+        })
+        activeReply.current=null
+      }
+      activeVisualReply.current=null
+      store.getState().setActiveTool(null)
+      store.getState().setPhase('dormant')
+      sfx.duck(false)
+      music.duck(false)
+      music.working(false)
+    }
+    visualSession.current.clear()
+    setVisionContextReady(false)
     setCameraPreviewOpen(false)
     setCameraStill(null)
   }
   const recaptureCameraViewfinder = () => {
     if(!CAMERA_VISION_VI02_ENABLED || cameraCapturing || experimentOwner.current)return
-    setCameraStill(null)
+    closeCameraViewfinder() // no late answer from a superseded photo
     setCameraPreviewOpen(true)
   }
   const analyzeCameraViewfinderFrame = (image:LocalVisualImage) => {
@@ -1319,7 +1395,15 @@ export default function App() {
     setCameraStill(image)
     silence()
     interrupt()
-    void respond('Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.',image)
+    void respond('Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.',image,false,true)
+  }
+
+  const submitVisualFollowUp = (text:string) => {
+    if(experimentOwner.current || !visualSession.current.hasAnalyzedFrame())return
+    if(store.getState().phase==='offline'||store.getState().phase==='boot')return
+    silence()
+    interrupt()
+    void respond(text,undefined,false,false,true)
   }
 
   const submitWritten = (text: string, image?: LocalVisualImage) => {
@@ -1462,6 +1546,10 @@ export default function App() {
           onCaptured={analyzeCameraViewfinderFrame}
           onClose={closeCameraViewfinder}
           onReopen={recaptureCameraViewfinder}
+          visualContextReady={visionContextReady}
+          visualReplyMode={visionReplyMode}
+          onVisualReplyModeChange={setVisionReplyMode}
+          onAskAboutStill={submitVisualFollowUp}
         />
       )}
       <Boot />
