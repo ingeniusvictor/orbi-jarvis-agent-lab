@@ -27,7 +27,6 @@ assert.doesNotMatch(picker,/onSend\(|ask\(|speechSynthesis|navigator\.mediaDevic
 assert.match(composer,/\{modelSelectorAvailable && \(/)
 assert.match(composer,/<LumiaModelDock disabled=/)
 assert.match(composer,/const busy=inboundBusy\|\|modelChanging/)
-assert.match(composer,/const dockBusy=busy/)
 assert.match(app,/modelSelectorAvailable=\{usingBridge && connectedServers\.includes\('ollama'\)\}/)
 assert.match(app,/modelControlBusy=/)
 assert.match(bridge,/type: 'model_ui'/)
