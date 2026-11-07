@@ -3432,3 +3432,50 @@ kbd {
   color: rgba(170,223,236,.8);
 }
 .lumia-vision-file-controls .lumia-vision-file-error {color:#ffc9ba}
+
+
+/* AMR-02 — compact brain selection above the existing single-row composer. */
+.lumia-model-dock {position:relative;flex:0 0 auto;display:flex;align-items:center}
+.lumia-model-trigger {color:#a5ecf8;border-color:rgba(122,225,247,.20);background:rgba(0,36,52,.27)}
+.lumia-model-trigger.is-active {color:#9afbe7;background:rgba(0,119,151,.25)}
+.lumia-model-menu {
+  position:absolute;bottom:calc(100% + 16px);left:0;
+  width:min(310px,calc(100vw - 40px));max-height:min(55vh,390px);
+  overflow-y:auto;box-sizing:border-box;padding:10px;
+  background:rgba(2,20,33,.97);border:1px solid rgba(108,228,246,.46);
+  border-radius:14px;box-shadow:0 16px 42px rgba(0,0,0,.5);
+  color:#e0fcff;font:12px 'Chakra Petch',system-ui,sans-serif;
+  backdrop-filter:blur(14px);z-index:26;
+}
+.lumia-model-head {display:flex;align-items:center;justify-content:space-between;
+  color:#96eef7;font-weight:700;letter-spacing:.12em;font-size:10px}
+.lumia-model-head button {color:#b9faff;background:transparent;border:0;
+  font-size:20px;line-height:1;cursor:pointer;padding:2px 6px}
+.lumia-model-head button:disabled {opacity:.45;cursor:default}
+.lumia-model-current {margin:8px 0 10px;color:#a3cdd8;font-size:11px;
+  overflow-wrap:anywhere}
+.lumia-model-current strong {color:#f2ffff;font-weight:600}
+.lumia-model-option {width:100%;display:flex;align-items:center;gap:9px;
+  min-height:38px;padding:7px 9px;margin:3px 0;border-radius:9px;
+  color:#dbf8fc;background:rgba(28,88,110,.19);
+  border:1px solid rgba(94,205,233,.18);cursor:pointer;text-align:left;
+  font:12px 'Chakra Petch',system-ui,sans-serif}
+.lumia-model-option:hover:not(:disabled),.lumia-model-option:focus-visible {
+  background:rgba(31,139,169,.27);border-color:rgba(104,232,248,.65)}
+.lumia-model-option.is-current {background:rgba(36,139,116,.17);
+  border-color:rgba(113,235,201,.42)}
+.lumia-model-option:disabled:not(.is-current) {opacity:.5;cursor:wait}
+.lumia-model-option.is-current {cursor:default}
+.lumia-model-led {color:#7ef6cf;flex:0 0 auto}
+.lumia-model-name {flex:1;min-width:0;overflow-wrap:anywhere}
+.lumia-model-selected {font-size:9px;color:#8ff4d4;flex:0 0 auto}
+.lumia-model-empty,.lumia-model-notice {padding:8px 3px;
+  font-size:11px;line-height:1.4;color:#c5e9ef}
+.lumia-model-notice {color:#ffe3ab;overflow-wrap:anywhere}
+.lumia-model-foot {border-top:1px solid rgba(120,220,240,.15);
+  margin-top:9px;padding-top:8px;color:#7db0bf;font-size:10px}
+.lumia-model-menu button:focus-visible {outline:2px solid #8cf8f1;outline-offset:2px}
+@media(max-width:650px) {
+  .lumia-model-menu {left:-45px;max-height:48vh}
+  .lumia-model-dock .lumia-composer-icon-button {width:33px;height:33px}
+}
