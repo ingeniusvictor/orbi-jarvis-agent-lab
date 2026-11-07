@@ -55,6 +55,13 @@ export function LumiaCameraViewfinder({
   const [followupDraft,setFollowupDraft]=useState('')
 
   useEffect(()=>()=>{fileRequest.current++},[])
+  useEffect(()=>{
+    if(fileMode)return
+    fileRequest.current++
+    setFileImage(null)
+    setFileBusy(false)
+    setFileError('')
+  },[fileMode])
   const selectFile=async(file:File|null)=>{
     const request=++fileRequest.current
     setFileImage(null)
@@ -230,7 +237,7 @@ export function LumiaCameraViewfinder({
         ) : still ? (
           <img className="lumia-camera-viewfinder-frame"
             src={`data:image/jpeg;base64,${still.data}`}
-            alt="Fotograma exacto de la cámara utilizado en la solicitud visual de LUMIA"/>
+            alt="Fotografía exacta utilizada en la solicitud visual de LUMIA"/>
         ) : null}
         {fileMode&&!fileImage&&(
           <span className="lumia-camera-viewfinder-placeholder" role="status">
@@ -324,10 +331,10 @@ export function LumiaCameraViewfinder({
         ) : (
           <>
             <span className="lumia-camera-viewfinder-help">
-              Esto es lo que recibió LUMIA. La cámara ya se liberó.
+              Esto es lo que recibió LUMIA. No hay cámara activa.
             </span>
             <button type="button" className="lumia-camera-viewfinder-secondary"
-              onClick={onReopen}>Volver a encuadrar</button>
+              onClick={onReopen}>{stillSource==='file'?'Elegir otra imagen':'Volver a encuadrar'}</button>
             <button type="button" className="lumia-camera-viewfinder-secondary"
               onClick={close}>Cerrar imagen</button>
           </>
