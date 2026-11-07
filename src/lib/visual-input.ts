@@ -51,3 +51,33 @@ export async function prepareVisualImage(file: File): Promise<LocalVisualImage> 
     bitmap.close()
   }
 }
+
+
+/**
+ * VISION-02: same size, encoding and payload limits as the approved photo
+ * path, but reads one already-authorized video element in memory. The source
+ * frame is NOT mirrored, so printed labels remain legible.
+ */
+export function prepareVisualCameraFrame(video:HTMLVideoElement):LocalVisualImage {
+  if(!video.videoWidth || !video.videoHeight ||
+      video.videoWidth*video.videoHeight>100_000_000){
+    throw new Error('La cámara no entregó un fotograma válido.')
+  }
+  for (const edge of [1024,800,640,512]){
+    const factor=Math.min(1,edge/Math.max(video.videoWidth,video.videoHeight))
+    const width=Math.max(1,Math.round(video.videoWidth*factor))
+    const height=Math.max(1,Math.round(video.videoHeight*factor))
+    const canvas=document.createElement('canvas')
+    canvas.width=width
+    canvas.height=height
+    const ctx=canvas.getContext('2d')
+    if(!ctx)throw new Error('No se pudo preparar la captura de cámara.')
+    ctx.drawImage(video,0,0,width,height)
+    const url=canvas.toDataURL('image/jpeg',.76)
+    const data=url.slice(url.indexOf(',')+1)
+    if(data.length && data.length<=MAX_VISUAL_PAYLOAD_CHARS){
+      return {mimeType:'image/jpeg',data}
+    }
+  }
+  throw new Error('La captura de cámara supera el límite permitido.')
+}
