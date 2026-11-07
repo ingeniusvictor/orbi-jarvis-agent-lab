@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {
   EphemeralVisualContext,VISION_CONTEXT_TTL_MS,
-  classifyVisualFollowUp,visualModeInstruction,followupVisionPrompt,
+  classifyVisualFollowUp,visualModeInstruction,followupVisionPrompt,visualSpatialFocus,
 } from '../src/lib/vision-context-vi023'
 const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8')
 const fakeA={mimeType:'image/jpeg' as const,data:'TEST-IMAGE-A-ONLY'}
@@ -18,6 +18,8 @@ const valid=[
   'Lumi, ¿qué más puedes observar?',
   '¿Qué aparece en el fotograma?',
   '¿Y qué más?',
+  'que hay destras y de que color es?',
+  '¿Qué hay atrás de esa persona?',
 ]
 for(const sentence of valid){
   assert.ok(classifyVisualFollowUp(sentence),'Must detect visual follow-up: '+sentence)
@@ -45,6 +47,14 @@ assert.match(visualModeInstruction('detallada'),/detalles útiles/)
 assert.match(followupVisionPrompt('¿Qué hay detrás?','breve'),/LA MISMA fotografía adjunta nuevamente/)
 assert.match(followupVisionPrompt('¿Qué hay detrás?','breve'),/no supongas que la cámara sigue activa/)
 assert.match(followupVisionPrompt('¿Qué hay detrás?','breve'),/40 palabras/)
+assert.match(visualSpatialFocus('que hay destras y de que color es?'),/IDENTIFICA PRIMERO/)
+assert.match(visualSpatialFocus('que hay destras y de que color es?'),/Después describe el color/)
+assert.match(visualSpatialFocus('que hay destras y de que color es?'),/pide una aclaración breve/)
+assert.match(visualSpatialFocus('¿Qué hay en el fondo?'),/no afirmes que no hay más objetos/)
+assert.equal(visualSpatialFocus('¿Qué hora es?'),'')
+assert.match(followupVisionPrompt('¿Qué hay detrás y de qué color es?','breve'),/imagen ACTUAL de nuevo/)
+assert.match(followupVisionPrompt('¿Qué hay detrás y de qué color es?','breve'),/IDENTIFICA PRIMERO/)
+assert.match(visualModeInstruction('breve'),/evita introducciones/)
 
 const session=new EphemeralVisualContext()
 assert.equal(session.hasFrame(0),false)
