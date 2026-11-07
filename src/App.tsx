@@ -9,6 +9,7 @@ import { AcousticLab } from './ui/AcousticLab'
 import { VisualInput } from './ui/VisualInput'
 import { LumiaComposer } from './ui/LumiaComposer'
 import type { LocalVisualImage } from './lib/visual-input'
+import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
 import {
@@ -96,6 +97,9 @@ const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INP
 const COMPLEX_VOICE_ENABLED = import.meta.env.VITE_LUMIA_COMPLEX_VOICE_VQ01 === '1'
 const MULTIMODAL_COMPOSER = import.meta.env.VITE_LUMIA_MULTIMODAL_COMPOSER === '1'
 const AVATAR_PH04_ENABLED = import.meta.env.VITE_LUMIA_AVATAR_PH04 === '1'
+const CAMERA_VISION_VI02_ENABLED = usingBridge &&
+  import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
+  import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
 
 // Owner-side opt-in only. The browser recognizer remains at the certified hold.
 // Never start listening before the actual synthesized-output echo tail expires.
@@ -130,6 +134,8 @@ export default function App() {
   const inputModeRef = useRef<LumiaInputMode>(initialLumiaInputMode(MULTIMODAL_COMPOSER))
   const [pushRecording, setPushRecording] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
+  const [cameraCapturing,setCameraCapturing] = useState(false)
+  const cameraCaptureOwner = useRef<string|null>(null)
   const pushCapture = useRef<PushCapture | null>(null)
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pushGeneration = useRef(0)
@@ -221,7 +227,7 @@ export default function App() {
 
   // -- one turn -------------------------------------------------------------
 
-  const respond = async (said: string, image?: LocalVisualImage): Promise<void> => {
+  const respond = async (said: string, image?: LocalVisualImage, cameraRequested = false): Promise<void> => {
     const mine = ++turn.current
     cancelGuidedDemo()
     const stale = () => mine !== turn.current
@@ -276,12 +282,40 @@ export default function App() {
     let guidedRun = false
 
     try {
-      // PH-04 handles only a small whitelist of authorized avatar commands.
-      // Everything else keeps the certified Qwen/Whisper/Kokoro route.
-      // Never parse background transcripts or unapproved wake segments here.
-      const avatarAction = AVATAR_PH04_ENABLED && !image
+      // VISION-02: authorized one-shot camera frame. The camera lease is
+      // released BEFORE local Ollama receives the JPEG; no background polling.
+      // Ordinary voice-only turns never run this branch or pay its latency.
+      const cameraIntent = CAMERA_VISION_VI02_ENABLED && !image
+        ? parseLumiaCameraIntent(said) : null
+      let visualImage=image
+      let captureFailure=''
+      if (cameraIntent || (cameraRequested && CAMERA_VISION_VI02_ENABLED)) {
+        cameraCaptureOwner.current=turnId
+        setCameraCapturing(true)
+        s.setLooking('VISIÓN LOCAL · UNA FOTO SOLICITADA')
+        try {
+          visualImage=await captureLumiaAuthorizedStill(stale)
+        } catch(err) {
+          if(stale())return
+          const detail=err instanceof Error ? err.message : String(err)
+          captureFailure=detail.includes('Permission') ||
+            detail.includes('NotAllowed') || detail.includes('denied')
+            ? 'No tengo permiso para utilizar la cámara. Autorízala en el navegador e inténtalo de nuevo.'
+            : 'No pude capturar una imagen de la cámara. '+detail
+        } finally {
+          if(cameraCaptureOwner.current===turnId){
+            cameraCaptureOwner.current=null
+            setCameraCapturing(false)
+            s.setLooking(null)
+          }
+        }
+        if(stale())return
+      }
+      const avatarAction = AVATAR_PH04_ENABLED && !visualImage && !captureFailure
         ? parseLumiaAvatarAction(said) : null
-      const { text } = avatarAction?.kind === 'demo'
+      const { text } = captureFailure
+        ? {text:captureFailure}
+        : avatarAction?.kind === 'demo'
         ? { text: await (async () => {
             const assets = await checkGuidedDemoAssets()
             if (stale()) return ''
@@ -300,7 +334,9 @@ export default function App() {
           })() }
         : avatarAction
         ? { text: respondToLumiaAvatarAction(avatarAction) }
-        : await ask(said, history.current, {
+        : await ask(cameraIntent || cameraRequested
+          ? cameraVisionPrompt(cameraIntent?.question ?? said) : said,
+          history.current, {
         onText: (delta) => {
           if (stale()) return
           if (!started) {
@@ -336,7 +372,7 @@ export default function App() {
             spk.say(forTool(name))
           }
         },
-      }, image)
+      }, visualImage)
 
       if (stale()) return
 
@@ -1232,6 +1268,14 @@ export default function App() {
     }
   }
 
+  const submitCamera = () => {
+    if(!CAMERA_VISION_VI02_ENABLED || cameraCapturing || experimentOwner.current)return
+    if(store.getState().phase==='offline'||store.getState().phase==='boot')return
+    silence()
+    interrupt()
+    void respond('Lumi, mira esto',undefined,true)
+  }
+
   const submitWritten = (text: string, image?: LocalVisualImage) => {
     if (experimentOwner.current) return
     const phase = store.getState().phase
@@ -1374,6 +1418,9 @@ export default function App() {
           recording={pushRecording}
           busy={pushBusy}
           visionAvailable={usingBridge && import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1'}
+          cameraAvailable={CAMERA_VISION_VI02_ENABLED}
+          cameraCapturing={cameraCapturing}
+          onCaptureCamera={submitCamera}
           translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
           avatarViewControl={AVATAR_PH04_ENABLED}
           onTranslate={translateWritten}
