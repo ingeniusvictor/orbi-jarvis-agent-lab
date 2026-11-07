@@ -14,7 +14,7 @@ export type VisualReference='explicit'|'contextual'
 
 export const visualModeInstruction=(mode:VisionReplyMode):string=>
   mode==='breve'
-    ? ' Responde en español de forma breve, idealmente en una o dos frases y hasta 40 palabras. Prioriza la pregunta concreta; evita introducciones, repetir la descripción inicial o enumerar detalles no solicitados. No inventes detalles.'
+    ? ' Responde en español de forma breve, idealmente en una o dos frases y hasta 40 palabras. Prioriza solo la pregunta concreta; evita introducciones y repetir la descripción inicial. No inventes detalles ni cites privacidad como causa de una imagen poco nítida.'
     : ' Responde en español con detalles útiles pero sin repetir información innecesaria. Explica qué no puedes distinguir.'
 
 /** VISION-02.3.1: a small, local instruction about spatial references.
@@ -54,7 +54,8 @@ export function visualReliabilityInstruction(question:string):string{
 export const followupVisionPrompt=(question:string,mode:VisionReplyMode):string=>
   'Pregunta de seguimiento del usuario sobre LA MISMA fotografía adjunta nuevamente en este turno. '+
   'Observa la imagen ACTUAL de nuevo, no tomes la descripción anterior como sustituto de la fotografía. '+
-  'Responde exactamente a lo preguntado; no supongas que la cámara sigue activa. '+
+  'Responde solamente a la pregunta actual, en una o dos frases; no repitas ni resumas la descripción anterior. ' +
+  'Si no puedes distinguir algo por nitidez o tamaño, dilo sin atribuirlo automáticamente a privacidad. no supongas que la cámara sigue activa. ' +
   'Pregunta: '+question.trim()+'.'+visualSpatialFocus(question)+visualReliabilityInstruction(question)+visualModeInstruction(mode)
 
 function clean(value:string):string{
