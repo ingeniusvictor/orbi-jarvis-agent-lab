@@ -27,7 +27,7 @@ function clean(value:string):string{
     .toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ')
     .replace(/\s+/g,' ').trim()
 }
-const unrelated=/\b(?:hora|fecha|clima|temperatura|noticias|precio|internet|google|github|ollama|receta|codigo|programar|javascript|musica|youtube|juego|bateria|calendario)\b/
+const unrelated=/\b(?:hora|fecha|clima|temperatura|noticias|precio|internet|google|github|ollama|receta|codigo|programar|javascript|musica|youtube|juego|bateria|calendario|crear|generar|editar|modificar|exportar|guardar|compartir|enviar|subir|video|grabar)\b/
 const explicit=/\b(?:foto|fotografia|imagen|captura|fotograma|esa escena|esta escena|la escena|lo que viste|lo que observaste|lo que acabas de ver|la misma imagen|la misma foto|la foto anterior|esa foto)\b/
 const sceneWords=/\b(?:objeto|detras|fondo|adelante|arriba|abajo|izquierda|derecha|al lado|persona|personas|hombre|mujer|nino|nina|ninos|ropa|camiseta|vestimenta|colores|color|cabello|manos|mano|cara|rostro|ventana|pared|cortina|mesa|silla|habitacion|figura|letrero|etiqueta|texto|aparece|aparecen|sostiene|llevan|lleva|viste|hay|ahi|eso|ese|esa|aquello)\b/
 const questionForm=/^(?:y\s+)?(?:que|cual|cuales|cuantos|cuantas|de que|en que|donde|como|quien|quienes|puedes|podrias|dime|describe|explicame|muestrame|identifica|lee|fijate|y)\b/
@@ -42,7 +42,9 @@ export function classifyVisualFollowUp(text:string):VisualReference|null{
     .replace(/^(?:(?:hola|oye|ok|okay|hey)\s+)?(?:lumi|lumia|jarvis)\b\s*/,'')
   if(!said || /^(?:no|nunca|sin|cancela|olvida|borra|cierra|descarta)\b/.test(said))return null
   if(unrelated.test(said))return null
-  if(explicit.test(said))return 'explicit'
+  if(explicit.test(said) && (questionForm.test(said) ||
+    /^(?:quiero saber|dime|describe|analiza|observa|revisa|explica|lee|recuerdas)\b/.test(said)))return 'explicit'
+  if(/^(?:y )?(?:que mas|algo mas|que otros detalles|dime mas|hay algo mas|puedes decirme mas)\b/.test(said)) return 'contextual'
   if(!questionForm.test(said))return null
   if(sceneWords.test(said))return 'contextual'
   return null
@@ -70,6 +72,11 @@ export class EphemeralVisualContext{
     if(!this.entry || this.entry.generation!==generation || this.expired(now))return false
     this.entry.analyzed=true
     return true
+  }
+  /** The viewer's own question form is explicit authorization to reuse it. */
+  getAuthorizedFrame(now=Date.now()):{image:LocalVisualImage;kind:VisualReference}|null{
+    if(!this.entry || !this.entry.analyzed || this.expired(now))return null
+    return {image:this.entry.image,kind:'explicit'}
   }
   getForFollowUp(text:string,now=Date.now()):{image:LocalVisualImage;kind:VisualReference}|null{
     const kind=classifyVisualFollowUp(text)
