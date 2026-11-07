@@ -82,6 +82,12 @@ export function buildLumiaSkillRegistry({
       'Enviar una fotografía seleccionada expresamente al modelo local.',
       'Depende de disponer de un modelo multimodal compatible y no implica acceso permanente a cámara.',
       'provider+env'),
+    entry('vision-camera', 'Cámara puntual autorizada', 'VISION-02',
+      canVision && local && enabled(env.ORBIA_LUMIA_VISION_CAMERA_VI02)
+        ? 'experimental' : 'disabled',
+      'Capturar una sola fotografía con permiso del usuario y describirla mediante Ollama local.',
+      'Sin cámara siempre activa, video continuo, observación de pantalla ni acceso sin permiso. La calidad depende del modelo visual instalado y requiere QA ASUS.',
+      'user-command+browser-permission+local-ollama'),
     entry('voice-model-controls', 'Controles locales específicos', 'C1-D',
       local ? 'configured' : 'disabled',
       'Consultar algunos diagnósticos y seleccionar modelos o ajustes de voz previstos.',
