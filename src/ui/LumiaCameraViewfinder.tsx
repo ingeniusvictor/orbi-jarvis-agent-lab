@@ -13,6 +13,7 @@ import {useEffect,useRef,useState} from 'react'
 import * as camera from '../lib/camera'
 import {prepareVisualCameraFrame,type LocalVisualImage} from '../lib/visual-input'
 import {inspectCameraSignal,connectedOrVirtualCameraHint} from '../lib/vision-camera-signal-vi022'
+import type {VisionReplyMode} from '../lib/vision-context-vi023'
 
 type Props={
   live:boolean
@@ -20,10 +21,15 @@ type Props={
   onCaptured:(image:LocalVisualImage)=>void
   onClose:()=>void
   onReopen:()=>void
+  visualContextReady:boolean
+  visualReplyMode:VisionReplyMode
+  onVisualReplyModeChange:(mode:VisionReplyMode)=>void
+  onAskAboutStill:(question:string)=>void
 }
 
 export function LumiaCameraViewfinder({
   live,still,onCaptured,onClose,onReopen,
+  visualContextReady,visualReplyMode,onVisualReplyModeChange,onAskAboutStill,
 }:Props){
   const videoRef=useRef<HTMLVideoElement>(null)
   const releaseRef=useRef<(()=>void)|null>(null)
@@ -36,6 +42,7 @@ export function LumiaCameraViewfinder({
   const [activeSource,setActiveSource]=useState(
     camera.getLastCameraSource()?.label??'')
   const [signalWarning,setSignalWarning]=useState<string|null>(null)
+  const [followupDraft,setFollowupDraft]=useState('')
 
   useEffect(()=>{
     if(!live)return
@@ -163,6 +170,18 @@ export function LumiaCameraViewfinder({
           Origen usado: {activeSource||'sin identificar'}
         </span>
       </div>
+      <div className="lumia-camera-reply-selector" role="group"
+        aria-label="Extensión de respuestas visuales">
+        <span>RESPUESTA VISUAL</span>
+        <button type="button"
+          className={visualReplyMode==='breve'?'is-selected':''}
+          aria-pressed={visualReplyMode==='breve'}
+          onClick={()=>onVisualReplyModeChange('breve')}>Breve</button>
+        <button type="button"
+          className={visualReplyMode==='detallada'?'is-selected':''}
+          aria-pressed={visualReplyMode==='detallada'}
+          onClick={()=>onVisualReplyModeChange('detallada')}>Detallada</button>
+      </div>
       <div className="lumia-camera-viewfinder-viewport">
         {live ? (
           <video ref={videoRef} className="lumia-camera-viewfinder-video"
@@ -188,6 +207,34 @@ export function LumiaCameraViewfinder({
         <p className="lumia-camera-signal-warning" role="status">
           {signalWarning}
         </p>
+      )}
+      {!live && still && (
+        <section className="lumia-camera-followup" aria-label="Conversación con la foto">
+          <p className="lumia-camera-followup-status" role="status">
+            {visualContextReady
+              ? 'Puedes preguntarme por esta misma imagen, también por voz. No encenderé otra vez la cámara.'
+              : 'Analizando imagen… Las preguntas de seguimiento estarán disponibles al finalizar.'}
+          </p>
+          <form className="lumia-camera-followup-form" onSubmit={(event)=>{
+            event.preventDefault()
+            const question=followupDraft.trim()
+            if(!question || !visualContextReady)return
+            setFollowupDraft('')
+            onAskAboutStill(question)
+          }}>
+            <input type="text" value={followupDraft} maxLength={400}
+              aria-label="Pregunta sobre la misma fotografía"
+              placeholder="¿Qué hay detrás? ¿De qué color es…?"
+              disabled={!visualContextReady}
+              onChange={(event)=>setFollowupDraft(event.target.value)}/>
+            <button type="submit" disabled={!visualContextReady||!followupDraft.trim()}>
+              Preguntar
+            </button>
+          </form>
+          <p className="lumia-camera-followup-privacy">
+            Foto temporal · 5 minutos · se descarta al cerrar.
+          </p>
+        </section>
       )}
       <footer className="lumia-camera-viewfinder-actions">
         {live ? (
