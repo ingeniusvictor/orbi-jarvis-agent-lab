@@ -138,13 +138,15 @@ export default function App() {
   const [pushBusy, setPushBusy] = useState(false)
   const [cameraCapturing,setCameraCapturing] = useState(false)
   const [cameraPreviewOpen,setCameraPreviewOpen] = useState(false)
+  const [visionFileMode,setVisionFileMode] = useState(false)
+  const [visionStillSource,setVisionStillSource] = useState<'camera'|'file'>('camera')
   const [cameraStill,setCameraStill] = useState<LocalVisualImage|null>(null)
   const [visionReplyMode,setVisionReplyMode] = useState<VisionReplyMode>('breve')
   const [visionContextReady,setVisionContextReady] = useState(false)
   const visualSession = useRef(new EphemeralVisualContext())
   const activeVisualReply = useRef<string|null>(null)
   const cameraCaptureOwner = useRef<string|null>(null)
-  // The captured JPEG is transient memory, never transcript/localStorage.
+  // Either an authorized webcam frame or a manually selected file is transient memory, never transcript/localStorage.
   // This timer erases even an unattended frozen picture after five minutes.
   useEffect(()=>{
     if(!cameraStill)return
@@ -311,13 +313,14 @@ export default function App() {
           ? visualSession.current.getAuthorizedFrame()
           : visualSession.current.getForFollowUp(said)
         : null
-      // A newly attached file is a separate VI-01 image, not a follow-up
-      // to a prior camera still: never silently send the old camera photo.
+      // A newly attached one-shot composer file is separate from the unified
+      // Vision panel: never silently send a previous picture along with it.
       if(image && !fromCameraPreview && !cameraRequested){
         visualSession.current.clear()
         setVisionContextReady(false)
         setCameraStill(null)
         setCameraPreviewOpen(false)
+        setVisionFileMode(false)
       }
       const cameraIntent = CAMERA_VISION_VI02_ENABLED && !image && !visualFollowUp
         ? parseLumiaCameraIntent(said) : null
@@ -338,6 +341,8 @@ export default function App() {
             // This is the precise JPEG that local Ollama will receive, NOT
             // an imaginary live feed continuing after the shutter closes.
             setCameraStill(visualImage)
+            setVisionStillSource('camera')
+            setVisionFileMode(false)
             setCameraPreviewOpen(false)
           }
         } catch(err) {
@@ -356,9 +361,9 @@ export default function App() {
         }
         if(stale())return
       }
-      // Only an owner-clicked/voice-camera frame creates a reusable session.
-      // A photo uploaded through VI-01 remains one-shot unless explicitly
-      // captured by the existing camera viewer; no silent photo retention.
+      // A camera shot or file explicitly analyzed in the unified viewer
+      // creates the same five-minute follow-up session. Composer attachments
+      // outside the viewer remain one-shot and are never retained silently.
       if(visualImage && !visualFollowUp &&
          (cameraIntent || cameraRequested || fromCameraPreview)){
         visualGeneration=visualSession.current.begin(visualImage)
@@ -1356,6 +1361,8 @@ export default function App() {
       return
     }
     closeCameraViewfinder() // cancels any in-flight analysis of the old still
+    setVisionStillSource('camera')
+    setVisionFileMode(false)
     setCameraPreviewOpen(true)
   }
   const closeCameraViewfinder = () => {
@@ -1381,17 +1388,46 @@ export default function App() {
     visualSession.current.clear()
     setVisionContextReady(false)
     setCameraPreviewOpen(false)
+    setVisionFileMode(false)
     setCameraStill(null)
   }
   const recaptureCameraViewfinder = () => {
     if(!CAMERA_VISION_VI02_ENABLED || cameraCapturing || experimentOwner.current)return
+    const fileAgain=visionStillSource==='file'
     closeCameraViewfinder() // no late answer from a superseded photo
+    setVisionFileMode(fileAgain)
+    setCameraPreviewOpen(!fileAgain)
+  }
+  const selectVisionFileMode = () => {
+    if(!CAMERA_VISION_VI02_ENABLED || cameraCapturing || experimentOwner.current)return
+    closeCameraViewfinder()
+    setVisionStillSource('file')
+    setVisionFileMode(true)
+  }
+  const selectVisionCameraMode = () => {
+    if(!CAMERA_VISION_VI02_ENABLED || cameraCapturing || experimentOwner.current)return
+    closeCameraViewfinder()
+    setVisionStillSource('camera')
     setCameraPreviewOpen(true)
   }
   const analyzeCameraViewfinderFrame = (image:LocalVisualImage) => {
     // LumiaCameraViewfinder releases the live webcam lease synchronously
     // BEFORE notifying us with these exact JPEG bytes.
     setCameraPreviewOpen(false)
+    setVisionFileMode(false)
+    setVisionStillSource('camera')
+    setCameraStill(image)
+    silence()
+    interrupt()
+    void respond('Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.',image,false,true)
+  }
+
+  const analyzeVisionFile = (image:LocalVisualImage) => {
+    // Explicit file-picker consent; jpeg bytes prepared locally and only now
+    // provided to the same Ollama + ephemeral context flow as a camera shot.
+    setCameraPreviewOpen(false)
+    setVisionFileMode(false)
+    setVisionStillSource('file')
     setCameraStill(image)
     silence()
     interrupt()
@@ -1539,11 +1575,16 @@ export default function App() {
         goDormant()
       }} />}
       <Hud />
-      {CAMERA_VISION_VI02_ENABLED && (cameraPreviewOpen || cameraStill) && (
+      {CAMERA_VISION_VI02_ENABLED && (cameraPreviewOpen || visionFileMode || cameraStill) && (
         <LumiaCameraViewfinder
           live={cameraPreviewOpen}
+          fileMode={visionFileMode}
+          stillSource={visionStillSource}
           still={cameraStill}
           onCaptured={analyzeCameraViewfinderFrame}
+          onFileCaptured={analyzeVisionFile}
+          onSelectFileMode={selectVisionFileMode}
+          onSelectCameraMode={selectVisionCameraMode}
           onClose={closeCameraViewfinder}
           onReopen={recaptureCameraViewfinder}
           visualContextReady={visionContextReady}
