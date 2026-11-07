@@ -24,6 +24,7 @@ type Props = {
   visionAvailable: boolean
   cameraAvailable?: boolean
   cameraCapturing?: boolean
+  cameraPreviewOpen?: boolean
   onCaptureCamera?: () => void
   translationAvailable: boolean
   avatarViewControl?: boolean
@@ -97,7 +98,7 @@ function DockIcon({ name }: { name: IconName }) {
 }
 
 export function LumiaComposer({
-  available, mode, recording, busy, visionAvailable, cameraAvailable = false, cameraCapturing = false, onCaptureCamera, translationAvailable, avatarViewControl = false, onTranslate, onTranslateAudio,
+  available, mode, recording, busy, visionAvailable, cameraAvailable = false, cameraCapturing = false, cameraPreviewOpen = false, onCaptureCamera, translationAvailable, avatarViewControl = false, onTranslate, onTranslateAudio,
   onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
@@ -224,11 +225,13 @@ export function LumiaComposer({
           <button
             type="button"
             className={'lumia-composer-icon-button lumia-composer-camera' +
-              (cameraCapturing ? ' is-capturing' : '')}
-            aria-label={cameraCapturing ? 'Capturando una imagen puntual' : 'Capturar una imagen con la cámara'}
+              (cameraCapturing || cameraPreviewOpen ? ' is-capturing' : '')}
+            aria-label={cameraCapturing ? 'Capturando una imagen puntual' : cameraPreviewOpen ? 'Cerrar vista previa de cámara' : 'Abrir vista previa de cámara'}
             title={cameraCapturing
               ? 'LUMIA está capturando una foto autorizada'
-              : 'Cámara · una foto local para LUMIA · se libera después'}
+              : cameraPreviewOpen
+              ? 'Cerrar cámara y descartar vista previa'
+              : 'Abrir encuadre en vivo; analiza solo cuando pulses Capturar'}
             disabled={cameraCapturing || busy || preparing || recording || !available}
             onClick={() => onCaptureCamera?.()}
           ><DockIcon name="camera" /></button>
