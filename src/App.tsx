@@ -1355,9 +1355,7 @@ export default function App() {
       closeCameraViewfinder()
       return
     }
-    visualSession.current.clear()
-    setVisionContextReady(false)
-    setCameraStill(null)
+    closeCameraViewfinder() // cancels any in-flight analysis of the old still
     setCameraPreviewOpen(true)
   }
   const closeCameraViewfinder = () => {
@@ -1387,9 +1385,7 @@ export default function App() {
   }
   const recaptureCameraViewfinder = () => {
     if(!CAMERA_VISION_VI02_ENABLED || cameraCapturing || experimentOwner.current)return
-    visualSession.current.clear()
-    setVisionContextReady(false)
-    setCameraStill(null)
+    closeCameraViewfinder() // no late answer from a superseded photo
     setCameraPreviewOpen(true)
   }
   const analyzeCameraViewfinderFrame = (image:LocalVisualImage) => {
