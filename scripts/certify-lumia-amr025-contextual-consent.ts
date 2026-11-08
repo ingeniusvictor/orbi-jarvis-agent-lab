@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
-import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction} from '../src/lib/vision-context-amr025'
+import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from '../src/lib/vision-context-amr025'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS} from '../src/lib/vision-context-vi023'
 const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8')
 
@@ -19,6 +19,15 @@ for(const [q,edge,result] of cases){
  assert.equal(classifyExistingPhotoFollowup(q,edge),result,q)
 }
 assert.match(visualReferenceClarification(),/¿A qué objeto o persona/)
+assert.equal(isVisualReferenceAnswer('La camisa del hombre de la derecha'),true)
+assert.equal(isVisualReferenceAnswer('El de la izquierda'),true)
+assert.equal(isVisualReferenceAnswer('Me refiero a la gorra'),true)
+assert.equal(isVisualReferenceAnswer('¿Qué hora es?'),false)
+assert.equal(isVisualReferenceAnswer('No'),false)
+assert.equal(isVisualReferenceAnswer('Apaga las luces'),false)
+assert.match(resolvedVisualReferencePrompt('¿De qué color es esto?','La camisa del hombre de la derecha'),/Pregunta original/)
+assert.match(resolvedVisualReferencePrompt('¿De qué color es esto?','La camisa del hombre de la derecha'),/Aclaración explícita/)
+
 assert.match(visualDetailOfferMessage('camera'),/No encenderé la cámara automáticamente/)
 assert.match(visualDetailOfferMessage('file'),/archivo original/)
 assert.match(visualDetailOfferMessage('none'),/cargar otra fotografía/)
@@ -67,6 +76,12 @@ assert.match(app,/const VISION_CONTEXT_AMR025_ENABLED = import\.meta\.env\.VITE_
 assert.match(app,/classifyExistingPhotoFollowup\(said,frameSource\.resolution\)/)
 assert.match(app,/visualDetailOfferMessage\(available\)/)
 assert.match(app,/visualReferenceClarification\(\)/)
+assert.match(app,/const resolvingReference=Boolean\(VISION_CONTEXT_AMR025_ENABLED/)
+assert.match(app,/isVisualReferenceAnswer\(said\)/)
+assert.match(app,/resolvedVisualReferencePrompt\(pendingReference,said\)/)
+assert.match(app,/followupVisionPrompt\(visualQuestion,visionReplyMode\)/)
+assert.match(app,/pendingReferenceQuestion\.current=null/)
+
 assert.match(app,/calibratedVisionInstruction\(\)/)
 assert.match(app,/const requestDetailedReanalysis = async \(\) =>/)
 assert.match(app,/const highResolution=await prepareVisualImage\(selected\.file,1024\)/)
