@@ -12,7 +12,7 @@ const proc=spawnSync(process.execPath,['--import','tsx',join(root,'scripts/bench
 assert.equal(proc.status,0,proc.stderr)
 // Node emits ASCII-only JSON even when Windows PowerShell defaults to an
 // OEM native stdout codepage; parsing reconstructs correct Spanish accents.
-assert.equal(/[^\\x00-\\x7f]/.test(proc.stdout),false,'Non-ASCII JSON stdout can be mangled by Windows PowerShell 5.1')
+assert.equal(/[^\x00-\x7f]/.test(proc.stdout),false,'Non-ASCII JSON stdout can be mangled by Windows PowerShell 5.1')
 const cfg=JSON.parse(proc.stdout)
 assert.match(cfg.tasks[0].question,/español/)
 assert.match(cfg.tasks[0].question,/qué es/)
