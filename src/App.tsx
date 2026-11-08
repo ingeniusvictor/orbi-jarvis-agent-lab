@@ -10,7 +10,7 @@ import { VisualInput } from './ui/VisualInput'
 import { LumiaComposer } from './ui/LumiaComposer'
 import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
 import {prepareVisualImage,DEFAULT_VISION_RESOLUTION,type LocalVisualImage,type VisionResolution} from './lib/visual-input'
-import {visionTracingEnabled,visualPrecisionInstruction,visualTraceIntent} from './lib/vision-trace-amr026'
+import {visionTracingEnabled,visualPrecisionInstruction,visualTraceIntent,type VisionTraceRole} from './lib/vision-trace-amr026'
 import {chooseVisionResolution,visionSpeechBudget} from './lib/vision-routing-amr024'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
@@ -435,7 +435,7 @@ export default function App() {
       // AMR-02.6: distinct turn ID for every inference, shared random photo ID
       // for the same owner-approved JPEG. No image bytes, path or prompt in logs.
       if(visualImage?.trace && visionTracingEnabled() && !contextualReply && !captureFailure){
-        const role=visualFollowUp?'followup'
+        const role:VisionTraceRole=visualFollowUp?'followup'
           :fromCameraPreview && said!=='Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.'?'reanalysis':'new'
         const trace={...visualImage.trace,turnId,role,intent:visualTraceIntent(visualQuestion)}
         visualImage={...visualImage,trace}
