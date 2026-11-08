@@ -1,4 +1,4 @@
-# AMR-02.9 — short, side-by-side local Qwen3.5 2B vs customised 4B trial.
+﻿# AMR-02.9 — short, side-by-side local Qwen3.5 2B vs customised 4B trial.
 # Written tasks + spoken-reply model contract + ONE image per model.
 # Real microphone (Whisper) and playback (Kokoro) are compared separately
 # through LUMIA's existing app; this CLI does NOT pretend to measure them.
