@@ -3,9 +3,13 @@
  * Photos are resized in the browser before they travel to the local bridge.
  * Never write the original file or base64 image into conversation state.
  */
+import {createVisionTrace,visionTracingEnabled,visionTraceSummary,type VisionTraceMetadata} from './vision-trace-amr026'
+
 export type LocalVisualImage = {
   mimeType: 'image/jpeg'
   data: string
+  /** Optional AMR-02.6 metadata, NO pixels, prompt, file hash or path. */
+  trace?: VisionTraceMetadata
 }
 
 export const MAX_VISUAL_FILE_BYTES = 12 * 1024 * 1024
@@ -72,7 +76,9 @@ export async function prepareVisualImage(file: File, maxEdge:VisionResolution=DE
       const data = dataUrl.slice(dataUrl.indexOf(',') + 1)
       if (data.length && data.length <= MAX_VISUAL_PAYLOAD_CHARS) {
         reportPreparedFrame('file', maxEdge, width, height, data.length)
-        return { mimeType: 'image/jpeg', data }
+        const trace=visionTracingEnabled()?createVisionTrace('file',maxEdge,width,height,data.length):undefined
+        if(trace)console.info('[lumia:vision-amr026] prepared',visionTraceSummary(trace))
+        return { mimeType: 'image/jpeg', data, ...(trace?{trace}:{}) }
       }
     }
     throw new Error('Esta imagen es demasiado grande incluso después de reducirla.')
@@ -104,7 +110,9 @@ export function prepareVisualCameraFrame(video:HTMLVideoElement,maxEdge:VisionRe
     const data=url.slice(url.indexOf(',')+1)
     if(data.length && data.length<=MAX_VISUAL_PAYLOAD_CHARS){
       reportPreparedFrame('camera',maxEdge,width,height,data.length)
-      return {mimeType:'image/jpeg',data}
+      const trace=visionTracingEnabled()?createVisionTrace('camera',maxEdge,width,height,data.length):undefined
+      if(trace)console.info('[lumia:vision-amr026] prepared',visionTraceSummary(trace))
+      return {mimeType:'image/jpeg',data,...(trace?{trace}:{})}
     }
   }
   throw new Error('La captura de cámara supera el límite permitido.')
