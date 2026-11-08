@@ -108,6 +108,8 @@ const AVATAR_PH04_ENABLED = import.meta.env.VITE_LUMIA_AVATAR_PH04 === '1'
 const VISION_AUTO_AMR024_ENABLED = import.meta.env.VITE_LUMIA_VISION_AUTO_AMR024 === '1'
 const VISION_CONTEXT_AMR025_ENABLED = import.meta.env.VITE_LUMIA_VISION_CONTEXT_AMR025 === '1'
 const VISION_ADAPTIVE_AMR027_ENABLED = import.meta.env.VITE_LUMIA_VISION_ADAPTIVE_AMR027 === '1'
+/** VI-03.0 pilot: opt-in temporal truth on previously authorized stills. */
+const VISION_TEMPORAL_VI030_ENABLED = import.meta.env.VITE_LUMIA_VISION_TEMPORAL_VI030 === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -343,7 +345,7 @@ export default function App() {
       // VI-03.0: a question about what changed must NOT silently reuse a
       // frozen JPEG as if LUMIA were looking through a live camera.
       // Explicit user-requested capture still has precedence via cameraRequested.
-      const temporalQuestion = CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested &&
+      const temporalQuestion = VISION_TEMPORAL_VI030_ENABLED && CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested &&
         !fromCameraPreview && visualSession.current.hasAnalyzedFrame() &&
         requiresFreshVisualObservation(said)
       const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested
