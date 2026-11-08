@@ -3343,6 +3343,27 @@ kbd {
   background: rgba(33,171,195,.32);
   color: #e9fdff;
 }
+/* AMR-02.5: explicit higher-resolution authorization inside the existing
+   viewer, never a floating persistent panel. */
+.lumia-camera-detail-offer {
+  display:flex;flex-direction:column;align-items:flex-start;gap:6px;
+  margin:9px 0;padding:10px;
+  border:1px solid rgba(128,219,231,.35);
+  border-radius:9px;background:rgba(9,46,60,.45);
+  color:#d7f5f7;font:11px/1.45 system-ui,sans-serif;
+}
+.lumia-camera-detail-offer p {margin:0}
+.lumia-camera-detail-offer p:last-child {font-size:10px;color:rgba(182,217,225,.79)}
+.lumia-camera-detail-offer button {
+  padding:7px 10px;min-height:34px;max-width:100%;
+  cursor:pointer;border-radius:8px;
+  border:1px solid rgba(133,236,247,.61);
+  background:rgba(22,132,154,.37);
+  color:#f0fcff;font:600 11px/1.2 system-ui,sans-serif;
+}
+.lumia-camera-detail-offer button:disabled {opacity:.55;cursor:wait}
+.lumia-camera-detail-offer button:focus-visible {outline:2px solid #b8faff;outline-offset:2px}
+
 .lumia-camera-followup {margin-top: 10px}
 .lumia-camera-followup-status {
   margin: 0 0 8px; color: #bdebf1; font: 11px/1.45 system-ui,sans-serif;
