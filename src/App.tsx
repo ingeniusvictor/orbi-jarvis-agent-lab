@@ -12,6 +12,7 @@ import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
 import {prepareVisualImage,DEFAULT_VISION_RESOLUTION,type LocalVisualImage,type VisionResolution} from './lib/visual-input'
 import {visionTracingEnabled,visualPrecisionInstruction,visualTraceIntent,type VisionTraceRole} from './lib/vision-trace-amr026'
 import {chooseVisionResolution,visionSpeechBudget} from './lib/vision-routing-amr024'
+import {chooseAdaptiveVisionResolution,shouldOfferGroupDetail} from './lib/vision-routing-amr027'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode,type VisualFrameSource} from './lib/vision-context-vi023'
@@ -105,6 +106,7 @@ const MULTIMODAL_COMPOSER = import.meta.env.VITE_LUMIA_MULTIMODAL_COMPOSER === '
 const AVATAR_PH04_ENABLED = import.meta.env.VITE_LUMIA_AVATAR_PH04 === '1'
 const VISION_AUTO_AMR024_ENABLED = import.meta.env.VITE_LUMIA_VISION_AUTO_AMR024 === '1'
 const VISION_CONTEXT_AMR025_ENABLED = import.meta.env.VITE_LUMIA_VISION_CONTEXT_AMR025 === '1'
+const VISION_ADAPTIVE_AMR027_ENABLED = import.meta.env.VITE_LUMIA_VISION_ADAPTIVE_AMR027 === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -154,6 +156,7 @@ export default function App() {
   const [visionAutoEnabled,setVisionAutoEnabled] = useState(VISION_AUTO_AMR024_ENABLED)
   const [visionContextReady,setVisionContextReady] = useState(false)
   const [visualDetailOffer,setVisualDetailOffer] = useState<'camera'|'file'|null>(null)
+  const [visualDetailPurpose,setVisualDetailPurpose] = useState<'ocr'|'count'>('ocr')
   const [visualDetailBusy,setVisualDetailBusy] = useState(false)
   const pendingVisualSource = useRef<VisualFrameSource|null>(null)
   const pendingDetailedQuestion = useRef<string|null>(null)
@@ -348,16 +351,29 @@ export default function App() {
         ? visualSession.current.getFrameSource() : null
       const contextAction=frameSource
         ? classifyExistingPhotoFollowup(visualQuestion,frameSource.resolution) : 'proceed'
+      // A previously approved 768px JPEG cannot gain missing details by
+      // upscaling. Offer owner-controlled re-encoding or camera reframing.
+      const groupUpgrade=Boolean(frameSource && contextAction==='proceed' &&
+        shouldOfferGroupDetail(visualQuestion,frameSource.resolution,
+          VISION_ADAPTIVE_AMR027_ENABLED && visionAutoEnabled))
       let contextualReply:string|null=null
       if(contextAction==='clarify-reference'){
         contextualReply=visualReferenceClarification()
         pendingReferenceQuestion.current=said
         setVisualDetailOffer(null)
         pendingDetailedQuestion.current=null
-      }else if(contextAction==='offer-high-resolution'){
+      }else if(contextAction==='offer-high-resolution' || groupUpgrade){
         const available=frameSource?.canReanalyzeOriginal ? 'file'
           : frameSource?.kind==='camera' ? 'camera' : 'none'
-        contextualReply=visualDetailOfferMessage(available)
+        const detailPurpose=groupUpgrade?'count' as const:'ocr' as const
+        setVisualDetailPurpose(detailPurpose)
+        contextualReply=detailPurpose==='count'
+          ? available==='file'
+            ? 'Esta foto fue preparada a resolución reducida. Para contar mejor las personas, pulsa Reanalizar grupo a 1024 píxeles. No enviaré otra imagen sin tu autorización.'
+            : available==='camera'
+              ? 'Para contar mejor las personas, pulsa Volver a encuadrar grupo a 1024 píxeles y confirma Capturar y analizar. No abriré la cámara automáticamente.'
+              : 'Esta foto tiene poco detalle para un conteo fiable. Puedes cargar otra imagen a 1024 píxeles o autorizar otra captura.'
+          : visualDetailOfferMessage(available)
         pendingDetailedQuestion.current=said
         setVisualDetailOffer(available==='none'?null:available)
         console.info('[lumia:vision-amr025] detail-offer',`source=${available} edge=${frameSource?.resolution ?? 0}px`)
@@ -392,7 +408,9 @@ export default function App() {
         setCameraCapturing(true)
         s.setLooking('VISIÓN LOCAL · UNA FOTO SOLICITADA')
         try {
-          const route=chooseVisionResolution(cameraIntent?.question ?? said,visionChoice)
+          const route=VISION_ADAPTIVE_AMR027_ENABLED
+            ? chooseAdaptiveVisionResolution(cameraIntent?.question ?? said,visionChoice,true)
+            : chooseVisionResolution(cameraIntent?.question ?? said,visionChoice)
           if(VISION_AUTO_AMR024_ENABLED)console.info('[lumia:vision-amr024] route',
             `source=voice mode=${visionChoice==='auto'?'auto':'manual'} edge=${route.resolution}px reason=${route.reason}`)
           visualImage=await captureLumiaAuthorizedStill(stale,undefined,route.resolution)
@@ -1745,6 +1763,7 @@ export default function App() {
           onVisionAutoEnabledChange={setVisionAutoEnabled}
           onAskAboutStill={submitVisualFollowUp}
           visualDetailOffer={VISION_CONTEXT_AMR025_ENABLED?visualDetailOffer:null}
+          visualDetailPurpose={visualDetailPurpose}
           visualDetailBusy={visualDetailBusy}
           onRequestDetailedReanalysis={()=>{void requestDetailedReanalysis()}}
         />
