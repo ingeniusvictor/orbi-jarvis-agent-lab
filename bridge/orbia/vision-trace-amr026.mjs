@@ -33,7 +33,7 @@ export function explicitGroupCount(answer){
   const groupMatches=new RegExp(groupPattern.source,'gu')
   for(const m of text.matchAll(groupMatches)){
     const remainder=text.slice((m.index??0)+m[0].length)
-    if(/^\\s+(?:de pie|sentad[oa]s?|agachad[oa]s?|parad[oa]s?|al fondo|al frente|en primer plano)\\b/.test(remainder))continue
+    if(/^\s+(?:de pie|sentad[oa]s?|agachad[oa]s?|parad[oa]s?|al fondo|al frente|en primer plano)\b/.test(remainder))continue
     const count=Number(m[1])||numWords[m[1]]
     if(Number.isInteger(count)&&count>=2&&count<=20)return count
   }
