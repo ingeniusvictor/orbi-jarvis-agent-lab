@@ -51,7 +51,7 @@ assert.match(mismatch.text,/conteos diferentes/)
 assert.doesNotMatch(mismatch.text,/\b(?:siete|ocho)\b/,'Do not falsely select a winner')
 assert.equal(ledger.review({photoId:b.photoId,answer:'Hay siete personas.',intent:'count',now:1003}).status,'first')
 assert.equal(ledger.review({photoId:a.photoId,answer:'Hay ocho personas.',intent:'scene',now:1004}).status,'changed-observation')
-assert.equal(ledger.review({photoId:a.photoId,answer:'Hay ocho personas.',intent:'count',now:1000+300001}).status,'first','TTL expiry')
+assert.equal(ledger.review({photoId:a.photoId,answer:'Hay ocho personas.',intent:'count',now:1004+300001}).status,'first','TTL expiry')
 ledger.clear()
 assert.equal(ledger.size,0)
 
