@@ -27,10 +27,17 @@ export function safeVisionTrace(raw,encodedLength){
 }
 
 export function explicitGroupCount(answer){
-  const m=groupPattern.exec(normalize(answer))
-  if(!m)return null
-  const count=Number(m[1])||numWords[m[1]]
-  return Number.isInteger(count)&&count>=2&&count<=20?count:null
+  const text=normalize(answer)
+  // A subgroup ('seis personas de pie') cannot replace the overall group
+  // total ('siete personas'); keep looking for an explicit overall count.
+  const groupMatches=new RegExp(groupPattern.source,'gu')
+  for(const m of text.matchAll(groupMatches)){
+    const remainder=text.slice((m.index??0)+m[0].length)
+    if(/^\\s+(?:de pie|sentad[oa]s?|agachad[oa]s?|parad[oa]s?|al fondo|al frente|en primer plano)\\b/.test(remainder))continue
+    const count=Number(m[1])||numWords[m[1]]
+    if(Number.isInteger(count)&&count>=2&&count<=20)return count
+  }
+  return null
 }
 
 export const countQuestion=q=>/\b(?:cuantos|cuantas|cuenta|contar|conteo|numero de personas|total de personas|cuantos hombres|cuantas mujeres)\b/.test(normalize(q))
