@@ -916,7 +916,7 @@ export function attachOllamaSession(socket) {
           visualTrace,
           askId:ask,
           onVisualAnswer:visualTrace ? (rawAnswer)=>{
-            const result=visualLedger.review({photoId:visualTrace.photoId,answer:rawAnswer,question:prompt})
+            const result=visualLedger.review({photoId:visualTrace.photoId,answer:rawAnswer,intent:visualTrace.intent})
             if(result.status!=='unmeasured')console.log('[lumia:vision-amr026] consistency',
               `ask=${String(ask??'unknown').slice(0,25)} photo=${visualTrace.photoId} status=${result.status}`)
             return result.text
