@@ -6,7 +6,7 @@ on:
       - feature/lumia-amr027-adaptive-group-vision-cache-20261108
   pull_request:
     branches:
-      - feature/lumia-amr027-adaptive-group-vision-cache-20261108
+      - feature/lumia-amr0261-persistent-count-consistency-20261108
   workflow_dispatch:
 
 permissions:
