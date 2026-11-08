@@ -437,9 +437,10 @@ export default function App() {
       if(visualImage?.trace && visionTracingEnabled() && !contextualReply && !captureFailure){
         const role=visualFollowUp?'followup'
           :fromCameraPreview && said!=='Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.'?'reanalysis':'new'
-        visualImage={...visualImage,trace:{...visualImage.trace,turnId,role,intent:visualTraceIntent(visualQuestion)}}
+        const trace={...visualImage.trace,turnId,role,intent:visualTraceIntent(visualQuestion)}
+        visualImage={...visualImage,trace}
         console.info('[lumia:vision-amr026] turn',
-          `turn=${turnId} photo=${visualImage.trace.photoId} role=${role} edge=${visualImage.trace.limitPx}px actual=${visualImage.trace.width}x${visualImage.trace.height}`)
+          `turn=${turnId} photo=${trace.photoId} role=${role} edge=${trace.limitPx}px actual=${trace.width}x${trace.height}`)
       }
       if(visualImage) activeVisualReply.current=turnId
       const avatarAction = AVATAR_PH04_ENABLED && !visualImage && !captureFailure
