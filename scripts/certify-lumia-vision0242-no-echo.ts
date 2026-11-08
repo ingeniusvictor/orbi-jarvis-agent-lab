@@ -12,7 +12,7 @@ const visual=backend.slice(backend.indexOf('  if (image) {',backend.indexOf('exp
 assert.ok(visual.includes('images: [image.data]'),'Still uses JPEG exactly once')
 assert.doesNotMatch(visual,/\.\.\.history/,'No previous conversation transcript inside visual payload')
 assert.match(backend,/const messages = \[[\s\S]*?\.\.\.history/,'Ordinary conversation continues using prior history')
-assert.match(app,/followupVisionPrompt\(said,visionReplyMode\)/)
+assert.match(app,/followupVisionPrompt\(visualQuestion,visionReplyMode\)/)
 assert.match(app,/visualReliabilityInstruction\(cameraIntent\?\.question \?\? said\)/)
 const count=followupVisionPrompt('Lumi, ¿cuántas personas están de pie y cuántas agachadas?','breve')
 assert.match(count,/su suma coincide con el total/)
