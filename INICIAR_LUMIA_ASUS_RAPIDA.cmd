@@ -10,6 +10,12 @@ set "ORBIA_BRAIN_DEFAULT=ollama"
 set "JARVIS_PROVIDER=ollama"
 set "ORBIA_LUMIA_MODEL=qwen3.5:2b-q4_K_M"
 set "JARVIS_OLLAMA_MODEL=qwen3.5:2b-q4_K_M"
+rem AMR-02.2: opt-in model override from the dedicated ASUS pilot launcher.
+rem The ordinary launcher remains exactly on the certified 2B baseline.
+if defined LUMIA_ASUS_MODEL_OVERRIDE (
+  set "ORBIA_LUMIA_MODEL=%LUMIA_ASUS_MODEL_OVERRIDE%"
+  set "JARVIS_OLLAMA_MODEL=%LUMIA_ASUS_MODEL_OVERRIDE%"
+)
 set "ORBIA_LUMIA_STT_MODE=local"
 set "ORBIA_LUMIA_TTS_MODE=local"
 set "ORBIA_LUMIA_VOICE_PROFILE=lumia-kokoro"
@@ -83,7 +89,7 @@ echo.
 echo ============================================================
 echo   L.U.M.I.A. / ASUS - local voice low-latency PILOT
 echo   Whisper CLI stable + Kokoro resident + phrase prefetch
-echo   Qwen3.5 2B; face horizontal calibration = 0 CSS px
+echo   Brain: %JARVIS_OLLAMA_MODEL%; face calibration = 0 CSS px
 echo   Realtime API OFF / writes OFF
 echo ============================================================
 echo.

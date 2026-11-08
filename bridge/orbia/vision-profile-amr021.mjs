@@ -11,6 +11,13 @@
  */
 export function visualOptionsForModel(model) {
   const name = String(model ?? '').trim().toLowerCase()
+  // AMR-02.2: Aragón's owner-created vision4096 profile has an empirically
+  // validated GPU/CPU split (num_gpu=32, num_batch=128) in its Modelfile.
+  // The bridge deliberately sets ONLY the context/output length. In particular,
+  // do not send num_gpu=99 or num_batch=256 and undo the hybrid allocation.
+  if (name === 'qwen3.5:4b-vision4096') {
+    return {temperature: 0, num_ctx: 4096, num_predict: 256}
+  }
   return {
     temperature: 0,
     num_ctx: name === 'qwen3.5:4b-fast' ? 2048 : 4096,
