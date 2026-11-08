@@ -40,6 +40,7 @@ import { rc03GroundedReply, RC03_VOICE_GROUNDING_INSTRUCTION } from './orbia/gro
 import { rc04TranslationCapabilityReply, RC04_TRANSLATION_FACTS } from './orbia/translation-capabilities-rc04.mjs'
 import { buildLumiaSkillRegistry, isSkillRegistryInquiry, skillRegistryReply } from './orbia/skill-registry-skill01.mjs'
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
+import { safeVisionTrace,createVisionCountLedger } from './orbia/vision-trace-amr026.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
@@ -296,6 +297,9 @@ export async function streamOllama({
   image,
   signal,
   onText,
+  visualTrace = null,
+  askId = null,
+  onVisualAnswer = null,
 }) {
   const model = getActiveModel()
   const complexVoice = process.env.ORBIA_LUMIA_COMPLEX_VOICE_VQ01 === '1' && isComplexVoicePrompt(prompt) && !image
@@ -404,6 +408,8 @@ export async function streamOllama({
     const speed = outputMs > 0 ? (outputTokens / outputMs) * 1000 : 0
     console.log(
       `[lumia] visual local model=${model} context=${visualOptions.num_ctx}` +
+      (visualTrace ? ` ask=${String(askId??'unknown').slice(0,25)} turn=${visualTrace.turnId} photo=${visualTrace.photoId}`+
+        ` source=${visualTrace.source} role=${visualTrace.role} edge=${visualTrace.limitPx}px actual=${visualTrace.width}x${visualTrace.height}` : '') +
       ` total=${totalMs.toFixed(0)}ms` +
       ` input=${promptMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
       ` inputTokens=${Number(packet?.prompt_eval_count ?? 0)}` +
@@ -412,8 +418,9 @@ export async function streamOllama({
       ` speed=${speed.toFixed(1)}tok/s` +
       ` doneReason=${String(packet?.done_reason ?? 'unknown').slice(0, 24)}`,
     )
-    onText(answer)
-    return answer
+    const finalAnswer=typeof onVisualAnswer==='function'?onVisualAnswer(answer):answer
+    onText(finalAnswer)
+    return finalAnswer
   }
 
   const responseSchema = {
@@ -675,6 +682,7 @@ export function attachOllamaSession(socket) {
     `lumia-socket-${Date.now()}-${Math.random().toString(16).slice(2)}`
   let active = null
   let closed = false
+  const visualLedger=createVisionCountLedger()
 
   const send = (msg) => {
     if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(msg))
@@ -790,6 +798,8 @@ export function attachOllamaSession(socket) {
         // One single local photo; malformed payloads fail before model call.
         // It is never added to chat history, console output or diagnostics.
         const image = parseLocalVisualImage(msg.image)
+        const visualTrace=image && process.env.ORBIA_LUMIA_VISUAL_QA_AMR026==='1'
+          ? safeVisionTrace(msg.image?.trace,image.data.length) : null
         if (image && process.env.ORBIA_LUMIA_VISION_ENABLED !== '1') {
           throw new Error('Visión experimental deshabilitada en este bridge.')
         }
@@ -903,6 +913,14 @@ export function attachOllamaSession(socket) {
           knowledgeContext,
           toolContext,
           image,
+          visualTrace,
+          askId:ask,
+          onVisualAnswer:visualTrace ? (rawAnswer)=>{
+            const result=visualLedger.review({photoId:visualTrace.photoId,answer:rawAnswer,intent:visualTrace.intent})
+            if(result.status!=='unmeasured')console.log('[lumia:vision-amr026] consistency',
+              `ask=${String(ask??'unknown').slice(0,25)} photo=${visualTrace.photoId} status=${result.status}`)
+            return result.text
+          } : null,
           signal: controller.signal,
           onText: (delta) => send({ type: 'text', ask, delta }),
         })
@@ -946,6 +964,7 @@ export function attachOllamaSession(socket) {
   })
 
   socket.on('close', () => {
+    visualLedger.clear()
     closed = true
     active?.abort()
     active = null

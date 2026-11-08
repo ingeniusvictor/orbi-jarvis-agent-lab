@@ -10,6 +10,7 @@ import { VisualInput } from './ui/VisualInput'
 import { LumiaComposer } from './ui/LumiaComposer'
 import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
 import {prepareVisualImage,DEFAULT_VISION_RESOLUTION,type LocalVisualImage,type VisionResolution} from './lib/visual-input'
+import {visionTracingEnabled,visualPrecisionInstruction,visualTraceIntent,type VisionTraceRole} from './lib/vision-trace-amr026'
 import {chooseVisionResolution,visionSpeechBudget} from './lib/vision-routing-amr024'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
@@ -431,6 +432,16 @@ export default function App() {
         setVisualDetailOffer(null)
         pendingDetailedQuestion.current=null
       }
+      // AMR-02.6: distinct turn ID for every inference, shared random photo ID
+      // for the same owner-approved JPEG. No image bytes, path or prompt in logs.
+      if(visualImage?.trace && visionTracingEnabled() && !contextualReply && !captureFailure){
+        const role:VisionTraceRole=visualFollowUp?'followup'
+          :fromCameraPreview && said!=='Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.'?'reanalysis':'new'
+        const trace={...visualImage.trace,turnId,role,intent:visualTraceIntent(visualQuestion)}
+        visualImage={...visualImage,trace}
+        console.info('[lumia:vision-amr026] turn',
+          `turn=${turnId} photo=${trace.photoId} role=${role} edge=${trace.limitPx}px actual=${trace.width}x${trace.height}`)
+      }
       if(visualImage) activeVisualReply.current=turnId
       const avatarAction = AVATAR_PH04_ENABLED && !visualImage && !captureFailure
         ? parseLumiaAvatarAction(said) : null
@@ -459,13 +470,15 @@ export default function App() {
         ? { text: respondToLumiaAvatarAction(avatarAction) }
         : await ask(visualFollowUp
           ? followupVisionPrompt(visualQuestion,visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
-            (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')
+            (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')+
+            (visionTracingEnabled()?visualPrecisionInstruction(visualQuestion):'')
           : visualImage
           ? (cameraIntent || cameraRequested || fromCameraPreview
               ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
               visualReliabilityInstruction(cameraIntent?.question ?? said) +
               visualModeInstruction(visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
-              (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')
+              (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')+
+              (visionTracingEnabled()?visualPrecisionInstruction(cameraIntent?.question ?? said):'')
           : said,
           history.current, {
         onText: (delta) => {
@@ -476,6 +489,8 @@ export default function App() {
             store.getState().updateTurn(turnId, {
               firstTextAt: Date.now(), status: 'generating',
             })
+            if(visualImage?.trace && visionTracingEnabled())console.info('[lumia:vision-amr026] first-text',
+              `turn=${turnId} photo=${visualImage.trace.photoId} wait=${ttsDiag.firstTextMs}ms`)
             if(visualImage && VISION_AUTO_AMR024_ENABLED) {
               console.info('[lumia:vision-amr024] first-text',
                 `elapsed=${ttsDiag.firstTextMs}ms mode=${visionAutoEnabled?'auto':'manual'} followUp=${Boolean(visualFollowUp)}`)
