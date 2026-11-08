@@ -13,6 +13,7 @@ import {
 } from '../lib/visual-input'
 import type { LumiaInputMode } from '../lib/input-mode'
 import {chooseVisionResolution} from '../lib/vision-routing-amr024'
+import {chooseAdaptiveVisionResolution} from '../lib/vision-routing-amr027'
 import { LumiaViewDock } from './LumiaViewDock'
 import { LumiaModelDock } from './LumiaModelDock'
 import { LumiaMotionDock } from './LumiaMotionDock'
@@ -141,8 +142,10 @@ export function LumiaComposer({
     setError('')
     try {
       const question=text || 'Describe esta imagen en español y señala lo que no se pueda comprobar.'
-      const route=chooseVisionResolution(question,
-        visionAutoAvailable && visionAutoEnabled ? 'auto' : visionResolution)
+      const route=import.meta.env.VITE_LUMIA_VISION_ADAPTIVE_AMR027==='1'
+        ? chooseAdaptiveVisionResolution(question,visionAutoAvailable && visionAutoEnabled ? 'auto' : visionResolution,true)
+        : chooseVisionResolution(question,
+          visionAutoAvailable && visionAutoEnabled ? 'auto' : visionResolution)
       if(photo && visionAutoAvailable)console.info('[lumia:vision-amr024] route',
         `source=composer mode=${visionAutoEnabled?'auto':'manual'} edge=${route.resolution}px reason=${route.reason}`)
       const image = photo ? await prepareVisualImage(photo,route.resolution) : undefined
