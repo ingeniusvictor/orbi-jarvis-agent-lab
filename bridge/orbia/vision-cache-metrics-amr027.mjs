@@ -11,5 +11,5 @@ export function formatVisionCacheMetrics(packet){
   if(!Number.isSafeInteger(cached)||cached<0||!Number.isSafeInteger(total)||total<0||cached>total)
     return 'cachedTokens=unavailable'
   const share=total>0?(100*cached/total):0
-  return \`cachedTokens=\${cached} cachedShare=\${share.toFixed(1)}%\`
+  return `cachedTokens=${cached} cachedShare=${share.toFixed(1)}%`
 }
