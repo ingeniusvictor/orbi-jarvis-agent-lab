@@ -59,8 +59,12 @@ export const visualReferenceClarification=()=>
 
 /** An instruction, not a post-processor: never fabricate numerical confidence. */
 export function calibratedVisionInstruction():string{
-  return ' Distingue claramente contar figuras visibles de identificar personas: una cuenta no verifica identidad ni permite afirmar que todos están identificados. '+
+  return ' Distingue claramente contar figuras visibles de identificar personas: puedes reconocer visualmente personas sin saber quiénes son. '+
+    'Una cuenta de personas no verifica identidades ni garantiza que todas las figuras sean distinguibles; nunca afirmes que están identificadas por nombre solo por contarlas. '+
     'Evita afirmaciones absolutas como "sin ambigüedades", "perfectamente reconocidos" o "todos claramente identificados" si no puedes comprobarlo. '+
+    'No respondas "no puedo confirmar si son personas reales" cuando solo te piden describir o contar figuras humanas: esa frase confunde percepción visual con autenticidad de una fotografía. '+
+    'No invoques privacidad como explicación automática al contar personas o describir ropa; si no se distinguen detalles, explica la limitación óptica específica. '+
+    'Si el usuario pregunta expresamente por autenticidad o si la imagen fue generada, comunica la incertidumbre sin afirmar autenticidad. '+
     'Si un texto o logo es pequeño, ilegible o está borroso, di qué no puede leerse sin inventar letras o marcas. '+
     'Para referencias ambiguas, pide aclaración concreta; no adivines la prenda u objeto señalado.'
 }
