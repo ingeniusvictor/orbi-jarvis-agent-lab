@@ -12,6 +12,7 @@ import { caps } from './capabilities'
 import { findEarlySpeechBoundary, findFastLocalFirstBoundary } from './first-audio-chunk'
 import { isIncompleteLumiaSpelling, normalizeSpokenLumiaName } from './speech-pronunciation'
 import { attributePhraseGap } from './phrase-gap-attribution'
+import { splitKokoroCompactPhrase } from './kokoro-compact-phrases-amr030'
 import { createStreamingMp3, type StreamedAudio } from './streaming-mp3'
 
 /** Owner-enabled desktop experiment. Default stays full-file playback. */
@@ -21,6 +22,8 @@ const CLOUD_AUDIO_STREAMING = import.meta.env.VITE_LUMIA_STREAMING_TTS === '1'
 const PREFETCH_NEXT_PHRASE = import.meta.env.VITE_LUMIA_TTS_PREFETCH_NEXT === '1'
 /** ASUS opt-in only, first local Kokoro phrase; no change to later cadence. */
 const FAST_LOCAL_FIRST_CHUNK = import.meta.env.VITE_LUMIA_FAST_FIRST_CHUNK === '1'
+/** AMR-03.0: bounded, owner-opt-in following phrase lengths for local Kokoro. */
+const KOKORO_COMPACT_PHRASES = import.meta.env.VITE_LUMIA_KOKORO_COMPACT_PHRASES === '1'
 /** ASUS-only recovery for local WAV elements that never start or stop advancing. */
 const LOCAL_PLAYBACK_RECOVERY = import.meta.env.VITE_LUMIA_LOCAL_PLAYBACK_RECOVERY === '1'
 const LOCAL_WAV_START_TIMEOUT_MS = 12_000
@@ -547,30 +550,30 @@ export function createSpeaker(
 
   const enqueue = (sentence: string, priority = false) => {
     if (cancelled) return
-    // Shape once here so both engines get the same text — stripped markdown,
-    // and the comma before "sir" that buys the beat.
     const text = shape(sentence)
     if (!text) return
 
-    const item: Item = { text, queuedAt: Date.now(), firstPhrase: !firstChunkQueued }
-    if (item.firstPhrase) {
-      diag.firstPhraseChars = text.length
-      diag.firstPhraseQueuedMs = Math.max(0, item.queuedAt - speakerCreatedAt)
+    // The short first chunk and the existing one-phrase-ahead prefetch remain
+    // authoritative. This owner-only experiment affects ONLY local Kokoro,
+    // splitting long later phrases at word-safe boundaries before synthesis.
+    const localVoice = caps().voice
+    const compactLocal = KOKORO_COMPACT_PHRASES &&
+      localVoice?.requested?.ttsMode === 'local' &&
+      localVoice?.local?.ttsAvailable === true
+    const chunks = compactLocal ? splitKokoroCompactPhrase(text) : [text]
+    // Priority insertions prepend; reverse their fragments to retain speech
+    // order. No extra audio concurrency or second model call is introduced.
+    for (const chunk of (priority ? chunks.slice().reverse() : chunks)) {
+      const item: Item = { text: chunk, queuedAt: Date.now(), firstPhrase: !firstChunkQueued }
+      if (item.firstPhrase) {
+        diag.firstPhraseChars = chunk.length
+        diag.firstPhraseQueuedMs = Math.max(0, item.queuedAt - speakerCreatedAt)
+      }
+      if (priority) queue.unshift(item)
+      else queue.push(item)
+      firstChunkQueued = true
+      if (pumping && PREFETCH_NEXT_PHRASE) prime(queue[0])
     }
-    if (priority) {
-      // Genuinely ahead of the queue this time. The old `say()` appended to the
-      // same chain and only appeared to preempt because it was called when the
-      // queue happened to be empty.
-      queue.unshift(item)
-    } else {
-      queue.push(item)
-    }
-    firstChunkQueued = true
-    // pump() is a no-op while an earlier phrase is playing. Without priming
-    // here, a second Kokoro sentence begins synthesizing only AFTER the first
-    // sound finishes, producing the ~10 s "Hola ... [silence] ... sentence"
-    // gap. Only prime the head, never the entire queue.
-    if (pumping && PREFETCH_NEXT_PHRASE) prime(queue[0])
     void pump()
   }
 
