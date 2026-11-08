@@ -17,7 +17,7 @@ assert.throws(()=>validateVisualFile({type:'image/jpeg',size:MAX_VISUAL_FILE_BYT
 assert.throws(()=>validateVisualFile({type:'image/jpeg',size:0}))
 assert.match(codec,/createImageBitmap\(file\)/)
 assert.match(codec,/canvas\.toDataURL\('image\/jpeg'/)
-assert.match(panel,/prepareVisualImage\(file\)/)
+assert.match(panel,/prepareVisualImage\(file,maxEdge\)/)
 assert.match(panel,/type="file"/)
 assert.match(panel,/onFileCaptured\(fileImage\)/)
 assert.match(panel,/!fileImage\|\|fileBusy/)
