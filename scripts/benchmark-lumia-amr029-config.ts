@@ -32,7 +32,13 @@ const tasks=[
   {id:'voz-modelo',kind:'speech-ready',question:voiceQuestion,numPredict:120},
   {id:'imagen',kind:'image',question:visualRequest,numPredict:256},
 ]
-process.stdout.write(JSON.stringify({model2B:'qwen3.5:2b',model4B:'qwen3.5:4b-vision4096',
+const json=JSON.stringify({model2B:'qwen3.5:2b',model4B:'qwen3.5:4b-vision4096',
   system,visualSystem,visualQuestion,voiceQuestion,tasks,
   format:{type:'object',properties:{respuesta:{type:'string'}},required:['respuesta'],additionalProperties:false},
-  options:{temperature:0,num_ctx:4096},keepAlive:'5m'}))
+  options:{temperature:0,num_ctx:4096},keepAlive:'5m'})
+// Windows PowerShell 5.1 may decode native stdout using an OEM codepage.
+// Escape all non-ASCII JSON code units so the questions survive unchanged.
+// JSON.parse in PowerShell restores the original Unicode text and accents.
+const ascii=json.replace(/[^\x00-\x7f]/g,(character)=>
+  '\\u'+character.charCodeAt(0).toString(16).padStart(4,'0'))
+process.stdout.write(ascii)
