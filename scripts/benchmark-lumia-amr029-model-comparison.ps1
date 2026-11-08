@@ -19,19 +19,38 @@ if ($Model2B -eq $Model4B -or $Model2B -notmatch '^qwen3\.5:2b(?:[-._a-zA-Z0-9]*
     $Model4B -ne 'qwen3.5:4b-vision4096') {
     throw 'Este ensayo compara solo el Qwen3.5 2B instalado contra qwen3.5:4b-vision4096, sin sustituir perfiles.'
 }
-# Read installed tags first: redirecting 'ollama show' stderr with
-# ErrorActionPreference=Stop aborts Windows PowerShell BEFORE diagnostics.
+# Inspect the installed tags first: with ErrorActionPreference=Stop, redirecting
+# stderr from 'ollama show' would terminate Windows PowerShell too early.
 $inventory=@(& ollama list)
 if ($LASTEXITCODE -ne 0) {
     throw 'No se pudo consultar Ollama local. Comprueba que el servicio esté funcionando.'
 }
 $installed=@($inventory | Select-Object -Skip 1 | ForEach-Object {
-    ($_ -split '\\s+')[0]
+    ($_ -split '\s+')[0]
 } | Where-Object { $_ })
 
 if ($Model2B -notin $installed) {
     $candidates=@($installed | Where-Object {
-        $_ -match '^qwen3\\.5:2b(?:[-._a-zA-Z0-9]*)?
+        $_ -match '^qwen3\.5:2b(?:[-._a-zA-Z0-9]*)?$'
+    })
+    if ($Model2B -eq 'qwen3.5:2b' -and $candidates.Count -eq 1) {
+        $Model2B=$candidates[0]
+        Write-Host ('Se detectó Qwen 2B instalado con otra etiqueta: '+$Model2B)
+    } else {
+        Write-Host 'Modelos instalados:'
+        $inventory | ForEach-Object { Write-Host $_ }
+        if ($candidates.Count -gt 1) {
+            throw 'Hay varios modelos 2B. Especifica el correcto con -Model2B (tag de ollama list).'
+        }
+        throw ('No se encontró '+$Model2B+' en Ollama. No se descargó ni modificó ningún modelo.')
+    }
+}
+if ($Model4B -notin $installed) {
+    Write-Host 'Modelos instalados:'
+    $inventory | ForEach-Object { Write-Host $_ }
+    throw ('No se encontró el 4B personalizado '+$Model4B+'. No se descargó ningún modelo.')
+}
+$models=@($Model2B,$Model4B)
 $sourcePath=(Resolve-Path -LiteralPath $ImagePath).Path
 $sourceInfo=Get-Item -LiteralPath $sourcePath
 if ($sourceInfo.PSIsContainer -or $sourceInfo.Length -le 0 -or $sourceInfo.Length -gt 12MB) {
