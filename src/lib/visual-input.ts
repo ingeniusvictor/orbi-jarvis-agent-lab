@@ -25,6 +25,16 @@ export function visionResolutionEdges(maxEdge: VisionResolution = DEFAULT_VISION
   throw new Error('Resolución visual no admitida.')
 }
 
+export function scaleVisualDimensions(sourceWidth:number,sourceHeight:number,maxEdge:number):{width:number;height:number} {
+  if(!Number.isInteger(sourceWidth)||!Number.isInteger(sourceHeight)||sourceWidth<=0||sourceHeight<=0||sourceWidth*sourceHeight>100_000_000){
+    throw new Error('Dimensiones de imagen no válidas.')
+  }
+  if(!Number.isInteger(maxEdge)||maxEdge<1||maxEdge>1024)throw new Error('Resolución visual no admitida.')
+  const factor=Math.min(1,maxEdge/Math.max(sourceWidth,sourceHeight))
+  return {width:Math.max(1,Math.round(sourceWidth*factor)),
+    height:Math.max(1,Math.round(sourceHeight*factor))}
+}
+
 function reportPreparedFrame(source: 'file'|'camera', limit: VisionResolution, width: number, height: number, chars: number):void {
   // Metadata only, never log image pixels, JPEG data, filenames or the prompt.
   console.info('[lumia:vision-amr023] prepared',
@@ -51,9 +61,7 @@ export async function prepareVisualImage(file: File, maxEdge:VisionResolution=DE
       throw new Error('Dimensiones de imagen no válidas.')
     }
     for (const edge of visionResolutionEdges(maxEdge)) {
-      const factor = Math.min(1, edge / Math.max(bitmap.width, bitmap.height))
-      const width = Math.max(1, Math.round(bitmap.width * factor))
-      const height = Math.max(1, Math.round(bitmap.height * factor))
+      const {width,height}=scaleVisualDimensions(bitmap.width,bitmap.height,edge)
       const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
@@ -85,9 +93,7 @@ export function prepareVisualCameraFrame(video:HTMLVideoElement,maxEdge:VisionRe
     throw new Error('La cámara no entregó un fotograma válido.')
   }
   for (const edge of visionResolutionEdges(maxEdge)){
-    const factor=Math.min(1,edge/Math.max(video.videoWidth,video.videoHeight))
-    const width=Math.max(1,Math.round(video.videoWidth*factor))
-    const height=Math.max(1,Math.round(video.videoHeight*factor))
+    const {width,height}=scaleVisualDimensions(video.videoWidth,video.videoHeight,edge)
     const canvas=document.createElement('canvas')
     canvas.width=width
     canvas.height=height
