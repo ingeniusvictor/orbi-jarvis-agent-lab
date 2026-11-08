@@ -9,7 +9,7 @@ import { AcousticLab } from './ui/AcousticLab'
 import { VisualInput } from './ui/VisualInput'
 import { LumiaComposer } from './ui/LumiaComposer'
 import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
-import type { LocalVisualImage } from './lib/visual-input'
+import {DEFAULT_VISION_RESOLUTION,type LocalVisualImage,type VisionResolution} from './lib/visual-input'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode} from './lib/vision-context-vi023'
@@ -144,6 +144,8 @@ export default function App() {
   const [visionStillSource,setVisionStillSource] = useState<'camera'|'file'>('camera')
   const [cameraStill,setCameraStill] = useState<LocalVisualImage|null>(null)
   const [visionReplyMode,setVisionReplyMode] = useState<VisionReplyMode>('breve')
+  // AMR-02.3: manual, session-only resolution pilot; preserves 1024px baseline.
+  const [visionResolution,setVisionResolution] = useState<VisionResolution>(DEFAULT_VISION_RESOLUTION)
   const [visionContextReady,setVisionContextReady] = useState(false)
   const visualSession = useRef(new EphemeralVisualContext())
   const activeVisualReply = useRef<string|null>(null)
@@ -338,7 +340,7 @@ export default function App() {
         setCameraCapturing(true)
         s.setLooking('VISIÓN LOCAL · UNA FOTO SOLICITADA')
         try {
-          visualImage=await captureLumiaAuthorizedStill(stale)
+          visualImage=await captureLumiaAuthorizedStill(stale,undefined,visionResolution)
           if(!stale()){
             // This is the precise JPEG that local Ollama will receive, NOT
             // an imaginary live feed continuing after the shutter closes.
@@ -1591,6 +1593,8 @@ export default function App() {
           visualContextReady={visionContextReady}
           visualReplyMode={visionReplyMode}
           onVisualReplyModeChange={setVisionReplyMode}
+          visionResolution={visionResolution}
+          onVisionResolutionChange={setVisionResolution}
           onAskAboutStill={submitVisualFollowUp}
         />
       )}
@@ -1606,6 +1610,8 @@ export default function App() {
           cameraAvailable={CAMERA_VISION_VI02_ENABLED}
           cameraCapturing={cameraCapturing}
           cameraPreviewOpen={cameraPreviewOpen}
+          visionResolution={visionResolution}
+          onVisionResolutionChange={setVisionResolution}
           onCaptureCamera={submitCamera}
           translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
           avatarViewControl={AVATAR_PH04_ENABLED}
