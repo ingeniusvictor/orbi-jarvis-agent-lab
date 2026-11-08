@@ -360,6 +360,10 @@ export default function App() {
         pendingDetailedQuestion.current=said
         setVisualDetailOffer(available==='none'?null:available)
         console.info('[lumia:vision-amr025] detail-offer',`source=${available} edge=${frameSource?.resolution ?? 0}px`)
+      }else if(VISION_CONTEXT_AMR025_ENABLED && visualFollowUp){
+        // A new on-topic question supersedes any older unread offer.
+        setVisualDetailOffer(null)
+        pendingDetailedQuestion.current=null
       }
       // A newly attached one-shot composer file is separate from the unified
       // Vision panel: never silently send a previous picture along with it.
