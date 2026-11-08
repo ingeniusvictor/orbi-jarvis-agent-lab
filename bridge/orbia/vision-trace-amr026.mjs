@@ -27,33 +27,61 @@ export function safeVisionTrace(raw,encodedLength){
 }
 
 export function explicitGroupCount(answer){
-  const m=groupPattern.exec(normalize(answer))
-  if(!m)return null
-  const count=Number(m[1])||numWords[m[1]]
-  return Number.isInteger(count)&&count>=2&&count<=20?count:null
+  const text=normalize(answer)
+  // A subgroup ('seis personas de pie') cannot replace the overall group
+  // total ('siete personas'); keep looking for an explicit overall count.
+  const groupMatches=new RegExp(groupPattern.source,'gu')
+  for(const m of text.matchAll(groupMatches)){
+    const remainder=text.slice((m.index??0)+m[0].length)
+    if(/^\s+(?:de pie|sentad[oa]s?|agachad[oa]s?|parad[oa]s?|al fondo|al frente|en primer plano)\b/.test(remainder))continue
+    const count=Number(m[1])||numWords[m[1]]
+    if(Number.isInteger(count)&&count>=2&&count<=20)return count
+  }
+  return null
 }
 
 export const countQuestion=q=>/\b(?:cuantos|cuantas|cuenta|contar|conteo|numero de personas|total de personas|cuantos hombres|cuantas mujeres)\b/.test(normalize(q))
 
+const COUNT_CONFLICT_SPEECH =
+  'He dado conteos diferentes al analizar esta misma fotografía. ' +
+  'No puedo confirmar la cantidad exacta con seguridad. ' +
+  'Si deseas comprobarla, puedes pedir un reanálisis de mayor detalle o proporcionar otra imagen.'
+
 export function createVisionCountLedger(){
-  // Ephemeral, per-WebSocket, bounded to only recent explicit group counts.
+  // Per-WebSocket, bounded/ephemeral data. The *first observation* is an
+  // immutable comparison anchor, NOT verified ground truth. Once a mismatch
+  // occurs, a later repetition cannot erase it (ASUS 8 -> 7 -> 7 -> 7).
+  // Only numeric counts, UUID-like photoId and timestamps are retained.
   const entries=new Map()
   return {
     review({photoId,answer,intent,now=Date.now()}){
       for(const [k,v] of entries)if(now-v.at>=TTL_MS)entries.delete(k)
       const count=explicitGroupCount(answer)
-      if(!photoId || count===null)return {text:answer,status:'unmeasured',count:null}
+      if(!photoId)return {text:answer,status:'unmeasured',count:null}
       const old=entries.get(photoId)
-      entries.delete(photoId)
-      entries.set(photoId,{count,at:now})
-      if(entries.size>MAX_FRAMES)entries.delete(entries.keys().next().value)
-      if(!old)return {text:answer,status:'first',count}
-      if(old.count===count)return {text:answer,status:'consistent',count}
-      if(intent!=='count')return {text:answer,status:'changed-observation',count,previous:old.count}
-      return {
-        text:'Al revisar la misma fotografía, obtuve conteos diferentes y no puedo asegurar la cifra exacta. Para verificarlo, necesitaría una imagen más clara o un análisis a mayor detalle.',
-        status:'count-discrepancy',count,previous:old.count
+      if(count===null){
+        // Do not override a naturally uncertain answer with an unsupported
+        // count. Keep the discrepancy latched until session expiry/clear.
+        return {text:answer,status:old?.conflicted?'conflict-held-no-count':'unmeasured',count:null}
       }
+      if(!old){
+        entries.set(photoId,{firstCount:count,lastCount:count,conflicted:false,at:now})
+        if(entries.size>MAX_FRAMES)entries.delete(entries.keys().next().value)
+        return {text:answer,status:'first',count}
+      }
+      // Bounded LRU and inactivity TTL, never reset the initial observation.
+      entries.delete(photoId)
+      const becameConflicted=!old.conflicted && count!==old.firstCount
+      const conflicted=old.conflicted || count!==old.firstCount
+      entries.set(photoId,{
+        firstCount:old.firstCount,lastCount:count,conflicted,at:now
+      })
+      if(conflicted)return {
+        text:COUNT_CONFLICT_SPEECH,
+        status:becameConflicted?'count-discrepancy':'conflict-persisted',
+        count,previous:old.firstCount
+      }
+      return {text:answer,status:'consistent',count}
     },
     clear(){entries.clear()},
     get size(){return entries.size}
