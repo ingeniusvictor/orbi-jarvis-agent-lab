@@ -8,8 +8,8 @@
  */
 import { useRef, useState, type KeyboardEvent } from 'react'
 import {
-  prepareVisualImage, validateVisualFile,
-  type LocalVisualImage,
+  prepareVisualImage, validateVisualFile, VISION_RESOLUTION_CHOICES,
+  type LocalVisualImage,type VisionResolution,
 } from '../lib/visual-input'
 import type { LumiaInputMode } from '../lib/input-mode'
 import { LumiaViewDock } from './LumiaViewDock'
@@ -26,6 +26,8 @@ type Props = {
   cameraAvailable?: boolean
   cameraCapturing?: boolean
   cameraPreviewOpen?: boolean
+  visionResolution:VisionResolution
+  onVisionResolutionChange:(edge:VisionResolution)=>void
   onCaptureCamera?: () => void
   translationAvailable: boolean
   avatarViewControl?: boolean
@@ -101,7 +103,7 @@ function DockIcon({ name }: { name: IconName }) {
 }
 
 export function LumiaComposer({
-  available, mode, recording, busy: inboundBusy, visionAvailable, cameraAvailable = false, cameraCapturing = false, cameraPreviewOpen = false, onCaptureCamera, translationAvailable, avatarViewControl = false, modelSelectorAvailable = false, modelControlBusy = false, onTranslate, onTranslateAudio,
+  available, mode, recording, busy: inboundBusy, visionAvailable, cameraAvailable = false, cameraCapturing = false, cameraPreviewOpen = false, visionResolution,onVisionResolutionChange, onCaptureCamera, translationAvailable, avatarViewControl = false, modelSelectorAvailable = false, modelControlBusy = false, onTranslate, onTranslateAudio,
   onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
@@ -134,7 +136,7 @@ export function LumiaComposer({
     setPreparing(true)
     setError('')
     try {
-      const image = photo ? await prepareVisualImage(photo) : undefined
+      const image = photo ? await prepareVisualImage(photo,visionResolution) : undefined
       if (translateEnabled && audioFile) await onTranslateAudio(audioFile, sourceLanguage, targetLanguage)
       else if (translateEnabled) onTranslate(text, sourceLanguage, targetLanguage)
       else onSend(text || 'Describe esta imagen en español y señala lo que no se pueda comprobar.', image)
@@ -353,6 +355,18 @@ export function LumiaComposer({
                 setPhoto(null)
                 if (photoInput.current) photoInput.current.value = ''
               }}><DockIcon name="close" /></button>
+            </span>
+          )}
+          {photo && !translateEnabled && (
+            <span className="lumia-composer-resolution" role="group"
+              aria-label="Resolución máxima de fotografía adjunta">
+              {VISION_RESOLUTION_CHOICES.map(edge=>(
+                <button key={edge} type="button" aria-pressed={edge===visionResolution}
+                  className={edge===visionResolution?'is-selected':''}
+                  title={edge===512?'Rápida':edge===768?'Equilibrada':'Detallada'}
+                  disabled={preparing || busy || recording}
+                  onClick={()=>onVisionResolutionChange(edge)}>{edge}px</button>
+              ))}
             </span>
           )}
           {audioFile && translateEnabled && (
