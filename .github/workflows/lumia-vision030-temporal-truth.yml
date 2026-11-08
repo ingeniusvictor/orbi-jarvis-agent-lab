@@ -1,0 +1,26 @@
+name: LUMIA VISION-03.0 temporal truth
+on:
+  pull_request:
+    paths:
+      - 'src/App.tsx'
+      - 'src/lib/vision-temporal-vi030.ts'
+      - 'scripts/certify-lumia-vision030-temporal-truth.ts'
+      - 'INICIAR_LUMIA_ASUS_OJOS_TEMPORALES_VI030.cmd'
+      - '.github/workflows/lumia-vision030-temporal-truth.yml'
+  workflow_dispatch:
+jobs:
+  certify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/certify-lumia-vision030-temporal-truth.ts
+      - run: npx tsc --noEmit
