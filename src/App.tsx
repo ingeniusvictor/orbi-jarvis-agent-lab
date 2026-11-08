@@ -9,11 +9,12 @@ import { AcousticLab } from './ui/AcousticLab'
 import { VisualInput } from './ui/VisualInput'
 import { LumiaComposer } from './ui/LumiaComposer'
 import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
-import {DEFAULT_VISION_RESOLUTION,type LocalVisualImage,type VisionResolution} from './lib/visual-input'
+import {prepareVisualImage,DEFAULT_VISION_RESOLUTION,type LocalVisualImage,type VisionResolution} from './lib/visual-input'
 import {chooseVisionResolution,visionSpeechBudget} from './lib/vision-routing-amr024'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
-import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode} from './lib/vision-context-vi023'
+import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode,type VisualFrameSource} from './lib/vision-context-vi023'
+import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
 import {
@@ -102,6 +103,7 @@ const COMPLEX_VOICE_ENABLED = import.meta.env.VITE_LUMIA_COMPLEX_VOICE_VQ01 === 
 const MULTIMODAL_COMPOSER = import.meta.env.VITE_LUMIA_MULTIMODAL_COMPOSER === '1'
 const AVATAR_PH04_ENABLED = import.meta.env.VITE_LUMIA_AVATAR_PH04 === '1'
 const VISION_AUTO_AMR024_ENABLED = import.meta.env.VITE_LUMIA_VISION_AUTO_AMR024 === '1'
+const VISION_CONTEXT_AMR025_ENABLED = import.meta.env.VITE_LUMIA_VISION_CONTEXT_AMR025 === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -150,6 +152,12 @@ export default function App() {
   const [visionResolution,setVisionResolution] = useState<VisionResolution>(DEFAULT_VISION_RESOLUTION)
   const [visionAutoEnabled,setVisionAutoEnabled] = useState(VISION_AUTO_AMR024_ENABLED)
   const [visionContextReady,setVisionContextReady] = useState(false)
+  const [visualDetailOffer,setVisualDetailOffer] = useState<'camera'|'file'|null>(null)
+  const [visualDetailBusy,setVisualDetailBusy] = useState(false)
+  const pendingVisualSource = useRef<VisualFrameSource|null>(null)
+  const pendingDetailedQuestion = useRef<string|null>(null)
+  const pendingReferenceQuestion = useRef<string|null>(null)
+  const detailedCameraQuestion = useRef<string|null>(null)
   const visualSession = useRef(new EphemeralVisualContext())
   const activeVisualReply = useRef<string|null>(null)
   const cameraCaptureOwner = useRef<string|null>(null)
@@ -159,6 +167,10 @@ export default function App() {
     if(!cameraStill)return
     const expiry=window.setTimeout(()=>{
       visualSession.current.clear()
+      pendingDetailedQuestion.current=null
+      pendingReferenceQuestion.current=null
+      pendingVisualSource.current=null
+      setVisualDetailOffer(null)
       setVisionContextReady(false)
       setCameraStill(null)
     },VISION_CONTEXT_TTL_MS)
@@ -318,15 +330,48 @@ export default function App() {
       // Ordinary voice-only turns never run this branch or pay its latency.
       // An authorized still can answer later scene questions without opening
       // the webcam again. Explicit new-camera commands still start a new shot.
+      // A single concise noun-phrase answer can resolve the reference
+      // clarification LUMIA just asked. The session must still be authorized.
+      const pendingReference=pendingReferenceQuestion.current
+      const resolvingReference=Boolean(VISION_CONTEXT_AMR025_ENABLED && pendingReference &&
+        !image && !cameraRequested && isVisualReferenceAnswer(said))
       const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested
-        ? forceVisualFollowUp
+        ? forceVisualFollowUp || resolvingReference
           ? visualSession.current.getAuthorizedFrame()
           : visualSession.current.getForFollowUp(said)
         : null
+      pendingReferenceQuestion.current=null
+      const visualQuestion=resolvingReference && visualFollowUp && pendingReference
+        ? resolvedVisualReferencePrompt(pendingReference,said) : said
+      const frameSource=VISION_CONTEXT_AMR025_ENABLED && visualFollowUp
+        ? visualSession.current.getFrameSource() : null
+      const contextAction=frameSource
+        ? classifyExistingPhotoFollowup(visualQuestion,frameSource.resolution) : 'proceed'
+      let contextualReply:string|null=null
+      if(contextAction==='clarify-reference'){
+        contextualReply=visualReferenceClarification()
+        pendingReferenceQuestion.current=said
+        setVisualDetailOffer(null)
+        pendingDetailedQuestion.current=null
+      }else if(contextAction==='offer-high-resolution'){
+        const available=frameSource?.canReanalyzeOriginal ? 'file'
+          : frameSource?.kind==='camera' ? 'camera' : 'none'
+        contextualReply=visualDetailOfferMessage(available)
+        pendingDetailedQuestion.current=said
+        setVisualDetailOffer(available==='none'?null:available)
+        console.info('[lumia:vision-amr025] detail-offer',`source=${available} edge=${frameSource?.resolution ?? 0}px`)
+      }else if(VISION_CONTEXT_AMR025_ENABLED && visualFollowUp){
+        // A new on-topic question supersedes any older unread offer.
+        setVisualDetailOffer(null)
+        pendingDetailedQuestion.current=null
+      }
       // A newly attached one-shot composer file is separate from the unified
       // Vision panel: never silently send a previous picture along with it.
       if(image && !fromCameraPreview && !cameraRequested){
         visualSession.current.clear()
+        pendingVisualSource.current=null
+        pendingDetailedQuestion.current=null
+        setVisualDetailOffer(null)
         setVisionContextReady(false)
         setCameraStill(null)
         setCameraPreviewOpen(false)
@@ -351,6 +396,7 @@ export default function App() {
             `source=voice mode=${visionChoice==='auto'?'auto':'manual'} edge=${route.resolution}px reason=${route.reason}`)
           visualImage=await captureLumiaAuthorizedStill(stale,undefined,route.resolution)
           if(!stale()){
+            pendingVisualSource.current={kind:'camera',resolution:route.resolution}
             // This is the precise JPEG that local Ollama will receive, NOT
             // an imaginary live feed continuing after the shutter closes.
             setCameraStill(visualImage)
@@ -379,12 +425,18 @@ export default function App() {
       // outside the viewer remain one-shot and are never retained silently.
       if(visualImage && !visualFollowUp &&
          (cameraIntent || cameraRequested || fromCameraPreview)){
-        visualGeneration=visualSession.current.begin(visualImage)
+        const source=pendingVisualSource.current ?? {kind:'camera' as const,resolution:visionResolution}
+        pendingVisualSource.current=null
+        visualGeneration=visualSession.current.begin(visualImage,Date.now(),source)
+        setVisualDetailOffer(null)
+        pendingDetailedQuestion.current=null
       }
       if(visualImage) activeVisualReply.current=turnId
       const avatarAction = AVATAR_PH04_ENABLED && !visualImage && !captureFailure
         ? parseLumiaAvatarAction(said) : null
-      const { text } = captureFailure
+      const { text } = contextualReply
+        ? {text:contextualReply}
+        : captureFailure
         ? {text:captureFailure}
         : avatarAction?.kind === 'demo'
         ? { text: await (async () => {
@@ -406,12 +458,14 @@ export default function App() {
         : avatarAction
         ? { text: respondToLumiaAvatarAction(avatarAction) }
         : await ask(visualFollowUp
-          ? followupVisionPrompt(said,visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)
+          ? followupVisionPrompt(visualQuestion,visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
+            (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')
           : visualImage
           ? (cameraIntent || cameraRequested || fromCameraPreview
               ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
               visualReliabilityInstruction(cameraIntent?.question ?? said) +
-              visualModeInstruction(visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)
+              visualModeInstruction(visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
+              (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')
           : said,
           history.current, {
         onText: (delta) => {
@@ -1402,6 +1456,12 @@ export default function App() {
       music.working(false)
     }
     visualSession.current.clear()
+    pendingVisualSource.current=null
+    pendingDetailedQuestion.current=null
+    pendingReferenceQuestion.current=null
+    detailedCameraQuestion.current=null
+    setVisualDetailOffer(null)
+    setVisualDetailBusy(false)
     setVisionContextReady(false)
     setCameraPreviewOpen(false)
     setVisionFileMode(false)
@@ -1426,7 +1486,10 @@ export default function App() {
     setVisionStillSource('camera')
     setCameraPreviewOpen(true)
   }
-  const analyzeCameraViewfinderFrame = (image:LocalVisualImage) => {
+  const analyzeCameraViewfinderFrame = (image:LocalVisualImage,resolution:VisionResolution=visionResolution) => {
+    pendingVisualSource.current={kind:'camera',resolution}
+    const question=detailedCameraQuestion.current ?? 'Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.'
+    detailedCameraQuestion.current=null
     // LumiaCameraViewfinder releases the live webcam lease synchronously
     // BEFORE notifying us with these exact JPEG bytes.
     setCameraPreviewOpen(false)
@@ -1435,10 +1498,11 @@ export default function App() {
     setCameraStill(image)
     silence()
     interrupt()
-    void respond('Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.',image,false,true)
+    void respond(question,image,false,true)
   }
 
-  const analyzeVisionFile = (image:LocalVisualImage) => {
+  const analyzeVisionFile = (image:LocalVisualImage,originalFile:File|null=null,resolution:VisionResolution=visionResolution) => {
+    pendingVisualSource.current={kind:'file',resolution,...(VISION_CONTEXT_AMR025_ENABLED && originalFile?{originalFile}:{})}
     // Explicit file-picker consent; jpeg bytes prepared locally and only now
     // provided to the same Ollama + ephemeral context flow as a camera shot.
     setCameraPreviewOpen(false)
@@ -1448,6 +1512,59 @@ export default function App() {
     silence()
     interrupt()
     void respond('Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.',image,false,true)
+  }
+
+  // AMR-02.5: user must press this control; an OCR follow-up by itself never
+  // reopens the camera, requests a new JPEG, or upgrades a prior JPEG.
+  const requestDetailedReanalysis = async () => {
+    if(!VISION_CONTEXT_AMR025_ENABLED || !visualDetailOffer || visualDetailBusy ||
+       cameraCapturing || experimentOwner.current)return
+    if(store.getState().phase==='offline'||store.getState().phase==='boot')return
+    const question=pendingDetailedQuestion.current
+    if(!question)return
+    const current=visualSession.current.getFrameSource()
+    if(!current || current.resolution>=1024)return
+
+    if(visualDetailOffer==='camera'){
+      if(current.kind!=='camera')return
+      // Explicitly open only the 90-second optical preview. A second press
+      // on 'Capturar y analizar' is required before any new photo is encoded.
+      closeCameraViewfinder()
+      setVisionAutoEnabled(false)
+      setVisionResolution(1024)
+      setVisionStillSource('camera')
+      setVisionFileMode(false)
+      setCameraPreviewOpen(true)
+      detailedCameraQuestion.current=question
+      console.info('[lumia:vision-amr025] approved', 'action=camera-preview edge=1024px')
+      return
+    }
+
+    const selected=visualSession.current.getOriginalFileForReanalysis()
+    if(!selected || current.kind!=='file' || selected.generation!==current.generation)return
+    setVisualDetailBusy(true)
+    try{
+      // Re-encode FROM ORIGINAL File: never upscale the previously sent JPEG.
+      const highResolution=await prepareVisualImage(selected.file,1024)
+      const fresh=visualSession.current.getOriginalFileForReanalysis()
+      if(!fresh || fresh.generation!==selected.generation ||
+         experimentOwner.current)return
+      pendingVisualSource.current={kind:'file',resolution:1024,originalFile:selected.file}
+      setVisionResolution(1024)
+      setVisionAutoEnabled(false)
+      setVisualDetailOffer(null)
+      pendingDetailedQuestion.current=null
+      setVisionStillSource('file')
+      setCameraStill(highResolution)
+      silence()
+      interrupt()
+      console.info('[lumia:vision-amr025] approved', 'action=file-reanalysis edge=1024px')
+      void respond(question,highResolution,false,true)
+    }catch(err){
+      store.getState().setError(err instanceof Error?err.message:'No pude preparar el archivo original.')
+    }finally{
+      setVisualDetailBusy(false)
+    }
   }
 
   const submitVisualFollowUp = (text:string) => {
@@ -1612,6 +1729,9 @@ export default function App() {
           visionAutoEnabled={visionAutoEnabled}
           onVisionAutoEnabledChange={setVisionAutoEnabled}
           onAskAboutStill={submitVisualFollowUp}
+          visualDetailOffer={VISION_CONTEXT_AMR025_ENABLED?visualDetailOffer:null}
+          visualDetailBusy={visualDetailBusy}
+          onRequestDetailedReanalysis={()=>{void requestDetailedReanalysis()}}
         />
       )}
       <Boot />

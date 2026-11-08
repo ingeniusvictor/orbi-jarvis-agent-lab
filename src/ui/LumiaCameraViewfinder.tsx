@@ -21,8 +21,8 @@ type Props={
   fileMode:boolean
   stillSource:'camera'|'file'
   still:LocalVisualImage|null
-  onCaptured:(image:LocalVisualImage)=>void
-  onFileCaptured:(image:LocalVisualImage)=>void
+  onCaptured:(image:LocalVisualImage,resolution:VisionResolution)=>void
+  onFileCaptured:(image:LocalVisualImage,originalFile:File|null,resolution:VisionResolution)=>void
   onSelectFileMode:()=>void
   onSelectCameraMode:()=>void
   onClose:()=>void
@@ -36,12 +36,16 @@ type Props={
   visionAutoEnabled:boolean
   onVisionAutoEnabledChange:(enabled:boolean)=>void
   onAskAboutStill:(question:string)=>void
+  visualDetailOffer:'camera'|'file'|null
+  visualDetailBusy:boolean
+  onRequestDetailedReanalysis:()=>void
 }
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
   visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
+  visualDetailOffer,visualDetailBusy,onRequestDetailedReanalysis,
 }:Props){
   const videoRef=useRef<HTMLVideoElement>(null)
   const fileRef=useRef<HTMLInputElement>(null)
@@ -173,7 +177,7 @@ export function LumiaCameraViewfinder({
       releaseRef.current?.() // release BEFORE Ollama starts, not in a later effect
       setReady(false)
       setError('')
-      onCaptured(image)
+      onCaptured(image,effectiveResolution)
     }catch(err){
       setError(err instanceof Error?err.message:'No pude capturar esta imagen.')
     }
@@ -321,6 +325,20 @@ export function LumiaCameraViewfinder({
           {signalWarning}
         </p>
       )}
+      {!live && still && visualContextReady && visualDetailOffer && (
+        <section className="lumia-camera-detail-offer" role="status" aria-label="Mejorar detalle de la fotografía">
+          <p>{visualDetailOffer==='file'
+            ? 'Para leer letras pequeñas, puedes volver al archivo original y reanalizarlo a 1024 px.'
+            : 'Para leer letras pequeñas, es necesario encuadrar de nuevo la cámara a 1024 px.'}</p>
+          <button type="button" disabled={visualDetailBusy}
+            onClick={onRequestDetailedReanalysis}>
+            {visualDetailBusy?'Preparando fotografía…'
+              :visualDetailOffer==='file'?'Reanalizar archivo original a 1024 px'
+              :'Volver a encuadrar a 1024 px'}
+          </button>
+          <p>Se requiere tu acción. Nunca se abre la cámara ni se envían fotos automáticamente.</p>
+        </section>
+      )}
       {!live && still && (
         <section className="lumia-camera-followup" aria-label="Conversación con la foto">
           <p className="lumia-camera-followup-status" role="status">
@@ -356,7 +374,7 @@ export function LumiaCameraViewfinder({
               La foto solo se envía a Ollama al pulsar Analizar imagen. No se activa la webcam.
             </span>
             <button type="button" className="lumia-camera-viewfinder-primary"
-              disabled={!fileImage||fileBusy} onClick={()=>{if(fileImage)onFileCaptured(fileImage)}}>
+              disabled={!fileImage||fileBusy} onClick={()=>{if(fileImage)onFileCaptured(fileImage,selectedFile.current,effectiveResolution)}}>
               Analizar imagen
             </button>
             <button type="button" className="lumia-camera-viewfinder-secondary"

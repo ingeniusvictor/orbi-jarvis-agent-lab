@@ -35,7 +35,7 @@ assert.ok(capture.indexOf('prepareVisualCameraFrame(video,effectiveResolution)')
 assert.ok(capture.indexOf('releaseRef.current?.()') >
   capture.indexOf('prepareVisualCameraFrame(video,effectiveResolution)'))
 assert.ok(capture.indexOf('releaseRef.current?.()') <
-  capture.indexOf('onCaptured(image)'))
+  capture.indexOf('onCaptured(image,effectiveResolution)'))
 assert.match(view,/onClick=\{capture\}/)
 assert.match(view,/disabled=\{!ready\}/)
 assert.match(view,/onClick=\{close\}/)
@@ -57,7 +57,7 @@ assert.match(view,/alt="Fotograma exacto de la cámara utilizado/)
 assert.match(app,/const \[cameraPreviewOpen,setCameraPreviewOpen\] = useState\(false\)/)
 assert.match(app,/const \[cameraStill,setCameraStill\] = useState<LocalVisualImage\|null>\(null\)/)
 assert.match(app,/setCameraStill\(visualImage\)/) // voice path
-assert.match(app,/const analyzeCameraViewfinderFrame = \(image:LocalVisualImage\) =>/)
+assert.match(app,/const analyzeCameraViewfinderFrame = \(image:LocalVisualImage,resolution:VisionResolution=visionResolution\) =>/)
 assert.match(app,/setCameraStill\(image\)/) // manual button
 assert.match(app,/void respond\('Lumi, describe exactamente lo que aparece en esta imagen.*',image,false,true\)/)
 assert.match(app,/<LumiaCameraViewfinder/)
