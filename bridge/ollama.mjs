@@ -42,6 +42,7 @@ import { buildLumiaSkillRegistry, isSkillRegistryInquiry, skillRegistryReply } f
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 import { safeVisionTrace,createVisionCountLedger } from './orbia/vision-trace-amr026.mjs'
 import { formatVisionCacheMetrics } from './orbia/vision-cache-metrics-amr027.mjs'
+import { guardVisualPostureCount } from './orbia/vision-posture-selfcheck-amr030.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
@@ -421,7 +422,16 @@ export async function streamOllama({
       ` speed=${speed.toFixed(1)}tok/s` +
       ` doneReason=${String(packet?.done_reason ?? 'unknown').slice(0, 24)}`,
     )
-    const finalAnswer=typeof onVisualAnswer==='function'?onVisualAnswer(answer):answer
+    // AMR-03.0: opt-in deterministic arithmetic check only, not a detector.
+    // Never compute a new true count or run a second model inference.
+    const selfCheck=process.env.ORBIA_LUMIA_VISUAL_POSTURE_GUARD_AMR030==='1'
+      ? guardVisualPostureCount(answer)
+      : {text:answer,status:'off'}
+    if(selfCheck.status==='posture-total-overflow') {
+      console.warn('[lumia:vision-amr030] visual posture/total contradiction; cautious answer, no count invented')
+    }
+    const finalAnswer=typeof onVisualAnswer==='function'
+      ? onVisualAnswer(selfCheck.text) : selfCheck.text
     onText(finalAnswer)
     return finalAnswer
   }
