@@ -13,8 +13,8 @@ const normalize = (text: string): string => String(text ?? '')
 
 const nonVisual = /\b(?:hora|fecha|clima|temperatura|noticias|precio|bolsa|internet|google|github|calendario|musica|receta|codigo|programa|bateria|descargar|archivo|correo)\b/
 const temporalScene = /\b(?:sigue|siguen|seguira|seguiran|todavia|aun|cambio|cambiaron|cambiado|cambia|movio|movieron|mueve|moviendo|ocurriendo|pasando|ahora|antes|despues)\b/
-const sceneReferent = /\b(?:escena|imagen|foto|fotografia|camara|fotograma|objeto|persona|personas|figura|figuras|mano|manos|ventana|mesa|silla|puerta|caja|etiqueta|pantalla|esto|eso|alli|ahi|lugar|entorno|fondo|atras|delante|se)\b/
-const unambiguousScene = /^(?:(?:y|pero)\s+)?(?:que cambio|que ha cambiado|que esta pasando|que pasa ahora|que ves ahora|que ocurre ahora|sigue igual|sigue ahi|siguen ahi|se movio|se movieron|hay algun cambio|ha cambiado algo|que se movio|y ahora que ves)\b/
+const sceneReferent = /\b(?:escena|imagen|foto|fotografia|camara|fotograma|objeto|persona|personas|figura|figuras|mano|manos|ventana|mesa|silla|puerta|caja|etiqueta|pantalla|esto|eso|alli|ahi|lugar|entorno|fondo|atras|delante|visor)\b/
+const unambiguousScene = /^(?:(?:y|pero)\s+)?(?:que cambio|que ha cambiado|que esta pasando|que pasa ahora|que ves ahora|que ocurre ahora|sigue igual|sigue ahi|siguen ahi|se movio|se movieron|hay algun cambio|ha cambiado algo|que se movio|ahora que ves)\b/
 
 /**
  * Returns true only when the user asks what is happening beyond an old still.
