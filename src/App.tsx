@@ -1502,7 +1502,7 @@ export default function App() {
   }
 
   const analyzeVisionFile = (image:LocalVisualImage,originalFile:File|null=null,resolution:VisionResolution=visionResolution) => {
-    pendingVisualSource.current={kind:'file',resolution,...(originalFile?{originalFile}:{})}
+    pendingVisualSource.current={kind:'file',resolution,...(VISION_CONTEXT_AMR025_ENABLED && originalFile?{originalFile}:{})}
     // Explicit file-picker consent; jpeg bytes prepared locally and only now
     // provided to the same Ollama + ephemeral context flow as a camera shot.
     setCameraPreviewOpen(false)
