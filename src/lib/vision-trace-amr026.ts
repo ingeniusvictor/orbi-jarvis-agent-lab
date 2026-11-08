@@ -31,3 +31,13 @@ export const visionTracingEnabled=()=>import.meta.env?.VITE_LUMIA_VISION_TRACE_A
 export function visionTraceSummary(trace:VisionTraceMetadata):string{
   return `photo=${trace.photoId} source=${trace.source} edge=${trace.limitPx}px actual=${trace.width}x${trace.height} encodedChars=${trace.encodedChars}`
 }
+
+/** Short, task-specific visual quality instructions; never a second model call. */
+export function visualPrecisionInstruction(question:string):string{
+  const q=String(question??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+  if(/\b(?:cuantos|cuantas|contar|cuenta|conteo|cantidad|numero de personas|total de personas)\b/.test(q))
+    return ' Antes de afirmar un total, recorre visualmente las figuras de izquierda a derecha una sola vez; no confundas figuras con sus reflejos. Si hay oclusiones o dudas sobre posturas, indícalo en vez de inventar cifras. '
+  if(/\b(?:lee|leer|lectura|texto|letras|etiqueta|placa|documento|transcribe|numero de serie|logo|marca)\b/.test(q))
+    return ' Transcribe solamente caracteres directamente visibles en el JPEG. No conviertas una marca reconocible por su diseño en letras supuestamente leídas; si unas letras son legibles y otras no, distingue ambas partes. '
+  return ''
+}
