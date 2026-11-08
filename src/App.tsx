@@ -10,7 +10,7 @@ import { VisualInput } from './ui/VisualInput'
 import { LumiaComposer } from './ui/LumiaComposer'
 import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
 import {prepareVisualImage,DEFAULT_VISION_RESOLUTION,type LocalVisualImage,type VisionResolution} from './lib/visual-input'
-import {visionTracingEnabled,visualPrecisionInstruction} from './lib/vision-trace-amr026'
+import {visionTracingEnabled,visualPrecisionInstruction,visualTraceIntent} from './lib/vision-trace-amr026'
 import {chooseVisionResolution,visionSpeechBudget} from './lib/vision-routing-amr024'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
@@ -437,7 +437,7 @@ export default function App() {
       if(visualImage?.trace && visionTracingEnabled()){
         const role=visualFollowUp?'followup'
           :fromCameraPreview && said!=='Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.'?'reanalysis':'new'
-        visualImage={...visualImage,trace:{...visualImage.trace,turnId,role}}
+        visualImage={...visualImage,trace:{...visualImage.trace,turnId,role,intent:visualTraceIntent(visualQuestion)}}
         console.info('[lumia:vision-amr026] turn',
           `turn=${turnId} photo=${visualImage.trace.photoId} role=${role} edge=${visualImage.trace.limitPx}px actual=${visualImage.trace.width}x${visualImage.trace.height}`)
       }
