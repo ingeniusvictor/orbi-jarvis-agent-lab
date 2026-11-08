@@ -1611,9 +1611,6 @@ export default function App() {
           visionAutoAvailable={VISION_AUTO_AMR024_ENABLED}
           visionAutoEnabled={visionAutoEnabled}
           onVisionAutoEnabledChange={setVisionAutoEnabled}
-          visionAutoAvailable={VISION_AUTO_AMR024_ENABLED}
-          visionAutoEnabled={visionAutoEnabled}
-          onVisionAutoEnabledChange={setVisionAutoEnabled}
           onAskAboutStill={submitVisualFollowUp}
         />
       )}
@@ -1631,6 +1628,9 @@ export default function App() {
           cameraPreviewOpen={cameraPreviewOpen}
           visionResolution={visionResolution}
           onVisionResolutionChange={setVisionResolution}
+          visionAutoAvailable={VISION_AUTO_AMR024_ENABLED}
+          visionAutoEnabled={visionAutoEnabled}
+          onVisionAutoEnabledChange={setVisionAutoEnabled}
           onCaptureCamera={submitCamera}
           translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
           avatarViewControl={AVATAR_PH04_ENABLED}
