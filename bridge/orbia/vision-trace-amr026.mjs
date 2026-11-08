@@ -9,7 +9,7 @@ const numWords={dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez
 const numberPattern='(?:[2-9]|1[0-9]|20|'+Object.keys(numWords).join('|')+')'
 const groupPattern=new RegExp('\\b(?:veo|hay|se ven|aparecen|observo|cuento|distingo|grupo de|un total de|total de|son)\\s+(?:(?:un|una)\\s+grupo\\s+de\\s+)?(?:alrededor de |aproximadamente )?('+numberPattern+')\\s+(?:personas|hombres|mujeres|figuras|ninos|ninas|individuos)\\b','u')
 const normalize=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-  .toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu,' ').replace(/\\s+/g,' ').trim()
+  .toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim()
 
 export function safeVisionTrace(raw,encodedLength){
   if(!raw || typeof raw!=='object' || Array.isArray(raw))return null
@@ -32,7 +32,7 @@ export function explicitGroupCount(answer){
   return Number.isInteger(count)&&count>=2&&count<=20?count:null
 }
 
-export const countQuestion=q=>/\\b(?:cuantos|cuantas|cuenta|contar|conteo|numero de personas|total de personas|cuantos hombres|cuantas mujeres)\\b/.test(normalize(q))
+export const countQuestion=q=>/\b(?:cuantos|cuantas|cuenta|contar|conteo|numero de personas|total de personas|cuantos hombres|cuantas mujeres)\b/.test(normalize(q))
 
 export function createVisionCountLedger(){
   // Ephemeral, per-WebSocket, bounded to only recent explicit group counts.
