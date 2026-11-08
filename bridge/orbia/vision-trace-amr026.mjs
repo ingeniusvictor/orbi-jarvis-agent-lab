@@ -13,16 +13,17 @@ const normalize=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
 
 export function safeVisionTrace(raw,encodedLength){
   if(!raw || typeof raw!=='object' || Array.isArray(raw))return null
-  const {photoId,turnId,source,role,limitPx,width,height,encodedChars}=raw
+  const {photoId,turnId,source,role,intent,limitPx,width,height,encodedChars}=raw
   if(typeof photoId!=='string'||!/^p[a-zA-Z0-9-]{8,60}$/.test(photoId))return null
   if(typeof turnId!=='string'||!/^[a-zA-Z0-9-]{8,70}$/.test(turnId))return null
   if(source!=='file' && source!=='camera')return null
   if(role!=='new'&&role!=='followup'&&role!=='reanalysis')return null
+  if(intent!=='count'&&intent!=='ocr'&&intent!=='scene')return null
   if(![512,768,1024].includes(limitPx))return null
   if(!Number.isInteger(width)||!Number.isInteger(height)||
     width<1||height<1||width>limitPx||height>limitPx)return null
   if(!Number.isInteger(encodedChars)||encodedChars<4||encodedChars>2_000_000||encodedChars!==encodedLength)return null
-  return {photoId,turnId,source,role,limitPx,width,height,encodedChars}
+  return {photoId,turnId,source,role,intent,limitPx,width,height,encodedChars}
 }
 
 export function explicitGroupCount(answer){
@@ -38,7 +39,7 @@ export function createVisionCountLedger(){
   // Ephemeral, per-WebSocket, bounded to only recent explicit group counts.
   const entries=new Map()
   return {
-    review({photoId,answer,question,now=Date.now()}){
+    review({photoId,answer,intent,now=Date.now()}){
       for(const [k,v] of entries)if(now-v.at>=TTL_MS)entries.delete(k)
       const count=explicitGroupCount(answer)
       if(!photoId || count===null)return {text:answer,status:'unmeasured',count:null}
@@ -48,7 +49,7 @@ export function createVisionCountLedger(){
       if(entries.size>MAX_FRAMES)entries.delete(entries.keys().next().value)
       if(!old)return {text:answer,status:'first',count}
       if(old.count===count)return {text:answer,status:'consistent',count}
-      if(!countQuestion(question))return {text:answer,status:'changed-observation',count,previous:old.count}
+      if(intent!=='count')return {text:answer,status:'changed-observation',count,previous:old.count}
       return {
         text:'Al revisar la misma fotografía, obtuve conteos diferentes y no puedo asegurar la cifra exacta. Para verificarlo, necesitaría una imagen más clara o un análisis a mayor detalle.',
         status:'count-discrepancy',count,previous:old.count
