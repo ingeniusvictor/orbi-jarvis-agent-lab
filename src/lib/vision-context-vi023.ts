@@ -6,7 +6,7 @@
  * browser module's private, in-memory object for at most five minutes.
  * No localStorage, file writes, transcript payloads, external API or replay.
  */
-import type {LocalVisualImage} from './visual-input'
+import type {LocalVisualImage,VisionResolution} from './visual-input'
 
 export const VISION_CONTEXT_TTL_MS=5*60*1000
 export type VisionReplyMode='breve'|'detallada'
@@ -86,22 +86,24 @@ export function classifyVisualFollowUp(text:string):VisualReference|null{
   return null
 }
 
+export type VisualFrameSource={kind:'camera'|'file';resolution:VisionResolution;originalFile?:File}
 type ActiveVisualFrame={
   image:LocalVisualImage
   generation:number
   acceptedAt:number
   analyzed:boolean
+  source?:VisualFrameSource
 }
 export class EphemeralVisualContext{
   private entry:ActiveVisualFrame|null=null
   private generation=0
   /** Called only when the user has explicitly authorized a still. */
-  begin(image:LocalVisualImage,now=Date.now()):number{
+  begin(image:LocalVisualImage,now=Date.now(),source?:VisualFrameSource):number{
     // Replace the prior frame, never concatenate or archive older images.
     this.clear()
     if(image.mimeType!=='image/jpeg'||!image.data)throw new Error('Fotografía no válida.')
     const generation=++this.generation
-    this.entry={image,generation,acceptedAt:now,analyzed:false}
+    this.entry={image,generation,acceptedAt:now,analyzed:false,source}
     return generation
   }
   confirmAnalyzed(generation:number,now=Date.now()):boolean{
@@ -118,6 +120,19 @@ export class EphemeralVisualContext{
     const kind=classifyVisualFollowUp(text)
     if(!kind || !this.entry || !this.entry.analyzed || this.expired(now))return null
     return {image:this.entry.image,kind}
+  }
+  /** Metadata-only description of the previously approved JPEG. */
+  getFrameSource(now=Date.now()):{kind:'camera'|'file';resolution:VisionResolution;canReanalyzeOriginal:boolean;generation:number}|null{
+    if(!this.entry || !this.entry.analyzed || this.expired(now) || !this.entry.source)return null
+    return {kind:this.entry.source.kind,resolution:this.entry.source.resolution,
+      canReanalyzeOriginal:this.entry.source.kind==='file' && Boolean(this.entry.source.originalFile),
+      generation:this.entry.generation}
+  }
+  /** The original File is kept ONLY in this five-minute owner-approved viewer session. */
+  getOriginalFileForReanalysis(now=Date.now()):{file:File;generation:number}|null{
+    const entry=this.entry
+    if(!entry || !entry.analyzed || this.expired(now) || entry.source?.kind!=='file' || !entry.source.originalFile)return null
+    return {file:entry.source.originalFile,generation:entry.generation}
   }
   hasAnalyzedFrame(now=Date.now()):boolean{
     return Boolean(this.entry && this.entry.analyzed && !this.expired(now))
