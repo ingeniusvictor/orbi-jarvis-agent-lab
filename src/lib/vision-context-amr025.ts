@@ -33,11 +33,11 @@ export function classifyExistingPhotoFollowup(question:string,resolution:VisionR
  */
 export function isVisualReferenceAnswer(value:string):boolean{
   const q=normalize(value)
-  if(!q || q.length>170 || /^(?:no|cancela|olvida|borra|cierra|cambia|para|detente)\\b/.test(q))
+  if(!q || q.length>170 || /^(?:no|cancela|olvida|borra|cierra|cambia|para|detente)\b/.test(q))
     return false
-  if(/\\b(?:hora|fecha|clima|noticias|calendario|musica|juego|receta|programa|internet|enciende|apaga)\\b/.test(q))
+  if(/\b(?:hora|fecha|clima|noticias|calendario|musica|juego|receta|programa|internet|enciende|apaga)\b/.test(q))
     return false
-  return /\\b(?:camisa|camiseta|chaqueta|prenda|pantalon|gorra|zapato|ropa|hombre|mujer|persona|nino|nina|objeto|vaso|botella|silla|mesa|puerta|pared|ventana|izquierda|derecha|centro|fondo|delante|detras|arriba|abajo|primero|segundo|tercero)\\b/.test(q)
+  return /\b(?:camisa|camiseta|chaqueta|prenda|pantalon|gorra|zapato|ropa|hombre|mujer|persona|nino|nina|objeto|vaso|botella|silla|mesa|puerta|pared|ventana|izquierda|derecha|centro|fondo|delante|detras|arriba|abajo|primero|segundo|tercero)\b/.test(q)
 }
 
 export function resolvedVisualReferencePrompt(question:string,answer:string):string{
