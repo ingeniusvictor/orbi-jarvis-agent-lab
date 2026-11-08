@@ -589,6 +589,12 @@ export async function ask(
     arm()
 
     try {
+      // Metadata-only correlation. The WebSocket still carries ONE authorized
+      // JPEG as before; this line does not expose text, pixels or filename.
+      if(image?.trace && import.meta.env?.VITE_LUMIA_VISION_TRACE_AMR026==='1'){
+        console.info('[lumia:vision-amr026] ws-send',
+          `ask=${id} turn=${image.trace.turnId??'unknown'} photo=${image.trace.photoId}`)
+      }
       ws.send(JSON.stringify({
         type: 'ask', text: prompt, id, conversationId,
         ...(image ? { image } : {}),
