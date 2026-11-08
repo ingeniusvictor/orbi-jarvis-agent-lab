@@ -434,7 +434,7 @@ export default function App() {
       }
       // AMR-02.6: distinct turn ID for every inference, shared random photo ID
       // for the same owner-approved JPEG. No image bytes, path or prompt in logs.
-      if(visualImage?.trace && visionTracingEnabled()){
+      if(visualImage?.trace && visionTracingEnabled() && !contextualReply && !captureFailure){
         const role=visualFollowUp?'followup'
           :fromCameraPreview && said!=='Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.'?'reanalysis':'new'
         visualImage={...visualImage,trace:{...visualImage.trace,turnId,role,intent:visualTraceIntent(visualQuestion)}}
