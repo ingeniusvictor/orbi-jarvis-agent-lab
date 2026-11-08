@@ -41,6 +41,7 @@ import { rc04TranslationCapabilityReply, RC04_TRANSLATION_FACTS } from './orbia/
 import { buildLumiaSkillRegistry, isSkillRegistryInquiry, skillRegistryReply } from './orbia/skill-registry-skill01.mjs'
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 import { safeVisionTrace,createVisionCountLedger } from './orbia/vision-trace-amr026.mjs'
+import { formatVisionCacheMetrics } from './orbia/vision-cache-metrics-amr027.mjs'
 
 const DEFAULT_URL = 'http://127.0.0.1:11434'
 export const OLLAMA_URL = (process.env.JARVIS_OLLAMA_URL ?? DEFAULT_URL).replace(/\/+$/, '')
@@ -413,6 +414,8 @@ export async function streamOllama({
       ` total=${totalMs.toFixed(0)}ms` +
       ` input=${promptMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
       ` inputTokens=${Number(packet?.prompt_eval_count ?? 0)}` +
+      (visualTrace && process.env.ORBIA_LUMIA_VISUAL_CACHE_AMR027==='1'
+        ? ` ${formatVisionCacheMetrics(packet)}` : '') +
       ` outputTokens=${outputTokens}` +
       ` generate=${outputMs.toFixed(0)}ms` +
       ` speed=${speed.toFixed(1)}tok/s` +

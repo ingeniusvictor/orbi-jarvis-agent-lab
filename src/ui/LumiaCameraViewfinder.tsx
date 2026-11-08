@@ -37,6 +37,7 @@ type Props={
   onVisionAutoEnabledChange:(enabled:boolean)=>void
   onAskAboutStill:(question:string)=>void
   visualDetailOffer:'camera'|'file'|null
+  visualDetailPurpose:'ocr'|'count'
   visualDetailBusy:boolean
   onRequestDetailedReanalysis:()=>void
 }
@@ -45,7 +46,7 @@ export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
   visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
-  visualDetailOffer,visualDetailBusy,onRequestDetailedReanalysis,
+  visualDetailOffer,visualDetailPurpose,visualDetailBusy,onRequestDetailedReanalysis,
 }:Props){
   const videoRef=useRef<HTMLVideoElement>(null)
   const fileRef=useRef<HTMLInputElement>(null)
@@ -327,14 +328,20 @@ export function LumiaCameraViewfinder({
       )}
       {!live && still && visualContextReady && visualDetailOffer && (
         <section className="lumia-camera-detail-offer" role="status" aria-label="Mejorar detalle de la fotografía">
-          <p>{visualDetailOffer==='file'
-            ? 'Para leer letras pequeñas, puedes volver al archivo original y reanalizarlo a 1024 px.'
-            : 'Para leer letras pequeñas, es necesario encuadrar de nuevo la cámara a 1024 px.'}</p>
+          <p>{visualDetailPurpose==='count'
+            ? visualDetailOffer==='file'
+              ? 'Para contar grupos de personas con más detalle, puedes reanalizar el archivo original a 1024 px.'
+              : 'Para contar grupos de personas con más detalle, puedes volver a encuadrar la cámara a 1024 px.'
+            : visualDetailOffer==='file'
+              ? 'Para leer letras pequeñas, puedes volver al archivo original y reanalizarlo a 1024 px.'
+              : 'Para leer letras pequeñas, es necesario encuadrar de nuevo la cámara a 1024 px.'}</p>
           <button type="button" disabled={visualDetailBusy}
             onClick={onRequestDetailedReanalysis}>
             {visualDetailBusy?'Preparando fotografía…'
-              :visualDetailOffer==='file'?'Reanalizar archivo original a 1024 px'
-              :'Volver a encuadrar a 1024 px'}
+              :visualDetailPurpose==='count'
+                ? visualDetailOffer==='file'?'Reanalizar grupo a 1024 px':'Volver a encuadrar grupo a 1024 px'
+                :visualDetailOffer==='file'?'Reanalizar archivo original a 1024 px'
+                :'Volver a encuadrar a 1024 px'}
           </button>
           <p>Se requiere tu acción. Nunca se abre la cámara ni se envían fotos automáticamente.</p>
         </section>
