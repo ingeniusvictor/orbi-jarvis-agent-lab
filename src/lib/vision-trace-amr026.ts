@@ -6,6 +6,7 @@
  */
 export type VisionTraceSource='file'|'camera'
 export type VisionTraceRole='new'|'followup'|'reanalysis'
+export type VisionTraceIntent='count'|'ocr'|'scene'
 export type VisionTraceMetadata={
   photoId:string
   source:VisionTraceSource
@@ -15,6 +16,7 @@ export type VisionTraceMetadata={
   encodedChars:number
   turnId?:string
   role?:VisionTraceRole
+  intent?:VisionTraceIntent
 }
 
 export function createVisionTrace(source:VisionTraceSource,limitPx:512|768|1024,width:number,height:number,encodedChars:number):VisionTraceMetadata{
@@ -40,4 +42,15 @@ export function visualPrecisionInstruction(question:string):string{
   if(/\b(?:lee|leer|lectura|texto|letras|etiqueta|placa|documento|transcribe|numero de serie|logo|marca)\b/.test(q))
     return ' Transcribe solamente caracteres directamente visibles en el JPEG. No conviertas una marca reconocible por su diseño en letras supuestamente leídas; si unas letras son legibles y otras no, distingue ambas partes. '
   return ''
+}
+
+/** Only classify the actual spoken/written question, never the prompt with
+ * instructions; the latter contains counting terms even for ordinary scenes. */
+export function visualTraceIntent(question:string):VisionTraceIntent{
+  const q=String(question??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+  if(/\b(?:lee|leer|lectura|texto|letras|etiqueta|placa|documento|transcribe|numero de serie|marca|logo|que dice|que pone)\b/.test(q))
+    return 'ocr'
+  if(/\b(?:cuantos|cuantas|contar|cuenta|conteo|cantidad|numero de personas|total de personas)\b/.test(q))
+    return 'count'
+  return 'scene'
 }
