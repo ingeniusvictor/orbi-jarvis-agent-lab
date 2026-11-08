@@ -20,7 +20,7 @@ assert.equal(visualFailureCategory('Ollama visual HTTP 500'),'runner')
 assert.equal(classifyLumiaVisualFailure(new Error('La IA local falló: Ollama visual HTTP 500: CUDA out of memory')),'memory')
 assert.match(lumiaVisualFailureReply(new Error('CUDA out of memory'),false),/memoria o GPU/)
 assert.match(lumiaVisualFailureReply(new Error('prompt exceeds context window'),true),/volver a analizar esa fotografía/)
-assert.doesNotMatch(lumiaVisualFailureReply(new Error('Ollama visual HTTP 500'),false),/carezca de visión\.$/)
+assert.match(lumiaVisualFailureReply(new Error('Ollama visual HTTP 500'),false),/no significa necesariamente/)
 assert.match(lumiaVisualFailureReply(new Error('not support images'),false),/no admite imágenes/)
 const visual=bridge.slice(
   bridge.indexOf('  if (image) {',bridge.indexOf('export async function streamOllama')),
