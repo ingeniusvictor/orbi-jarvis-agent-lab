@@ -61,7 +61,7 @@ assert.equal(explicitGroupCount('En la foto hay una persona.'),null)
 
 // Expiry applies to each photo's most recent numeric observation. A new
 // photo within the same WebSocket must never inherit another image's count.
-const afterTTL=t+6+300001
+const afterTTL=t+8+300001
 assert.equal(ledger.review({photoId:group,answer:'Veo ocho hombres.',intent:'count',now:afterTTL}).status,'first')
 assert.equal(ledger.review({photoId:other,answer:'Hay siete personas.',intent:'count',now:afterTTL}).status,'first')
 ledger.clear()
