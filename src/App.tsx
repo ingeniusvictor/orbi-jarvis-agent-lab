@@ -11,6 +11,7 @@ import { LumiaComposer } from './ui/LumiaComposer'
 import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
 import type { LocalVisualImage } from './lib/visual-input'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
+import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode} from './lib/vision-context-vi023'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -443,12 +444,10 @@ export default function App() {
         visualInferenceFailed=true
         // Never claim visual understanding if Ollama rejected the image.
         console.warn('[lumia:vision023] Local image inference unavailable:',
-          err instanceof Error ? err.name : 'unknown')
+          classifyLumiaVisualFailure(err),
+          String(err instanceof Error ? err.message : err).replace(/[A-Za-z0-9+/=]{128,}/g, '[redacted]').slice(0, 180))
         return {
-          text: visualFollowUp
-            ? 'No pude volver a analizar esa fotografía. Inténtalo nuevamente o toma otra imagen.'
-            : 'Pude tomar la imagen, pero el modelo local no consiguió analizarla. ' +
-              'Comprueba que el modelo activo admite imágenes en Ollama.',
+          text: lumiaVisualFailureReply(err, Boolean(visualFollowUp)),
           tools: [],
         }
       })

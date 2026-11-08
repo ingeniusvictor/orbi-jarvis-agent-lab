@@ -21,6 +21,7 @@ import {
 import { createToolRequest } from './orbia/contracts.mjs'
 import { createReadOnlyDiagnosticTools } from './orbia/diagnostic-tools.mjs'
 import { ToolExecutor, ToolRegistry } from './orbia/tool-engine.mjs'
+import {visualOptionsForModel,visualFailureCategory} from './orbia/vision-profile-amr021.mjs'
 import {
   buildModelInventory,
   getActiveModel,
@@ -354,6 +355,7 @@ export async function streamOllama({
   // unchanged. Native plain text avoids cutting useful visual analysis inside
   // the short JSON voice-response contract.
   if (image) {
+    const visualOptions = visualOptionsForModel(model)
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -377,7 +379,7 @@ export async function streamOllama({
         stream: false,
         think: false,
         keep_alive: OLLAMA_KEEP_ALIVE,
-        options: { temperature: 0, num_ctx: 4096, num_predict: 256 },
+        options: visualOptions,
       }),
       signal,
     })
@@ -385,7 +387,7 @@ export async function streamOllama({
       const detail = await res.text().catch(() => '')
       throw new Error(
         `Ollama visual HTTP ${res.status}` +
-        (detail ? `: ${detail.slice(0, 160)}` : ''),
+        (detail ? `: ${detail.replace(/[A-Za-z0-9+/=]{128,}/g, '[redacted]').slice(0, 160)}` : ''),
       )
     }
     const packet = await res.json()
@@ -398,7 +400,8 @@ export async function streamOllama({
     const promptMs = Number(packet?.prompt_eval_duration ?? 0) / 1_000_000
     const loadMs = Number(packet?.load_duration ?? 0) / 1_000_000
     console.log(
-      `[lumia] visual local model=${model} total=${totalMs.toFixed(0)}ms` +
+      `[lumia] visual local model=${model} context=${visualOptions.num_ctx}` +
+      ` total=${totalMs.toFixed(0)}ms` +
       ` input=${promptMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
       ` outputTokens=${Number(packet?.eval_count ?? 0)}`,
     )
@@ -913,6 +916,17 @@ export function attachOllamaSession(socket) {
         })
       } catch (err) {
         if (controller.signal.aborted || closed) return
+        // Do not log JPEG bytes or the original image/prompt. Report only a
+        // bounded backend failure category and the already-selected model.
+        const visualFailure = typeof msg.image !== 'undefined'
+          ? visualFailureCategory(err) : null
+        if (visualFailure) {
+          console.warn(
+            `[lumia] visual inference failed model=${getActiveModel()}` +
+            ` category=${visualFailure}` +
+            ` reason=${String(err?.message ?? err).replace(/[A-Za-z0-9+/=]{128,}/g, '[redacted]').slice(0, 160)}`,
+          )
+        }
         send({
           type: 'error',
           ask,
