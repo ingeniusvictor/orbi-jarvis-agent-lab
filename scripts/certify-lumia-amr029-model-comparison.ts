@@ -10,7 +10,15 @@ const proc=spawnSync(process.execPath,['--import','tsx',join(root,'scripts/bench
   cwd:root,encoding:'utf8',timeout:20000
 })
 assert.equal(proc.status,0,proc.stderr)
+// Node emits ASCII-only JSON even when Windows PowerShell defaults to an
+// OEM native stdout codepage; parsing reconstructs correct Spanish accents.
+assert.equal(/[^\\x00-\\x7f]/.test(proc.stdout),false,'Non-ASCII JSON stdout can be mangled by Windows PowerShell 5.1')
 const cfg=JSON.parse(proc.stdout)
+assert.match(cfg.tasks[0].question,/español/)
+assert.match(cfg.tasks[0].question,/qué es/)
+assert.match(cfg.voiceQuestion,/¿qué revisarías primero/)
+assert.match(cfg.visualQuestion,/¿Cuántas personas/)
+
 assert.equal(cfg.model2B,'qwen3.5:2b')
 assert.equal(cfg.model4B,'qwen3.5:4b-vision4096')
 assert.equal(cfg.keepAlive,'5m')
@@ -34,6 +42,7 @@ assert.equal(cfg.format.additionalProperties,false)
 assert.doesNotMatch(proc.stdout,/data:image|base64|filePath|localStorage/)
 
 const ps=read('scripts/benchmark-lumia-amr029-model-comparison.ps1')
+assert.equal(ps.charCodeAt(0),0xFEFF,'Windows PowerShell 5.1 requires BOM to decode script UTF-8 literals correctly')
 assert.match(ps,/\[Parameter\(Mandatory=\$true\)\]\[string\]\$ImagePath/)
 assert.match(ps,/\$Model2B='qwen3\.5:2b'/)
 assert.match(ps,/\$Model4B='qwen3\.5:4b-vision4096'/)
