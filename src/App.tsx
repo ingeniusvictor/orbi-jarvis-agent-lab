@@ -16,6 +16,7 @@ import {chooseAdaptiveVisionResolution,shouldOfferGroupDetail} from './lib/visio
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode,type VisualFrameSource} from './lib/vision-context-vi023'
+import {requiresFreshVisualObservation,frozenVisualTruthReply} from './lib/vision-temporal-vi030'
 import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -339,8 +340,14 @@ export default function App() {
       const pendingReference=pendingReferenceQuestion.current
       const resolvingReference=Boolean(VISION_CONTEXT_AMR025_ENABLED && pendingReference &&
         !image && !cameraRequested && isVisualReferenceAnswer(said))
+      // VI-03.0: a question about what changed must NOT silently reuse a
+      // frozen JPEG as if LUMIA were looking through a live camera.
+      // Explicit user-requested capture still has precedence via cameraRequested.
+      const temporalQuestion = CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested &&
+        !fromCameraPreview && visualSession.current.hasAnalyzedFrame() &&
+        requiresFreshVisualObservation(said)
       const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested
-        ? forceVisualFollowUp || resolvingReference
+        ? forceVisualFollowUp || resolvingReference || temporalQuestion
           ? visualSession.current.getAuthorizedFrame()
           : visualSession.current.getForFollowUp(said)
         : null
@@ -357,7 +364,12 @@ export default function App() {
         shouldOfferGroupDetail(visualQuestion,frameSource.resolution,
           VISION_ADAPTIVE_AMR027_ENABLED && visionAutoEnabled))
       let contextualReply:string|null=null
-      if(contextAction==='clarify-reference'){
+      if(temporalQuestion && visualFollowUp){
+        // No new camera permission, frame, Ollama vision pass, or stale scene claim.
+        contextualReply=frozenVisualTruthReply(frameSource?.kind??'camera')
+        setVisualDetailOffer(null)
+        pendingDetailedQuestion.current=null
+      }else if(contextAction==='clarify-reference'){
         contextualReply=visualReferenceClarification()
         pendingReferenceQuestion.current=said
         setVisualDetailOffer(null)
