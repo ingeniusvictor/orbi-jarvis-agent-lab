@@ -11,7 +11,7 @@
  */
 import {useEffect,useRef,useState} from 'react'
 import * as camera from '../lib/camera'
-import {prepareVisualCameraFrame,prepareVisualImage,type LocalVisualImage} from '../lib/visual-input'
+import {prepareVisualCameraFrame,prepareVisualImage,VISION_RESOLUTION_CHOICES,type LocalVisualImage,type VisionResolution} from '../lib/visual-input'
 import {inspectCameraSignal,connectedOrVirtualCameraHint} from '../lib/vision-camera-signal-vi022'
 import type {VisionReplyMode} from '../lib/vision-context-vi023'
 
@@ -29,16 +29,19 @@ type Props={
   visualContextReady:boolean
   visualReplyMode:VisionReplyMode
   onVisualReplyModeChange:(mode:VisionReplyMode)=>void
+  visionResolution:VisionResolution
+  onVisionResolutionChange:(edge:VisionResolution)=>void
   onAskAboutStill:(question:string)=>void
 }
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
-  visualContextReady,visualReplyMode,onVisualReplyModeChange,onAskAboutStill,
+  visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,onAskAboutStill,
 }:Props){
   const videoRef=useRef<HTMLVideoElement>(null)
   const fileRef=useRef<HTMLInputElement>(null)
   const fileRequest=useRef(0)
+  const selectedFile=useRef<File|null>(null)
   const [fileImage,setFileImage]=useState<LocalVisualImage|null>(null)
   const [fileBusy,setFileBusy]=useState(false)
   const [fileError,setFileError]=useState('')
@@ -58,18 +61,20 @@ export function LumiaCameraViewfinder({
   useEffect(()=>{
     if(fileMode)return
     fileRequest.current++
+    selectedFile.current=null
     setFileImage(null)
     setFileBusy(false)
     setFileError('')
   },[fileMode])
-  const selectFile=async(file:File|null)=>{
+  const selectFile=async(file:File|null, maxEdge:VisionResolution=visionResolution)=>{
+    selectedFile.current=file
     const request=++fileRequest.current
     setFileImage(null)
     setFileError('')
     if(!file)return
     setFileBusy(true)
     try{
-      const jpeg=await prepareVisualImage(file)
+      const jpeg=await prepareVisualImage(file,maxEdge)
       if(request===fileRequest.current)setFileImage(jpeg)
     }catch(err){
       if(request===fileRequest.current)setFileError(err instanceof Error?err.message:'No pude abrir la fotografía.')
@@ -155,7 +160,7 @@ export function LumiaCameraViewfinder({
     const video=videoRef.current
     if(!ready || !video)return
     try{
-      const image=prepareVisualCameraFrame(video)
+      const image=prepareVisualCameraFrame(video,visionResolution)
       releaseRef.current?.() // release BEFORE Ollama starts, not in a later effect
       setReady(false)
       setError('')
@@ -226,6 +231,26 @@ export function LumiaCameraViewfinder({
           aria-pressed={visualReplyMode==='detallada'}
           onClick={()=>onVisualReplyModeChange('detallada')}>Detallada</button>
       </div>
+      {(live || fileMode) && (
+        <div className="lumia-camera-resolution-selector" role="group"
+          aria-label="Resolución máxima para la próxima fotografía">
+          <span>CALIDAD IMAGEN</span>
+          {VISION_RESOLUTION_CHOICES.map(edge=>(
+            <button key={edge} type="button" aria-pressed={visionResolution===edge}
+              className={visionResolution===edge?'is-selected':''}
+              title={edge===512?'Rápida · objetos grandes':edge===768?'Equilibrada · escenas':'Detallada · textos pequeños'}
+              onClick={()=>{
+                if(visionResolution===edge)return
+                onVisionResolutionChange(edge)
+                // Re-encode the same manually selected File; never use the
+                // previous-resolution JPEG as the new source.
+                if(fileMode && selectedFile.current)void selectFile(selectedFile.current,edge)
+              }}>
+              {edge} px
+            </button>
+          ))}
+        </div>
+      )}
       <div className="lumia-camera-viewfinder-viewport">
         {live ? (
           <video ref={videoRef} className="lumia-camera-viewfinder-video"

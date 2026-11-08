@@ -7,7 +7,7 @@
  * feature. This module acquires/relinquishes exactly its own lease.
  */
 import * as camera from './camera'
-import {prepareVisualCameraFrame,type LocalVisualImage} from './visual-input'
+import {prepareVisualCameraFrame,DEFAULT_VISION_RESOLUTION,type LocalVisualImage,type VisionResolution} from './visual-input'
 
 const normalize=(value:string)=>String(value??'')
   .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -52,7 +52,7 @@ export function cameraVisionPrompt(question:string):string{
 type CameraCaptureDeps={
   acquire:()=>Promise<HTMLVideoElement>
   release:()=>void
-  prepare:(video:HTMLVideoElement)=>LocalVisualImage
+  prepare:(video:HTMLVideoElement,edge?:VisionResolution)=>LocalVisualImage
   waitReady:(video:HTMLVideoElement,isStale:()=>boolean)=>Promise<void>
 }
 async function waitCameraFrame(video:HTMLVideoElement,isStale:()=>boolean):Promise<void>{
@@ -79,6 +79,7 @@ let captureInFlight=false
 export async function captureLumiaAuthorizedStill(
   isStale:()=>boolean=()=>false,
   deps:CameraCaptureDeps=defaultCapture,
+  maxEdge:VisionResolution=DEFAULT_VISION_RESOLUTION,
 ):Promise<LocalVisualImage>{
   if(captureInFlight)throw new Error('Ya estoy capturando una imagen de cámara.')
   captureInFlight=true
@@ -90,7 +91,7 @@ export async function captureLumiaAuthorizedStill(
     if(isStale())throw new Error('Captura de cámara cancelada.')
     await deps.waitReady(video,isStale)
     if(isStale())throw new Error('Captura de cámara cancelada.')
-    const image=deps.prepare(video)
+    const image=deps.prepare(video,maxEdge)
     if(isStale())throw new Error('Captura de cámara cancelada.')
     return image
   }finally{

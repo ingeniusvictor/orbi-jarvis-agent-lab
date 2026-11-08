@@ -10,6 +10,36 @@ export type LocalVisualImage = {
 
 export const MAX_VISUAL_FILE_BYTES = 12 * 1024 * 1024
 export const MAX_VISUAL_PAYLOAD_CHARS = 2_000_000
+
+// AMR-02.3: explicit, session-only benchmark of the *same* photograph at
+// different maximum long-side resolutions. The original 1024 preset remains
+// the default; reducing image detail is never automatic or irreversible.
+export const VISION_RESOLUTION_CHOICES = [512, 768, 1024] as const
+export type VisionResolution = typeof VISION_RESOLUTION_CHOICES[number]
+export const DEFAULT_VISION_RESOLUTION: VisionResolution = 1024
+
+export function visionResolutionEdges(maxEdge: VisionResolution = DEFAULT_VISION_RESOLUTION): number[] {
+  if (maxEdge === 512) return [512]
+  if (maxEdge === 768) return [768, 640, 512]
+  if (maxEdge === 1024) return [1024, 800, 640, 512]
+  throw new Error('Resolución visual no admitida.')
+}
+
+export function scaleVisualDimensions(sourceWidth:number,sourceHeight:number,maxEdge:number):{width:number;height:number} {
+  if(!Number.isInteger(sourceWidth)||!Number.isInteger(sourceHeight)||sourceWidth<=0||sourceHeight<=0||sourceWidth*sourceHeight>100_000_000){
+    throw new Error('Dimensiones de imagen no válidas.')
+  }
+  if(!Number.isInteger(maxEdge)||maxEdge<1||maxEdge>1024)throw new Error('Resolución visual no admitida.')
+  const factor=Math.min(1,maxEdge/Math.max(sourceWidth,sourceHeight))
+  return {width:Math.max(1,Math.round(sourceWidth*factor)),
+    height:Math.max(1,Math.round(sourceHeight*factor))}
+}
+
+function reportPreparedFrame(source: 'file'|'camera', limit: VisionResolution, width: number, height: number, chars: number):void {
+  // Metadata only, never log image pixels, JPEG data, filenames or the prompt.
+  console.info('[lumia:vision-amr023] prepared',
+    `source=${source} limit=${limit}px actual=${width}x${height} encodedChars=${chars}`)
+}
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 export function validateVisualFile(file: Pick<File, 'type' | 'size'>): void {
@@ -23,17 +53,15 @@ export function validateVisualFile(file: Pick<File, 'type' | 'size'>): void {
 
 /** Encoding never opens a camera or reads the screen; it needs a file selected
  * by the owner via the standard browser file picker. */
-export async function prepareVisualImage(file: File): Promise<LocalVisualImage> {
+export async function prepareVisualImage(file: File, maxEdge:VisionResolution=DEFAULT_VISION_RESOLUTION): Promise<LocalVisualImage> {
   validateVisualFile(file)
   const bitmap = await createImageBitmap(file)
   try {
     if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 100_000_000) {
       throw new Error('Dimensiones de imagen no válidas.')
     }
-    for (const edge of [1024, 800, 640, 512]) {
-      const factor = Math.min(1, edge / Math.max(bitmap.width, bitmap.height))
-      const width = Math.max(1, Math.round(bitmap.width * factor))
-      const height = Math.max(1, Math.round(bitmap.height * factor))
+    for (const edge of visionResolutionEdges(maxEdge)) {
+      const {width,height}=scaleVisualDimensions(bitmap.width,bitmap.height,edge)
       const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
@@ -43,6 +71,7 @@ export async function prepareVisualImage(file: File): Promise<LocalVisualImage> 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.76)
       const data = dataUrl.slice(dataUrl.indexOf(',') + 1)
       if (data.length && data.length <= MAX_VISUAL_PAYLOAD_CHARS) {
+        reportPreparedFrame('file', maxEdge, width, height, data.length)
         return { mimeType: 'image/jpeg', data }
       }
     }
@@ -58,15 +87,13 @@ export async function prepareVisualImage(file: File): Promise<LocalVisualImage> 
  * path, but reads one already-authorized video element in memory. The source
  * frame is NOT mirrored, so printed labels remain legible.
  */
-export function prepareVisualCameraFrame(video:HTMLVideoElement):LocalVisualImage {
+export function prepareVisualCameraFrame(video:HTMLVideoElement,maxEdge:VisionResolution=DEFAULT_VISION_RESOLUTION):LocalVisualImage {
   if(!video.videoWidth || !video.videoHeight ||
       video.videoWidth*video.videoHeight>100_000_000){
     throw new Error('La cámara no entregó un fotograma válido.')
   }
-  for (const edge of [1024,800,640,512]){
-    const factor=Math.min(1,edge/Math.max(video.videoWidth,video.videoHeight))
-    const width=Math.max(1,Math.round(video.videoWidth*factor))
-    const height=Math.max(1,Math.round(video.videoHeight*factor))
+  for (const edge of visionResolutionEdges(maxEdge)){
+    const {width,height}=scaleVisualDimensions(video.videoWidth,video.videoHeight,edge)
     const canvas=document.createElement('canvas')
     canvas.width=width
     canvas.height=height
@@ -76,6 +103,7 @@ export function prepareVisualCameraFrame(video:HTMLVideoElement):LocalVisualImag
     const url=canvas.toDataURL('image/jpeg',.76)
     const data=url.slice(url.indexOf(',')+1)
     if(data.length && data.length<=MAX_VISUAL_PAYLOAD_CHARS){
+      reportPreparedFrame('camera',maxEdge,width,height,data.length)
       return {mimeType:'image/jpeg',data}
     }
   }
