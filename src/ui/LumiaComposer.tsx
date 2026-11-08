@@ -12,6 +12,7 @@ import {
   type LocalVisualImage,type VisionResolution,
 } from '../lib/visual-input'
 import type { LumiaInputMode } from '../lib/input-mode'
+import {chooseVisionResolution} from '../lib/vision-routing-amr024'
 import { LumiaViewDock } from './LumiaViewDock'
 import { LumiaModelDock } from './LumiaModelDock'
 import { LumiaMotionDock } from './LumiaMotionDock'
@@ -28,6 +29,9 @@ type Props = {
   cameraPreviewOpen?: boolean
   visionResolution:VisionResolution
   onVisionResolutionChange:(edge:VisionResolution)=>void
+  visionAutoAvailable:boolean
+  visionAutoEnabled:boolean
+  onVisionAutoEnabledChange:(enabled:boolean)=>void
   onCaptureCamera?: () => void
   translationAvailable: boolean
   avatarViewControl?: boolean
@@ -103,7 +107,7 @@ function DockIcon({ name }: { name: IconName }) {
 }
 
 export function LumiaComposer({
-  available, mode, recording, busy: inboundBusy, visionAvailable, cameraAvailable = false, cameraCapturing = false, cameraPreviewOpen = false, visionResolution,onVisionResolutionChange, onCaptureCamera, translationAvailable, avatarViewControl = false, modelSelectorAvailable = false, modelControlBusy = false, onTranslate, onTranslateAudio,
+  available, mode, recording, busy: inboundBusy, visionAvailable, cameraAvailable = false, cameraCapturing = false, cameraPreviewOpen = false, visionResolution,onVisionResolutionChange, visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onCaptureCamera, translationAvailable, avatarViewControl = false, modelSelectorAvailable = false, modelControlBusy = false, onTranslate, onTranslateAudio,
   onModeChange, onSend, onStartRecording, onStopRecording, onCancelRecording,
 }: Props) {
   const [draft, setDraft] = useState('')
@@ -136,7 +140,12 @@ export function LumiaComposer({
     setPreparing(true)
     setError('')
     try {
-      const image = photo ? await prepareVisualImage(photo,visionResolution) : undefined
+      const question=text || 'Describe esta imagen en español y señala lo que no se pueda comprobar.'
+      const route=chooseVisionResolution(question,
+        visionAutoAvailable && visionAutoEnabled ? 'auto' : visionResolution)
+      if(photo && visionAutoAvailable)console.info('[lumia:vision-amr024] route',
+        `source=composer mode=${visionAutoEnabled?'auto':'manual'} edge=${route.resolution}px reason=${route.reason}`)
+      const image = photo ? await prepareVisualImage(photo,route.resolution) : undefined
       if (translateEnabled && audioFile) await onTranslateAudio(audioFile, sourceLanguage, targetLanguage)
       else if (translateEnabled) onTranslate(text, sourceLanguage, targetLanguage)
       else onSend(text || 'Describe esta imagen en español y señala lo que no se pueda comprobar.', image)
@@ -360,12 +369,21 @@ export function LumiaComposer({
           {photo && !translateEnabled && (
             <span className="lumia-composer-resolution" role="group"
               aria-label="Resolución máxima de fotografía adjunta">
+              {visionAutoAvailable && (
+                <button type="button" aria-pressed={visionAutoEnabled}
+                  className={visionAutoEnabled?'is-selected':''}
+                  title="Automático conservador, según la pregunta escrita"
+                  disabled={preparing || busy || recording}
+                  onClick={()=>onVisionAutoEnabledChange(true)}>
+                  AUTO · {chooseVisionResolution(draft || 'Describe esta imagen', 'auto').resolution}px
+                </button>
+              )}
               {VISION_RESOLUTION_CHOICES.map(edge=>(
-                <button key={edge} type="button" aria-pressed={edge===visionResolution}
-                  className={edge===visionResolution?'is-selected':''}
+                <button key={edge} type="button" aria-pressed={!visionAutoEnabled && edge===visionResolution}
+                  className={!visionAutoEnabled && edge===visionResolution?'is-selected':''}
                   title={edge===512?'Rápida':edge===768?'Equilibrada':'Detallada'}
                   disabled={preparing || busy || recording}
-                  onClick={()=>onVisionResolutionChange(edge)}>{edge}px</button>
+                  onClick={()=>{onVisionAutoEnabledChange(false);onVisionResolutionChange(edge)}}>{edge}px</button>
               ))}
             </span>
           )}

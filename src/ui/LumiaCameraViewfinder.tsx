@@ -14,6 +14,7 @@ import * as camera from '../lib/camera'
 import {prepareVisualCameraFrame,prepareVisualImage,VISION_RESOLUTION_CHOICES,type LocalVisualImage,type VisionResolution} from '../lib/visual-input'
 import {inspectCameraSignal,connectedOrVirtualCameraHint} from '../lib/vision-camera-signal-vi022'
 import type {VisionReplyMode} from '../lib/vision-context-vi023'
+import {chooseVisionResolution} from '../lib/vision-routing-amr024'
 
 type Props={
   live:boolean
@@ -31,12 +32,16 @@ type Props={
   onVisualReplyModeChange:(mode:VisionReplyMode)=>void
   visionResolution:VisionResolution
   onVisionResolutionChange:(edge:VisionResolution)=>void
+  visionAutoAvailable:boolean
+  visionAutoEnabled:boolean
+  onVisionAutoEnabledChange:(enabled:boolean)=>void
   onAskAboutStill:(question:string)=>void
 }
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
-  visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,onAskAboutStill,
+  visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
+  visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
 }:Props){
   const videoRef=useRef<HTMLVideoElement>(null)
   const fileRef=useRef<HTMLInputElement>(null)
@@ -56,6 +61,10 @@ export function LumiaCameraViewfinder({
     camera.getLastCameraSource()?.label??'')
   const [signalWarning,setSignalWarning]=useState<string|null>(null)
   const [followupDraft,setFollowupDraft]=useState('')
+  const sceneQuestion='Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.'
+  const sceneRoute=chooseVisionResolution(sceneQuestion,
+    visionAutoAvailable && visionAutoEnabled ? 'auto' : visionResolution)
+  const effectiveResolution=sceneRoute.resolution
 
   useEffect(()=>()=>{fileRequest.current++},[])
   useEffect(()=>{
@@ -66,7 +75,7 @@ export function LumiaCameraViewfinder({
     setFileBusy(false)
     setFileError('')
   },[fileMode])
-  const selectFile=async(file:File|null, maxEdge:VisionResolution=visionResolution)=>{
+  const selectFile=async(file:File|null, maxEdge:VisionResolution=effectiveResolution)=>{
     selectedFile.current=file
     const request=++fileRequest.current
     setFileImage(null)
@@ -160,7 +169,7 @@ export function LumiaCameraViewfinder({
     const video=videoRef.current
     if(!ready || !video)return
     try{
-      const image=prepareVisualCameraFrame(video,visionResolution)
+      const image=prepareVisualCameraFrame(video,effectiveResolution)
       releaseRef.current?.() // release BEFORE Ollama starts, not in a later effect
       setReady(false)
       setError('')
@@ -234,13 +243,25 @@ export function LumiaCameraViewfinder({
       {(live || fileMode) && (
         <div className="lumia-camera-resolution-selector" role="group"
           aria-label="Resolución máxima para la próxima fotografía">
-          <span>CALIDAD IMAGEN</span>
+          <span>CALIDAD IMAGEN{visionAutoAvailable&&visionAutoEnabled?` · AUTO ${effectiveResolution}px`:''}</span>
+          {visionAutoAvailable && (
+            <button type="button" aria-pressed={visionAutoEnabled}
+              className={visionAutoEnabled?'is-selected':''}
+              title="Automático conservador: 768 escenas, 1024 para lectura, 512 solo objetos simples"
+              onClick={()=>{
+                if(visionAutoEnabled)return
+                onVisionAutoEnabledChange(true)
+                const edge=chooseVisionResolution(sceneQuestion,'auto').resolution
+                if(fileMode && selectedFile.current)void selectFile(selectedFile.current,edge)
+              }}>AUTO</button>
+          )}
           {VISION_RESOLUTION_CHOICES.map(edge=>(
-            <button key={edge} type="button" aria-pressed={visionResolution===edge}
-              className={visionResolution===edge?'is-selected':''}
+            <button key={edge} type="button" aria-pressed={!visionAutoEnabled && visionResolution===edge}
+              className={!visionAutoEnabled && visionResolution===edge?'is-selected':''}
               title={edge===512?'Rápida · objetos grandes':edge===768?'Equilibrada · escenas':'Detallada · textos pequeños'}
               onClick={()=>{
-                if(visionResolution===edge)return
+                if(visionResolution===edge && !visionAutoEnabled)return
+                onVisionAutoEnabledChange(false)
                 onVisionResolutionChange(edge)
                 // Re-encode the same manually selected File; never use the
                 // previous-resolution JPEG as the new source.

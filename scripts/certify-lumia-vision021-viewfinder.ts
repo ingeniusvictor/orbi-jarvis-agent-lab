@@ -14,7 +14,7 @@ const workflow=read('.github/workflows/lumia-vision021-viewfinder.yml')
 assert.match(view,/className="lumia-camera-viewfinder-video"/)
 assert.match(view,/ref=\{videoRef\}/)
 assert.match(view,/const video=videoRef\.current/)
-assert.match(view,/prepareVisualCameraFrame\(video,visionResolution\)/)
+assert.match(view,/prepareVisualCameraFrame\(video,effectiveResolution\)/)
 assert.match(view,/video\.srcObject=source/)
 assert.match(view,/source=camera\.cameraStream\(\)/)
 assert.match(view,/await camera\.holdCamera\(\)/)
@@ -31,9 +31,9 @@ assert.doesNotMatch(view,/getDisplayMedia|MediaRecorder|toBlob|localStorage|fetc
 // The owner explicitly commits ONE frame. Releasing a camera lease before
 // onCaptured is critical: asynchronous Ollama thinking must NOT keep it on.
 const capture=view.slice(view.indexOf('  const capture=()=>'),view.indexOf('\n  return ('))
-assert.ok(capture.indexOf('prepareVisualCameraFrame(video,visionResolution)')>=0)
+assert.ok(capture.indexOf('prepareVisualCameraFrame(video,effectiveResolution)')>=0)
 assert.ok(capture.indexOf('releaseRef.current?.()') >
-  capture.indexOf('prepareVisualCameraFrame(video,visionResolution)'))
+  capture.indexOf('prepareVisualCameraFrame(video,effectiveResolution)'))
 assert.ok(capture.indexOf('releaseRef.current?.()') <
   capture.indexOf('onCaptured(image)'))
 assert.match(view,/onClick=\{capture\}/)
@@ -78,7 +78,7 @@ assert.match(composer,/aria-label=\{cameraCapturing \? 'Capturando una imagen pu
 // Existing photograph intake, webcam-by-voice and ordinary fast conversation
 // remain separate; no 2nd Ollama session or new npm/3rd-party service.
 assert.match(app,/parseLumiaCameraIntent\(said\)/)
-assert.match(app,/captureLumiaAuthorizedStill\(stale,undefined,visionResolution\)/)
+assert.match(app,/captureLumiaAuthorizedStill\(stale,undefined,route.resolution\)/)
 assert.match(app,/}, visualImage\)/)
 assert.match(composer,/onClick=\{\(\) => \(translateEnabled \? audioInput : photoInput\)\.current\?\.click\(\)\}/)
 assert.match(camera,/export async function holdCamera/)

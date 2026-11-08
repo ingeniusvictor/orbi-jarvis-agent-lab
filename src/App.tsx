@@ -10,6 +10,7 @@ import { VisualInput } from './ui/VisualInput'
 import { LumiaComposer } from './ui/LumiaComposer'
 import { LumiaCameraViewfinder } from './ui/LumiaCameraViewfinder'
 import {DEFAULT_VISION_RESOLUTION,type LocalVisualImage,type VisionResolution} from './lib/visual-input'
+import {chooseVisionResolution,visionSpeechBudget} from './lib/vision-routing-amr024'
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode} from './lib/vision-context-vi023'
@@ -100,6 +101,7 @@ const LONG_QUESTION_INPUT_ENABLED = import.meta.env.VITE_LUMIA_LONG_QUESTION_INP
 const COMPLEX_VOICE_ENABLED = import.meta.env.VITE_LUMIA_COMPLEX_VOICE_VQ01 === '1'
 const MULTIMODAL_COMPOSER = import.meta.env.VITE_LUMIA_MULTIMODAL_COMPOSER === '1'
 const AVATAR_PH04_ENABLED = import.meta.env.VITE_LUMIA_AVATAR_PH04 === '1'
+const VISION_AUTO_AMR024_ENABLED = import.meta.env.VITE_LUMIA_VISION_AUTO_AMR024 === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -146,6 +148,7 @@ export default function App() {
   const [visionReplyMode,setVisionReplyMode] = useState<VisionReplyMode>('breve')
   // AMR-02.3: manual, session-only resolution pilot; preserves 1024px baseline.
   const [visionResolution,setVisionResolution] = useState<VisionResolution>(DEFAULT_VISION_RESOLUTION)
+  const [visionAutoEnabled,setVisionAutoEnabled] = useState(VISION_AUTO_AMR024_ENABLED)
   const [visionContextReady,setVisionContextReady] = useState(false)
   const visualSession = useRef(new EphemeralVisualContext())
   const activeVisualReply = useRef<string|null>(null)
@@ -185,6 +188,9 @@ export default function App() {
   // local hardware test must NEVER share the normal assistant mic loop.
   const experimentOwner = useRef<'realtime' | 'acoustic' | null>(null)
   const [activeExperiment, setActiveExperiment] = useState<'realtime' | 'acoustic' | null>(null)
+
+  // AMR-02.4: manual numeric choice wins. AUTO exists only in opt-in launcher.
+  const visionChoice = visionAutoEnabled && VISION_AUTO_AMR024_ENABLED ? 'auto' as const : visionResolution
 
   // -- helpers --------------------------------------------------------------
 
@@ -340,7 +346,10 @@ export default function App() {
         setCameraCapturing(true)
         s.setLooking('VISIÓN LOCAL · UNA FOTO SOLICITADA')
         try {
-          visualImage=await captureLumiaAuthorizedStill(stale,undefined,visionResolution)
+          const route=chooseVisionResolution(cameraIntent?.question ?? said,visionChoice)
+          if(VISION_AUTO_AMR024_ENABLED)console.info('[lumia:vision-amr024] route',
+            `source=voice mode=${visionChoice==='auto'?'auto':'manual'} edge=${route.resolution}px reason=${route.reason}`)
+          visualImage=await captureLumiaAuthorizedStill(stale,undefined,route.resolution)
           if(!stale()){
             // This is the precise JPEG that local Ollama will receive, NOT
             // an imaginary live feed continuing after the shutter closes.
@@ -397,12 +406,12 @@ export default function App() {
         : avatarAction
         ? { text: respondToLumiaAvatarAction(avatarAction) }
         : await ask(visualFollowUp
-          ? followupVisionPrompt(said,visionReplyMode)
+          ? followupVisionPrompt(said,visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)
           : visualImage
           ? (cameraIntent || cameraRequested || fromCameraPreview
               ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
               visualReliabilityInstruction(cameraIntent?.question ?? said) +
-              visualModeInstruction(visionReplyMode)
+              visualModeInstruction(visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)
           : said,
           history.current, {
         onText: (delta) => {
@@ -413,6 +422,10 @@ export default function App() {
             store.getState().updateTurn(turnId, {
               firstTextAt: Date.now(), status: 'generating',
             })
+            if(visualImage && VISION_AUTO_AMR024_ENABLED) {
+              console.info('[lumia:vision-amr024] first-text',
+                `elapsed=${ttsDiag.firstTextMs}ms mode=${visionAutoEnabled?'auto':'manual'} followUp=${Boolean(visualFollowUp)}`)
+            }
             store.getState().setPhase('speaking')
             // The answer arriving is what ends the tool phase — a timer would
             // clear the readout while a slow tool was still running.
@@ -1595,6 +1608,9 @@ export default function App() {
           onVisualReplyModeChange={setVisionReplyMode}
           visionResolution={visionResolution}
           onVisionResolutionChange={setVisionResolution}
+          visionAutoAvailable={VISION_AUTO_AMR024_ENABLED}
+          visionAutoEnabled={visionAutoEnabled}
+          onVisionAutoEnabledChange={setVisionAutoEnabled}
           onAskAboutStill={submitVisualFollowUp}
         />
       )}
@@ -1612,6 +1628,9 @@ export default function App() {
           cameraPreviewOpen={cameraPreviewOpen}
           visionResolution={visionResolution}
           onVisionResolutionChange={setVisionResolution}
+          visionAutoAvailable={VISION_AUTO_AMR024_ENABLED}
+          visionAutoEnabled={visionAutoEnabled}
+          onVisionAutoEnabledChange={setVisionAutoEnabled}
           onCaptureCamera={submitCamera}
           translationAvailable={usingBridge && import.meta.env.VITE_LUMIA_TRANSLATE_LT01 === '1'}
           avatarViewControl={AVATAR_PH04_ENABLED}
