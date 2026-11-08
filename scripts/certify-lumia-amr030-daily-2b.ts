@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {spawnSync} from 'node:child_process'
+import {fileURLToPath} from 'node:url'
 import {splitKokoroCompactPhrase,MAX_KOKORO_COMPACT_CHARS}
   from '../src/lib/kokoro-compact-phrases-amr030'
 import {guardVisualPostureCount} from '../bridge/orbia/vision-posture-selfcheck-amr030.mjs'
@@ -78,6 +79,6 @@ assert.match(bridge,/onVisualAnswer\(selfCheck\.text\)/)
 assert.doesNotMatch(bridge,/await .*guardVisualPostureCount/)
 
 const check=spawnSync(process.execPath,['--check',
-  new URL('../bridge/orbia/vision-posture-selfcheck-amr030.mjs',import.meta.url).pathname],{encoding:'utf8'})
+  fileURLToPath(new URL('../bridge/orbia/vision-posture-selfcheck-amr030.mjs',import.meta.url))],{encoding:'utf8'})
 assert.equal(check.status,0,check.stderr)
 console.log('AMR-03.0 PASS: opt-in 2B daily, limited local Kokoro phrase segmentation, privacy-safe posture overflow guard; existing 4B launcher unchanged')
