@@ -1498,6 +1498,59 @@ export default function App() {
     void respond('Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.',image,false,true)
   }
 
+  // AMR-02.5: user must press this control; an OCR follow-up by itself never
+  // reopens the camera, requests a new JPEG, or upgrades a prior JPEG.
+  const requestDetailedReanalysis = async () => {
+    if(!VISION_CONTEXT_AMR025_ENABLED || !visualDetailOffer || visualDetailBusy ||
+       cameraCapturing || experimentOwner.current)return
+    if(store.getState().phase==='offline'||store.getState().phase==='boot')return
+    const question=pendingDetailedQuestion.current
+    if(!question)return
+    const current=visualSession.current.getFrameSource()
+    if(!current || current.resolution>=1024)return
+
+    if(visualDetailOffer==='camera'){
+      if(current.kind!=='camera')return
+      // Explicitly open only the 90-second optical preview. A second press
+      // on 'Capturar y analizar' is required before any new photo is encoded.
+      closeCameraViewfinder()
+      setVisionAutoEnabled(false)
+      setVisionResolution(1024)
+      setVisionStillSource('camera')
+      setVisionFileMode(false)
+      setCameraPreviewOpen(true)
+      detailedCameraQuestion.current=question
+      console.info('[lumia:vision-amr025] approved', 'action=camera-preview edge=1024px')
+      return
+    }
+
+    const selected=visualSession.current.getOriginalFileForReanalysis()
+    if(!selected || current.kind!=='file' || selected.generation!==current.generation)return
+    setVisualDetailBusy(true)
+    try{
+      // Re-encode FROM ORIGINAL File: never upscale the previously sent JPEG.
+      const highResolution=await prepareVisualImage(selected.file,1024)
+      const fresh=visualSession.current.getOriginalFileForReanalysis()
+      if(!fresh || fresh.generation!==selected.generation ||
+         experimentOwner.current)return
+      pendingVisualSource.current={kind:'file',resolution:1024,originalFile:selected.file}
+      setVisionResolution(1024)
+      setVisionAutoEnabled(false)
+      setVisualDetailOffer(null)
+      pendingDetailedQuestion.current=null
+      setVisionStillSource('file')
+      setCameraStill(highResolution)
+      silence()
+      interrupt()
+      console.info('[lumia:vision-amr025] approved', 'action=file-reanalysis edge=1024px')
+      void respond(question,highResolution,false,true)
+    }catch(err){
+      store.getState().setError(err instanceof Error?err.message:'No pude preparar el archivo original.')
+    }finally{
+      setVisualDetailBusy(false)
+    }
+  }
+
   const submitVisualFollowUp = (text:string) => {
     if(experimentOwner.current || !visualSession.current.hasAnalyzedFrame())return
     if(store.getState().phase==='offline'||store.getState().phase==='boot')return
@@ -1660,6 +1713,9 @@ export default function App() {
           visionAutoEnabled={visionAutoEnabled}
           onVisionAutoEnabledChange={setVisionAutoEnabled}
           onAskAboutStill={submitVisualFollowUp}
+          visualDetailOffer={VISION_CONTEXT_AMR025_ENABLED?visualDetailOffer:null}
+          visualDetailBusy={visualDetailBusy}
+          onRequestDetailedReanalysis={()=>{void requestDetailedReanalysis()}}
         />
       )}
       <Boot />
