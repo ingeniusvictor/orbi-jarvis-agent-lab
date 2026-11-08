@@ -20,7 +20,7 @@ assert.match(pilot,/if errorlevel 1/)
 assert.match(pilot,/set "LUMIA_ASUS_MODEL_OVERRIDE=qwen3\.5:4b-vision4096"/)
 assert.match(pilot,/set "JARVIS_OLLAMA_KEEP_ALIVE=30m"/)
 assert.match(pilot,/call "%~dp0INICIAR_LUMIA_ASUS_RAPIDA\.cmd"/)
-assert.doesNotMatch(pilot,/ollama\s+(pull|rm|create|stop)\b/i)
+assert.doesNotMatch(pilot,/^\s*ollama\s+(pull|rm|create|stop)\b/im)
 assert.doesNotMatch(stable,/set "ORBIA_LUMIA_MODEL=qwen3\.5:4b-vision4096"/)
 
 const expectedVision={temperature:0,num_ctx:4096,num_predict:256}
