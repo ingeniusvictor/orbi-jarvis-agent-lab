@@ -27,6 +27,26 @@ export function classifyExistingPhotoFollowup(question:string,resolution:VisionR
   return 'proceed'
 }
 
+/**
+ * Only after LUMIA herself asked for a reference, a short noun phrase can
+ * resolve the question. Never infer this from arbitrary household speech.
+ */
+export function isVisualReferenceAnswer(value:string):boolean{
+  const q=normalize(value)
+  if(!q || q.length>170 || /^(?:no|cancela|olvida|borra|cierra|cambia|para|detente)\\b/.test(q))
+    return false
+  if(/\\b(?:hora|fecha|clima|noticias|calendario|musica|juego|receta|programa|internet|enciende|apaga)\\b/.test(q))
+    return false
+  return /\\b(?:camisa|camiseta|chaqueta|prenda|pantalon|gorra|zapato|ropa|hombre|mujer|persona|nino|nina|objeto|vaso|botella|silla|mesa|puerta|pared|ventana|izquierda|derecha|centro|fondo|delante|detras|arriba|abajo|primero|segundo|tercero)\\b/.test(q)
+}
+
+export function resolvedVisualReferencePrompt(question:string,answer:string):string{
+  return 'Pregunta original sobre la misma fotografía: '+question.trim()+
+    '. Aclaración explícita del usuario sobre el referente: '+answer.trim()+
+    '. Responde a la pregunta original aplicándola solo al objeto o persona ahora señalado. '+
+    'Si sigue habiendo varios candidatos, solicita otra precisión; no inventes detalles.'
+}
+
 export type VisualUpgradeSource='file'|'camera'|'none'
 export function visualDetailOfferMessage(source:VisualUpgradeSource):string{
   if(source==='file')return 'La foto guardada para esta conversación tiene resolución reducida. Para leer letras pequeñas con mayor detalle, pulsa Reanalizar archivo original a 1024 píxeles. No enviaré otra imagen sin que lo autorices.'
