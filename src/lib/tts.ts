@@ -24,6 +24,8 @@ const PREFETCH_NEXT_PHRASE = import.meta.env.VITE_LUMIA_TTS_PREFETCH_NEXT === '1
 const FAST_LOCAL_FIRST_CHUNK = import.meta.env.VITE_LUMIA_FAST_FIRST_CHUNK === '1'
 /** AMR-03.0: bounded, owner-opt-in following phrase lengths for local Kokoro. */
 const KOKORO_COMPACT_PHRASES = import.meta.env.VITE_LUMIA_KOKORO_COMPACT_PHRASES === '1'
+/** AMR-03.1: timings only; no personal text, URLs or audio content logged. */
+const KOKORO_TIMING_AMR031 = import.meta.env.VITE_LUMIA_KOKORO_TIMING_AMR031 === '1'
 /** ASUS-only recovery for local WAV elements that never start or stop advancing. */
 const LOCAL_PLAYBACK_RECOVERY = import.meta.env.VITE_LUMIA_LOCAL_PLAYBACK_RECOVERY === '1'
 const LOCAL_WAV_START_TIMEOUT_MS = 12_000
@@ -474,6 +476,7 @@ type Item = {
   /** Generation starts one sentence ahead, not all at once. */
   audio?: Promise<AudioSource | null> | null
   firstPhrase?: boolean
+  localTiming?: { requestMs: number; headersMs: number; blobMs: number; serverMs: number | null }
 }
 
 export function createSpeaker(
@@ -519,6 +522,18 @@ export function createSpeaker(
       diag.lastGapWaitingTextMs = waitingTextMs
       diag.lastGapWaitingAudioMs = waitingAudioMs
       diag.lastGapPlaybackMs = waitingPlaybackMs
+    }
+    if (KOKORO_TIMING_AMR031 && item.localTiming) {
+      const start = item.synthesisStartedAt ?? item.queuedAt
+      console.info('[lumia][AMR-03.1][Kokoro]', JSON.stringify({
+        chars: item.text.length,
+        queuedToStartMs: Math.max(0, start - item.queuedAt),
+        requestToHeadersMs: item.localTiming.headersMs - item.localTiming.requestMs,
+        headersToBlobMs: item.localTiming.blobMs - item.localTiming.headersMs,
+        serverSynthesisMs: item.localTiming.serverMs,
+        preparedBeforePlaybackMs: Math.max(0, at - (item.synthesisReadyAt ?? at)),
+        phraseGapMs: gapMs, waitingTextMs, waitingAudioMs, waitingPlaybackMs,
+      }))
     }
     onPhraseStart?.({
       text: item.text, at, gapMs,
@@ -578,7 +593,7 @@ export function createSpeaker(
   }
 
   /** null means "no audio pipeline, use the system voice directly". */
-  function synthesise(text: string): Promise<AudioSource | null> | null {
+  function synthesise(text: string, item: Item): Promise<AudioSource | null> | null {
     const runtime = caps().voice
     const requested = runtime?.requested?.ttsMode ?? 'auto'
     const localReady = Boolean(runtime?.local?.ttsAvailable)
@@ -599,6 +614,7 @@ export function createSpeaker(
         text,
         runtime?.activeProfile?.speakerRef ?? 'ef_dora',
         audioAbort.signal,
+        (timing) => { item.localTiming = timing },
       ).catch(() => null)
     }
 
@@ -620,7 +636,7 @@ export function createSpeaker(
   const prime = (item: Item | undefined) => {
     if (!item || item.audio !== undefined) return
     item.synthesisStartedAt = Date.now()
-    const pending = synthesise(item.text)
+    const pending = synthesise(item.text, item)
     item.audio = pending ? pending.then((source) => {
       item.synthesisReadyAt = Date.now()
       if (item.firstPhrase) {
@@ -1110,15 +1126,18 @@ async function fetchLocalAudio(
   text: string,
   speaker: string,
   signal?: AbortSignal,
+  onTiming?: (timing: { requestMs: number; headersMs: number; blobMs: number; serverMs: number | null }) => void,
 ): Promise<string | null> {
   if (BACKEND !== 'bridge') return null
   try {
+    const requestMs = Date.now()
     const res = await fetch(`${BRIDGE_HTTP_URL}/tts/local`, {
       signal,
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text, speaker }),
     })
+    const headersMs = Date.now()
     if (!res.ok) return null
     const header = res.headers.get('x-orbia-tts-synthesis-ms')
     if (header !== null) {
@@ -1128,7 +1147,14 @@ async function fetchLocalAudio(
         diag.localSynthesisCount++
       }
     }
-    return URL.createObjectURL(await res.blob())
+    const blob = await res.blob()
+    const blobMs = Date.now()
+    const serverMs = header === null ? null : Number(header)
+    onTiming?.({
+      requestMs, headersMs, blobMs,
+      serverMs: serverMs !== null && Number.isFinite(serverMs) && serverMs >= 0 ? serverMs : null,
+    })
+    return URL.createObjectURL(blob)
   } catch {
     return null
   }
