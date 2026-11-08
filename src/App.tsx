@@ -14,7 +14,7 @@ import {chooseVisionResolution,visionSpeechBudget} from './lib/vision-routing-am
 import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} from './lib/vision-camera-vi02'
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode,type VisualFrameSource} from './lib/vision-context-vi023'
-import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction} from './lib/vision-context-amr025'
+import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
 import {
@@ -156,6 +156,7 @@ export default function App() {
   const [visualDetailBusy,setVisualDetailBusy] = useState(false)
   const pendingVisualSource = useRef<VisualFrameSource|null>(null)
   const pendingDetailedQuestion = useRef<string|null>(null)
+  const pendingReferenceQuestion = useRef<string|null>(null)
   const detailedCameraQuestion = useRef<string|null>(null)
   const visualSession = useRef(new EphemeralVisualContext())
   const activeVisualReply = useRef<string|null>(null)
@@ -167,6 +168,7 @@ export default function App() {
     const expiry=window.setTimeout(()=>{
       visualSession.current.clear()
       pendingDetailedQuestion.current=null
+      pendingReferenceQuestion.current=null
       pendingVisualSource.current=null
       setVisualDetailOffer(null)
       setVisionContextReady(false)
@@ -328,18 +330,27 @@ export default function App() {
       // Ordinary voice-only turns never run this branch or pay its latency.
       // An authorized still can answer later scene questions without opening
       // the webcam again. Explicit new-camera commands still start a new shot.
+      // A single concise noun-phrase answer can resolve the reference
+      // clarification LUMIA just asked. The session must still be authorized.
+      const pendingReference=pendingReferenceQuestion.current
+      const resolvingReference=Boolean(VISION_CONTEXT_AMR025_ENABLED && pendingReference &&
+        !image && !cameraRequested && isVisualReferenceAnswer(said))
       const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested
-        ? forceVisualFollowUp
+        ? forceVisualFollowUp || resolvingReference
           ? visualSession.current.getAuthorizedFrame()
           : visualSession.current.getForFollowUp(said)
         : null
+      pendingReferenceQuestion.current=null
+      const visualQuestion=resolvingReference && visualFollowUp && pendingReference
+        ? resolvedVisualReferencePrompt(pendingReference,said) : said
       const frameSource=VISION_CONTEXT_AMR025_ENABLED && visualFollowUp
         ? visualSession.current.getFrameSource() : null
       const contextAction=frameSource
-        ? classifyExistingPhotoFollowup(said,frameSource.resolution) : 'proceed'
+        ? classifyExistingPhotoFollowup(visualQuestion,frameSource.resolution) : 'proceed'
       let contextualReply:string|null=null
       if(contextAction==='clarify-reference'){
         contextualReply=visualReferenceClarification()
+        pendingReferenceQuestion.current=said
         setVisualDetailOffer(null)
         pendingDetailedQuestion.current=null
       }else if(contextAction==='offer-high-resolution'){
@@ -443,7 +454,7 @@ export default function App() {
         : avatarAction
         ? { text: respondToLumiaAvatarAction(avatarAction) }
         : await ask(visualFollowUp
-          ? followupVisionPrompt(said,visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
+          ? followupVisionPrompt(visualQuestion,visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
             (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')
           : visualImage
           ? (cameraIntent || cameraRequested || fromCameraPreview
@@ -1443,6 +1454,7 @@ export default function App() {
     visualSession.current.clear()
     pendingVisualSource.current=null
     pendingDetailedQuestion.current=null
+    pendingReferenceQuestion.current=null
     detailedCameraQuestion.current=null
     setVisualDetailOffer(null)
     setVisualDetailBusy(false)
