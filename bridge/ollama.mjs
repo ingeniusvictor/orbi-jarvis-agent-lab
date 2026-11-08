@@ -399,11 +399,18 @@ export async function streamOllama({
     const totalMs = Number(packet?.total_duration ?? 0) / 1_000_000
     const promptMs = Number(packet?.prompt_eval_duration ?? 0) / 1_000_000
     const loadMs = Number(packet?.load_duration ?? 0) / 1_000_000
+    const outputMs = Number(packet?.eval_duration ?? 0) / 1_000_000
+    const outputTokens = Number(packet?.eval_count ?? 0)
+    const speed = outputMs > 0 ? (outputTokens / outputMs) * 1000 : 0
     console.log(
       `[lumia] visual local model=${model} context=${visualOptions.num_ctx}` +
       ` total=${totalMs.toFixed(0)}ms` +
       ` input=${promptMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
-      ` outputTokens=${Number(packet?.eval_count ?? 0)}`,
+      ` inputTokens=${Number(packet?.prompt_eval_count ?? 0)}` +
+      ` outputTokens=${outputTokens}` +
+      ` generate=${outputMs.toFixed(0)}ms` +
+      ` speed=${speed.toFixed(1)}tok/s` +
+      ` doneReason=${String(packet?.done_reason ?? 'unknown').slice(0, 24)}`,
     )
     onText(answer)
     return answer
