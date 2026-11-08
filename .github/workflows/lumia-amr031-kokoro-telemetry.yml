@@ -1,0 +1,25 @@
+name: LUMIA AMR-03.1 Kokoro telemetry
+on:
+  pull_request:
+    paths:
+      - 'src/lib/tts.ts'
+      - 'scripts/certify-lumia-amr031-kokoro-telemetry.ts'
+      - 'INICIAR_LUMIA_ASUS_2B_KOKORO_DIAGNOSTICO_AMR031.cmd'
+      - '.github/workflows/lumia-amr031-kokoro-telemetry.yml'
+  workflow_dispatch:
+jobs:
+  certify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/certify-lumia-amr031-kokoro-telemetry.ts
+      - run: npx tsc --noEmit
