@@ -58,7 +58,7 @@ function requestedSize(value) {
     .replace(/(\d)\s+b\b/g, '$1b')
     .replace(/(\d)\s*[.,]\s*(\d)\s*b\b/g, '$1.$2b')
 
-  const match = text.match(/\b(1\.7b|4b|7b|8b|14b|32b|70b)\b/)
+  const match = text.match(/\b(0\.8b|1\.7b|2b|4b|7b|8b|14b|32b|70b)\b/)
   return match?.[1] ?? null
 }
 
@@ -233,9 +233,13 @@ export function parseModelControl(prompt, history = []) {
   // language model that can invent generic categories instead of real tags.
   // Restrict "cuántos modelos" to local/available/owner intent, not broad
   // questions such as "¿cuántos modelos existen en el mundo?".
+  const ownerInventoryContext =
+    /\b(?:tiene|tienes|tengo|tenemos|disponible|disponibles|instalado|instalados|instalada|instaladas|ollama|cambiar|usar|equipo|computadora|ordenador)\b/.test(text)
   const explicitCount =
-    /\bcuantos?\s+modelos?\b/.test(text) &&
-    /\b(?:tienes|tengo|tenemos|disponibles?|instalados?|puedo|puedes|puede|podemos|cambiar|usar|ollama|locales|mi|tu|ordenador|computadora|equipo)\b/.test(text)
+    (/\bcuantos?\s+modelos?\b/.test(text) ||
+     /\bcuant[oa]s?\s+(?:(?:tipos?|clases?)\s+de\s+)?(?:ias?|inteligencias?\s+artificiales?|modelos?)\b/.test(text)) &&
+    ownerInventoryContext &&
+    /\b(?:local|locales|ollama|tiene|tienes|tengo|tenemos|disponible|disponibles|instalado|instalados|instalada|instaladas|cambiar|usar)\b/.test(text)
   const explicitWhich =
     /\bcuales?\s+(?:son\s+)?(?:los\s+)?modelos?\b/.test(text) &&
     /\b(?:tienes|tengo|disponibles?|instalados?|ollama|cambiar|usar|locales)\b/.test(text)
@@ -259,6 +263,8 @@ export function parseModelControl(prompt, history = []) {
     /^(?:(?:lumi|lumia)\s+)?(?:(?:me\s+)?(?:puedes?|podrias?)\s+decir\s+)?(?:cuales?\s+son|cuales?)\s*(?:(?:esos|estos|los)\s+)?$/.test(text) &&
     recentlyDiscussedLocalModels(history)
   const asksForInventory =
+    /\b(?:que|cuales?)\s+(?:ias?|inteligencias?\s+artificiales?)\s+local(?:es)?\b/.test(text) &&
+      ownerInventoryContext ||
     /\bque modelos? (?:puedo|puedes|puede|podemos) usar\b/.test(text) ||
     /\bque modelos? (?:tienes|hay|estan)\b/.test(text) ||
     /\bmodelos? (?:disponibles|instalados)\b/.test(text) ||
@@ -271,7 +277,7 @@ export function parseModelControl(prompt, history = []) {
     return { action: 'list' }
   }
 
-  const withoutName = raw.replace(/^(?:lumi|lumia)[,\s:.-]*/i, '').trim()
+  const withoutName = raw.replace(/^(?:lumi|lumia|lumiar|silumia)[,\s:.-]*/i, '').trim()
 
   // Explicit negation must never be turned into a model switch.
   if (
@@ -281,6 +287,16 @@ export function parseModelControl(prompt, history = []) {
   ) {
     return null
   }
+
+  // Do not reinterpret avatar commands ("cambia a medio cuerpo", "usa la
+  // vista") as Ollama model switches. Spoken verb alone is not authority to
+  // change a model: require a clear model family, size, profile or noun.
+  const avatarDomain = /\b(?:vista|vistas|avatar|rostro|cara|cabeza|busto|cuerpo|presentacion|apariencia)\b/.test(text)
+  const modelClue =
+    soundsLikeQwen(text) ||
+    requestedSize(text) !== null ||
+    /\b(?:modelo|modelos|cerebro|ollama|rapido|ligero|equilibrado|balanceado|principal|codigo|coder|programacion)\b/.test(text)
+  if (avatarDomain && !soundsLikeQwen(text) && requestedSize(text) === null) return null
 
   const patterns = [
     /(?:puedes |podrias |puede )?(?:cambiar|cambia|cambiate) (?:al modelo |de modelo a |de modelo al |de modelo por |a |al |por )(.+)/i,
@@ -292,7 +308,7 @@ export function parseModelControl(prompt, history = []) {
   for (const pattern of patterns) {
     const match = pattern.exec(withoutName)
     const requested = match?.[1]?.trim().replace(/[?.!]+$/, '').trim()
-    if (requested) return { action: 'switch', requested }
+    if (requested && modelClue) return { action: 'switch', requested }
   }
 
   // SpeechRecognition often mangles the grammar around technical names even
@@ -303,13 +319,6 @@ export function parseModelControl(prompt, history = []) {
     /\b(?:cambiar|cambia|cambiate|cambies|usar|usa|uses|utiliza|activar|activa|pon|ponte|pasar|pasa|pasate)\b/.test(
       text,
     )
-  const modelClue =
-    soundsLikeQwen(text) ||
-    requestedSize(text) !== null ||
-    /\b(?:rapido|ligero|equilibrado|balanceado|principal|codigo|coder|programacion)\b/.test(
-      text,
-    )
-
   if (switchIntent && modelClue) {
     return { action: 'switch', requested: withoutName.replace(/[?.!]+$/, '').trim() }
   }
