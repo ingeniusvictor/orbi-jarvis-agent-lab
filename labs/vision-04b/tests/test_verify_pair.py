@@ -189,5 +189,40 @@ class FaceLabContractTests(unittest.TestCase):
         self.assertNotIn("C:/PRIVATE", str(report))
 
 
+    def test_same_content_under_different_names_is_blocked(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            a = root / "private_a.jpg"
+            b = root / "private_b.jpg"
+            a.write_bytes(b"SIMULATED SAME PHOTO BYTES")
+            b.write_bytes(b"SIMULATED SAME PHOTO BYTES")
+            self.assertNotEqual(str(a), str(b))
+            with self.assertRaises(lab.LabError) as cm:
+                lab.ensure_distinct_photo_content(str(a), str(b))
+            report = lab.safe_failure(cm.exception)
+            self.assertEqual(report["error_code"], "SAME_IMAGE_CONTENT")
+            self.assertIsNone(report["photo"])
+            self.assertNotIn("private_a", str(report))
+            self.assertNotIn("private_b", str(report))
+
+    def test_different_content_does_not_fail_pair_source_check(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            a = root / "private_a.jpg"
+            b = root / "private_b.jpg"
+            a.write_bytes(b"SIMULATED IMAGE A")
+            b.write_bytes(b"SIMULATED IMAGE B")
+            self.assertIsNone(lab.ensure_distinct_photo_content(str(a), str(b)))
+
+    def test_cannot_report_duplicate_when_file_is_not_readable(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            a = root / "a.jpg"
+            a.write_bytes(b"SIMULATED IMAGE A")
+            with self.assertRaises(lab.LabError) as cm:
+                lab.ensure_distinct_photo_content(str(a), str(root / "does_not_exist.jpg"))
+            self.assertEqual(lab.safe_failure(cm.exception)["error_code"], "PHOTO_READ_ERROR")
+
+
 if __name__ == "__main__":
     unittest.main()
