@@ -8,6 +8,7 @@ This is a diagnostic, NOT proof of identity or an authentication factor.
 from __future__ import annotations
 
 import argparse
+from hashlib import sha256
 import json
 import math
 import os
@@ -41,6 +42,7 @@ def safe_failure(err: Exception) -> dict[str, Any]:
         "PHOTO_UNSUPPORTED": "Solo se admite JPG, JPEG, PNG o WebP.",
         "PHOTO_SIZE_INVALID": "Usa una foto entre 1 byte y 12 MB.",
         "SAME_IMAGE": "Elige dos fotografías diferentes.",
+        "SAME_IMAGE_CONTENT": "Las fotos A y B tienen exactamente el mismo contenido; elige dos capturas distintas.",
         "NO_FACE_DETECTED": "El detector no encontró rostro frontal; prueba otra foto o --detector-backend yunet.",
         "MULTIPLE_FACES": "Hay más de un rostro visible; usa una foto con una sola persona.",
         "BAD_EMBEDDING": "SFace no devolvió exactamente 128 valores numéricos finitos.",
@@ -85,6 +87,27 @@ def validate_photo(raw: str, photo_label: str | None = None) -> str:
     if not (1 <= photo.stat().st_size <= MAX_FILE_BYTES):
         raise LabError("Tamaño inválido.", code="PHOTO_SIZE_INVALID", photo=photo_label)
     return str(photo)
+
+
+def ensure_distinct_photo_content(photo_a: str, photo_b: str) -> None:
+    """Compare source file bytes before any cropping/model work; never expose hashes.
+
+    Different paths do NOT guarantee different photographs: Windows users can
+    select copies under separate names. SHA256 is a strict exact-duplicate gate,
+    not a perceptual similarity or identity test.
+    """
+    def fingerprint(photo: str) -> bytes:
+        digest = sha256()
+        try:
+            with open(photo, "rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        except OSError:
+            raise LabError("No se pudo leer una fotografía.", code="PHOTO_READ_ERROR") from None
+        return digest.digest()
+
+    if fingerprint(photo_a) == fingerprint(photo_b):
+        raise LabError("Se eligió la misma imagen.", code="SAME_IMAGE_CONTENT")
 
 
 def extract_single_embedding(
@@ -204,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         photo_b = validate_photo(args.image_b, "B")
         if photo_a == photo_b:
             raise LabError("Selecciona dos fotografías distintas.", code="SAME_IMAGE")
+        ensure_distinct_photo_content(photo_a, photo_b)
         if args.manual_crop_a or args.manual_crop_b:
             from face_crop_gui import CropError, choose_face_crop
             def choose(photo_path: str, slot: str):
