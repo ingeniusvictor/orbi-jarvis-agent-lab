@@ -3180,6 +3180,52 @@ kbd {
   fill: rgba(46, 204, 215, .065);
   vector-effect: non-scaling-stroke;
 }
+/* VISION-04A: opt-in FaceDetector state + only anonymous face rectangles. */
+.lumia-face-detector-panel {
+  padding: 8px;
+  margin: 7px 0 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(135, 222, 241, .4);
+  background: rgba(8, 39, 54, .7);
+  font: 11px/1.45 system-ui,sans-serif;
+  color: #d1f8fc;
+}
+.lumia-face-detector-head {display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.lumia-face-detector-head button {
+  border: 1px solid #86d9e9;
+  border-radius: 6px;
+  background: rgba(28, 109, 140, .4);
+  color: #e0fdff;
+  padding: 7px 9px;
+  cursor: pointer;
+  font: 600 11px/1.3 system-ui,sans-serif;
+}
+.lumia-face-detector-head button[aria-pressed="true"] {
+  border-color: #84dfb6;
+  background: rgba(24, 116, 84, .5);
+}
+.lumia-face-detector-panel small {display:block;margin-top:5px;opacity:.78;font-size:10px;}
+.lumia-face-detector-error {color:#ffc4b8;font-size:11px;overflow-wrap:anywhere;}
+.lumia-face-detector-overlay {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+}
+.lumia-face-detector-overlay rect {
+  fill:rgba(62,241,186,.055);
+  stroke:#84ffcb;
+  stroke-width:2.5;
+  vector-effect:non-scaling-stroke;
+}
+.lumia-face-detector-overlay text {
+  fill:#dcfff0;
+  stroke:rgba(0,20,22,.85);
+  stroke-width:3;
+  paint-order:stroke;
+  font-weight:700;
+}
 .lumia-camera-viewfinder-head {
   display: flex;
   align-items: center;
