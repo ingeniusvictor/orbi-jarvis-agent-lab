@@ -10,8 +10,8 @@ import math
 from pathlib import Path
 from typing import Any
 
-PREVIEW_MAX_WIDTH = 880
-PREVIEW_MAX_HEIGHT = 650
+PREVIEW_MAX_WIDTH = 800
+PREVIEW_MAX_HEIGHT = 480
 MAX_DECODED_PIXELS = 32_000_000
 MIN_CROP_SIDE = 80
 
