@@ -86,3 +86,24 @@ Si el resultado acusa `NO_FACE_DETECTED`, el fork DeepFace revisado ofrece una a
 ```
 
 No se instaló otro cerebro ni se cambió el servidor LUMIA. Un resultado `match_candidate` es solo diagnóstico experimental, **no una identidad real confirmada**.
+
+## FIX-VI04B-02: recorte de una cara con el mouse, sin guardar nueva imagen
+
+Un caso real en ASUS dio `MULTIPLE_FACES` en A con Haar/OpenCV y `NO_FACE_DETECTED` en A con YuNet. Son diagnósticos divergentes de los detectores, no una prueba de que exista más de una persona.
+
+**Si la fotografía A sí muestra una sola persona**, el piloto puede abrir una ventana nativa Windows para que el usuario delimite manualmente la región de la cara. Esto no selecciona una cara automáticamente: el usuario debe arrastrar un recuadro y pulsar `Usar recorte`. Es importante incluir frente, ojos, nariz, mentón y margen alrededor, sin caras adicionales.
+
+```powershell
+cd C:\Users\ingvm\LUMIA-ASUS
+$labPython = "$env:LOCALAPPDATA\ORBI\LUMIA-FACE-LAB-VI04B\.venv\Scripts\python.exe"
+& $labPython ".\labs\vision-04b\verify_pair.py" `
+   --image-a $foto1 --image-b $foto2 --manual-crop-a --detector-backend yunet
+```
+
+- La selección de la imagen se muestra con Tkinter; los píxeles se recortan con OpenCV en RAM y se entregan como array BGR compatible con DeepFace. **No se guarda otra fotografía ni un recorte temporal**.
+- DeepFace sigue exigiendo `enforce_detection=True`, `max_faces=None`, vector válido SFace 128d y **exactamente una cara en el recorte**. No se acepta un recorte sin detección facial ni se salta el modelo.
+- Si también falla la foto B, se puede añadir `--manual-crop-b`. Si se rechaza el recuadro, seleccionar una fotografía nueva, frontal y bien iluminada es la opción preferida.
+- El botón `Cancelar`, cerrar la ventana o un recorte demasiado pequeño no generan resultados de identidad.
+- Errores adicionales: `CROP_CANCELLED`, `CROP_TOO_SMALL`, `CROP_INVALID`, `GUI_UNAVAILABLE`, `PHOTO_READ_ERROR`, `PHOTO_TOO_LARGE`. Las salidas no contienen rutas privadas, nombres o fotos.
+- La GUI solo existe en la prueba bajo demanda del script `verify_pair.py`; **no afecta** el visor LUMIA, la webcam, la voz ni el registro encriptado.
+- La funcionalidad es un instrumento de diagnóstico manual de fotos, NO una vía para usar reconocimiento automático sin pruebas de seguridad.
