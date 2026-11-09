@@ -296,7 +296,9 @@ export function parseModelControl(prompt, history = []) {
     soundsLikeQwen(text) ||
     requestedSize(text) !== null ||
     /\b(?:modelo|modelos|cerebro|ollama|rapido|ligero|equilibrado|balanceado|principal|codigo|coder|programacion)\b/.test(text)
-  if (avatarDomain && !soundsLikeQwen(text) && requestedSize(text) === null) return null
+  // Even if STT mixed a Qwen name with a visual-view instruction, do not
+  // perform an unintended side-effect; require a separate model-only turn.
+  if (avatarDomain) return null
 
   const patterns = [
     /(?:puedes |podrias |puede )?(?:cambiar|cambia|cambiate) (?:al modelo |de modelo a |de modelo al |de modelo por |a |al |por )(.+)/i,
