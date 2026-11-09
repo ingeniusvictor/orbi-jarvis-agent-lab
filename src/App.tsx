@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Scene } from './scene/Scene'
 import { Hud } from './ui/Hud'
 import { Boot } from './ui/Boot'
@@ -18,6 +18,7 @@ import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-f
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode,type VisualFrameSource} from './lib/vision-context-vi023'
 import {requiresFreshVisualObservation,frozenVisualTruthReply} from './lib/vision-temporal-vi030'
 import {isActiveVisionQuestion,asksActiveVisionChange,recentActiveVisionFrame,type ActiveVisionFrame} from './lib/vision-active-vi031'
+import {classifyFreshCameraSpeech,freshCameraScenePrompt} from './lib/vision-voice-grounding-vi032b'
 import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -116,6 +117,7 @@ const VISION_ACTIVE_VI031_ENABLED = import.meta.env.VITE_LUMIA_VISION_ACTIVE_VI0
 /** VI-03.2A has no AI model: CPU-only optical change detection on the shared camera. */
 const VISION_SENTINEL_VI032_ENABLED = VISION_ACTIVE_VI031_ENABLED &&
   import.meta.env.VITE_LUMIA_VISION_SENTINEL_VI032 === '1'
+const VISION_FRESH_VOICE_VI032B_ENABLED = import.meta.env.VITE_LUMIA_VISION_FRESH_VOICE_VI032B === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -174,6 +176,10 @@ export default function App() {
   const visualSession = useRef(new EphemeralVisualContext())
   const activeVisionAuthorized = useRef(false)
   const activeVisionLatest = useRef<ActiveVisionFrame|null>(null)
+  const activeVisionCapture = useRef<(()=>ActiveVisionFrame|null)|null>(null)
+  const registerActiveVisionCapture = useCallback((fn:(()=>ActiveVisionFrame|null)|null)=>{
+    activeVisionCapture.current=fn
+  },[])
   const activeVisualReply = useRef<string|null>(null)
   const cameraCaptureOwner = useRef<string|null>(null)
   // Either an authorized webcam frame or a manually selected file is transient memory, never transcript/localStorage.
@@ -1507,6 +1513,7 @@ export default function App() {
   const closeCameraViewfinder = () => {
     activeVisionAuthorized.current=false
     activeVisionLatest.current=null
+    activeVisionCapture.current=null
     // Closing the viewer discards the image and revokes visual follow-ups.
     // If Qwen is still using that image, interrupt that visual reply too.
     if(activeVisualReply.current){
@@ -1814,6 +1821,7 @@ export default function App() {
           sentinelAvailable={VISION_SENTINEL_VI032_ENABLED}
           onActiveVisionChange={changeActiveVision}
           onActiveVisionFrame={receiveActiveVisionFrame}
+          onRegisterActiveCapture={registerActiveVisionCapture}
           onAnalyzeLiveFrame={analyzeActiveVisionFrame}
           onFileCaptured={analyzeVisionFile}
           onSelectFileMode={selectVisionFileMode}
