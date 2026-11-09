@@ -22,7 +22,8 @@ from adult_vault import (
     load,
     save_new,
 )
-from verify_pair import configure_cpu_environment, extract_single_embedding, validate_photo
+from verify_pair import LabError, configure_cpu_environment, extract_single_embedding, validate_photo
+from face_crop_gui import CropError, choose_face_crop
 
 ADULT_CONSENT_PHRASE = "ACEPTO REGISTRAR MI ROSTRO"
 DELETION_PHRASE = "ELIMINAR REGISTRO FACIAL"
@@ -67,7 +68,17 @@ def command_enroll(args: Any, path: Path, cipher: WindowsDpapi) -> dict[str, Any
         "El registro no demuestra identidad ni permite reconocer personas automáticamente.",
     )
     from deepface import DeepFace
-    embeddings = [extract_single_embedding(DeepFace, photo) for photo in validated]
+    # Human selects a region only when explicitly requested. Never persist crops.
+    embeddings = []
+    for index, photo in enumerate(validated, start=1):
+        image = choose_face_crop(photo, f"REGISTRO {index}/3") if args.manual_crop else photo
+        embeddings.append(
+            extract_single_embedding(
+                DeepFace, image,
+                detector_backend=args.detector_backend,
+                photo_label=None,
+            )
+        )
     record = create_record(args.label, embeddings)
     save_new(path, record, cipher)
     return {
@@ -99,6 +110,14 @@ def main(argv: list[str] | None = None) -> int:
     enroll.add_argument("--label", required=True, help="Apodo local autorizado, no se imprime")
     enroll.add_argument("--photos", nargs=3, required=True, metavar="FOTO")
     probe = sub.add_parser("probe", help="Probar foto sin declarar identidades")
+    enroll.add_argument(
+        "--manual-crop", action="store_true",
+        help="Elegir una cara con el mouse en cada foto, solo RAM (requiere consentimiento)"
+    )
+    enroll.add_argument(
+        "--detector-backend", choices=("opencv", "yunet"), default="opencv",
+        help="Detector facial, mantiene enforce_detection=True"
+    )
     probe.add_argument("--photo", required=True)
     sub.add_parser("forget", help="Eliminar voluntariamente el registro cifrado")
     args = parser.parse_args(argv)
@@ -140,8 +159,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except Exception as err:
         # DO NOT log labels, file paths, embeddings, stack traces or image bytes.
+        code = err.code if isinstance(err, (CropError, LabError)) else type(err).__name__
         print(json.dumps({
-            "lab": "VISION-04C0", "ok": False, "error": type(err).__name__,
+            "lab": "VISION-04C0", "ok": False, "error_code": code,
             "hint": "Operación cancelada o entorno no preparado. Consulta el manual local.",
         }, ensure_ascii=False), file=sys.stderr)
         return 1
