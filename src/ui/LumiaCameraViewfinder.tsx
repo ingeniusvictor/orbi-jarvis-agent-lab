@@ -88,6 +88,7 @@ export function LumiaCameraViewfinder({
   const [visionActive,setVisionActive]=useState(false)
   const [visionSamples,setVisionSamples]=useState(0)
   const faceGateRef=useRef(new FaceCountGate())
+  const faceLastLoggedRef=useRef<number|null>(null)
   const [faceEnabled,setFaceEnabled]=useState(false)
   const [faceStatus,setFaceStatus]=useState<'off'|'loading'|'ready'|'error'>('off')
   const [faceError,setFaceError]=useState('')
@@ -246,6 +247,7 @@ export function LumiaCameraViewfinder({
     let responseTimer:number|null=null
     const worker=new Worker(new URL('../lib/vision-face-worker-vi04.ts',import.meta.url),{type:'module'})
     faceGateRef.current.reset()
+    faceLastLoggedRef.current=null
     setFaceCount(null)
     setFaceBoxes([])
     setFaceError('')
@@ -300,8 +302,18 @@ export function LumiaCameraViewfinder({
         busy=false
         if(msg.sequence!==sequence||!Array.isArray(msg.faces))return
         setFaceBoxes(msg.faces)
-        setFaceCount(faceGateRef.current.observe(msg.faces.length,Date.now()))
+        const confirmed=faceGateRef.current.observe(msg.faces.length,Date.now())
+        setFaceCount(confirmed)
         setFaceLatency(Number.isFinite(msg.elapsedMs)?Math.round(msg.elapsedMs!):null)
+        if(confirmed!==null && confirmed!==faceLastLoggedRef.current){
+          faceLastLoggedRef.current=confirmed
+          // Count and runtime only. No face images, landmarks or identity data.
+          console.info('[lumia:vision-vi04a]',JSON.stringify({
+            faceCount:confirmed,
+            inferenceMs:Number.isFinite(msg.elapsedMs)?Math.round(msg.elapsedMs!):null,
+            processor:'cpu',
+          }))
+        }
       }else if(msg.type==='ERROR'){
         fail(msg.message||'No se pudo ejecutar el detector facial.')
       }
