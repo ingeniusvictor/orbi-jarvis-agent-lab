@@ -113,6 +113,9 @@ const VISION_ADAPTIVE_AMR027_ENABLED = import.meta.env.VITE_LUMIA_VISION_ADAPTIV
 const VISION_TEMPORAL_VI030_ENABLED = import.meta.env.VITE_LUMIA_VISION_TEMPORAL_VI030 === '1'
 /** VI-03.1 remains off unless explicitly enabled by the owner's launcher. */
 const VISION_ACTIVE_VI031_ENABLED = import.meta.env.VITE_LUMIA_VISION_ACTIVE_VI031 === '1'
+/** VI-03.2A has no AI model: CPU-only optical change detection on the shared camera. */
+const VISION_SENTINEL_VI032_ENABLED = VISION_ACTIVE_VI031_ENABLED &&
+  import.meta.env.VITE_LUMIA_VISION_SENTINEL_VI032 === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -1808,6 +1811,7 @@ export default function App() {
           still={cameraStill}
           onCaptured={analyzeCameraViewfinderFrame}
           visionActiveAvailable={VISION_ACTIVE_VI031_ENABLED}
+          sentinelAvailable={VISION_SENTINEL_VI032_ENABLED}
           onActiveVisionChange={changeActiveVision}
           onActiveVisionFrame={receiveActiveVisionFrame}
           onAnalyzeLiveFrame={analyzeActiveVisionFrame}
