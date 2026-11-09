@@ -269,7 +269,7 @@ export function parseModelControl(prompt, history = []) {
     /\bque modelos? (?:tienes|hay|estan)\b/.test(text) ||
     /\bmodelos? (?:disponibles|instalados)\b/.test(text) ||
     /\b(?:lista|listar|muestra|muestrame|muestranos|mostrar|dime) (?:los )?modelos\b/.test(text) ||
-    /\b(?:puedes|podrias|puede|eres capaz de) (?:cambiar|cambiarte|usar) (?:de |a |otro )?modelo\b/.test(text)
+    /\b(?:puedes|podrias|puede|eres capaz de) (?:cambiar|cambiarte|usar) (?:de |a |otro )?modelo\s*$/.test(text)
 
   if (explicitCount) return { action: 'count' }
   if (asksForInventory || explicitWhich || shortFollowup || inventoryFromContext ||
