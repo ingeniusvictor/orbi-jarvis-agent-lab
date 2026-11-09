@@ -107,3 +107,24 @@ $labPython = "$env:LOCALAPPDATA\ORBI\LUMIA-FACE-LAB-VI04B\.venv\Scripts\python.e
 - Errores adicionales: `CROP_CANCELLED`, `CROP_TOO_SMALL`, `CROP_INVALID`, `GUI_UNAVAILABLE`, `PHOTO_READ_ERROR`, `PHOTO_TOO_LARGE`. Las salidas no contienen rutas privadas, nombres o fotos.
 - La GUI solo existe en la prueba bajo demanda del script `verify_pair.py`; **no afecta** el visor LUMIA, la webcam, la voz ni el registro encriptado.
 - La funcionalidad es un instrumento de diagnóstico manual de fotos, NO una vía para usar reconocimiento automático sin pruebas de seguridad.
+
+## FIX-VI04B-03: evitar coincidencias falsas por comparar dos veces la misma foto
+
+En QA físico el usuario vio **la misma fotografía en las dos ventanas**, y SFace obtuvo `match_candidate:true` con distancia `0.04711`. Ese resultado **NO se acepta como prueba positiva**, porque se desconoce si las imágenes de origen eran realmente diferentes.
+
+El laboratorio ahora calcula hashes SHA-256 de ambos archivos **solo en memoria** antes de abrir ventanas o llamar al modelo. Si los contenidos son exactamente iguales, rechaza la comparación con `SAME_IMAGE_CONTENT`, incluso si los archivos tienen nombres o rutas diferentes. No imprime hashes, rutas ni fotos.
+
+Las ventanas de recorte muestran `FOTO A` / `FOTO B` y el **nombre original del archivo exclusivamente en la pantalla local**, para verificar que se eligieron las fotografías deseadas. Ese nombre no se imprime en logs, CI ni stdout. No se modifican fotos, modelos ni el vault DPAPI.
+
+Verificación independiente en PowerShell (sin compartir rutas ni hashes):
+
+```powershell
+$mismaRuta = (Resolve-Path -LiteralPath $foto1).Path -eq (Resolve-Path -LiteralPath $foto2).Path
+$mismosBytes = (Get-FileHash -LiteralPath $foto1 -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $foto2 -Algorithm SHA256).Hash
+Write-Host "Misma ruta:" $mismaRuta
+Write-Host "Mismos bytes:" $mismosBytes
+```
+
+Si `Mismos bytes: True`, selecciona una **segunda captura genuinamente distinta de la misma persona adulta**; es inválido usar la misma imagen dos veces. Si aparece `False` pero las dos ventanas muestran la misma escena, inspecciona por separado los dos archivos originales: el hash solo detecta duplicados exactos, no imágenes recomprimidas o capturas equivalentes. En ese caso tampoco se valida la prueba positiva hasta confirmar dos fotografías independientes.
+
+Después del control, repetir `--manual-crop-a --manual-crop-b` con la selección correcta. El objetivo es comparar dos tomas realmente diferentes, no demostrar que una imagen coincide consigo misma.
