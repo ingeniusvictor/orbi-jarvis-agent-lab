@@ -15,6 +15,7 @@ import {prepareVisualCameraFrame,prepareVisualImage,VISION_RESOLUTION_CHOICES,ty
 import {inspectCameraSignal,connectedOrVirtualCameraHint} from '../lib/vision-camera-signal-vi022'
 import type {VisionReplyMode} from '../lib/vision-context-vi023'
 import {chooseVisionResolution} from '../lib/vision-routing-amr024'
+import {ACTIVE_VISION_SAMPLE_MS,ACTIVE_VISION_MAX_SESSION_MS} from '../lib/vision-active-vi031'
 
 type Props={
   live:boolean
@@ -22,6 +23,10 @@ type Props={
   stillSource:'camera'|'file'
   still:LocalVisualImage|null
   onCaptured:(image:LocalVisualImage,resolution:VisionResolution)=>void
+  visionActiveAvailable:boolean
+  onActiveVisionChange:(active:boolean)=>void
+  onActiveVisionFrame:(image:LocalVisualImage,resolution:VisionResolution,at:number)=>void
+  onAnalyzeLiveFrame:(image:LocalVisualImage,resolution:VisionResolution)=>void
   onFileCaptured:(image:LocalVisualImage,originalFile:File|null,resolution:VisionResolution)=>void
   onSelectFileMode:()=>void
   onSelectCameraMode:()=>void
@@ -44,6 +49,7 @@ type Props={
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
+  visionActiveAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
   visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
   visualDetailOffer,visualDetailPurpose,visualDetailBusy,onRequestDetailedReanalysis,
@@ -58,6 +64,16 @@ export function LumiaCameraViewfinder({
   const releaseRef=useRef<(()=>void)|null>(null)
   const closeRef=useRef(onClose)
   closeRef.current=onClose
+  const onActiveRef=useRef(onActiveVisionChange)
+  onActiveRef.current=onActiveVisionChange
+  const onFrameRef=useRef(onActiveVisionFrame)
+  onFrameRef.current=onActiveVisionFrame
+  const activeRef=useRef(false)
+  const sampleTimerRef=useRef<ReturnType<typeof setInterval>|null>(null)
+  const sessionTimerRef=useRef<ReturnType<typeof setTimeout>|null>(null)
+  const previewExpiryRef=useRef<ReturnType<typeof setTimeout>|null>(null)
+  const [visionActive,setVisionActive]=useState(false)
+  const [visionSamples,setVisionSamples]=useState(0)
   const [ready,setReady]=useState(false)
   const [error,setError]=useState('')
   const [devices,setDevices]=useState<Array<{deviceId:string;label:string}>>([])
@@ -70,6 +86,21 @@ export function LumiaCameraViewfinder({
   const sceneRoute=chooseVisionResolution(sceneQuestion,
     visionAutoAvailable && visionAutoEnabled ? 'auto' : visionResolution)
   const effectiveResolution=sceneRoute.resolution
+
+  const endActive=()=>{
+    if(sampleTimerRef.current!==null){window.clearInterval(sampleTimerRef.current);sampleTimerRef.current=null}
+    if(sessionTimerRef.current!==null){window.clearTimeout(sessionTimerRef.current);sessionTimerRef.current=null}
+    const wasActive=activeRef.current
+    activeRef.current=false
+    if(wasActive){onActiveRef.current(false);setVisionActive(false)}
+  }
+  // Unmount, source change and tab suspension must not retain image sampling.
+  useEffect(()=>()=>{
+    if(sampleTimerRef.current!==null)window.clearInterval(sampleTimerRef.current)
+    if(sessionTimerRef.current!==null)window.clearTimeout(sessionTimerRef.current)
+    if(activeRef.current){activeRef.current=false;onActiveRef.current(false)}
+  },[])
+  useEffect(()=>{if(!live)endActive()},[live])
 
   useEffect(()=>()=>{fileRequest.current++},[])
   useEffect(()=>{
@@ -157,9 +188,14 @@ export function LumiaCameraViewfinder({
     // A preview is temporary and must never silently become an always-on
     // webcam. Closing the panel also discards the camera's lease.
     const expiry=window.setTimeout(()=>{if(!cancelled)closeRef.current()},90_000)
+    previewExpiryRef.current=expiry
+    const onHidden=()=>{if(document.visibilityState==='hidden'&&activeRef.current)closeRef.current()}
+    document.addEventListener('visibilitychange',onHidden)
     return ()=>{
       cancelled=true
       window.clearTimeout(expiry)
+      if(previewExpiryRef.current===expiry)previewExpiryRef.current=null
+      document.removeEventListener('visibilitychange',onHidden)
       if(inspectionTimer)clearTimeout(inspectionTimer)
       release()
       if(releaseRef.current===release)releaseRef.current=null
@@ -167,8 +203,45 @@ export function LumiaCameraViewfinder({
   },[live,deviceChoice])
 
   const close=()=>{
+    endActive()
     releaseRef.current?.()
     onClose()
+  }
+  const takeActiveFrame=():LocalVisualImage|null=>{
+    const video=videoRef.current
+    if(!activeRef.current||!ready||!video||document.visibilityState==='hidden')return null
+    if(camera.cameraStream()?.getVideoTracks()[0]?.readyState!=='live'){
+      closeRef.current()
+      return null
+    }
+    try{
+      const image=prepareVisualCameraFrame(video,effectiveResolution)
+      onFrameRef.current(image,effectiveResolution,Date.now())
+      setVisionSamples(n=>n+1)
+      return image
+    }catch(err){
+      setError(err instanceof Error?err.message:'No se pudo actualizar el fotograma.')
+      closeRef.current()
+      return null
+    }
+  }
+  const beginActive=()=>{
+    if(!visionActiveAvailable||!live||!ready||activeRef.current)return
+    activeRef.current=true
+    setVisionActive(true)
+    setVisionSamples(0)
+    onActiveRef.current(true)
+    // The owner explicitly opted in; replace the preview's 90 s expiry
+    // with one bounded 3-minute observation session. No indefinite lease.
+    if(previewExpiryRef.current!==null){window.clearTimeout(previewExpiryRef.current);previewExpiryRef.current=null}
+    takeActiveFrame()
+    if(!activeRef.current)return
+    sampleTimerRef.current=window.setInterval(()=>{void takeActiveFrame()},ACTIVE_VISION_SAMPLE_MS)
+    sessionTimerRef.current=window.setTimeout(()=>closeRef.current(),ACTIVE_VISION_MAX_SESSION_MS)
+  }
+  const analyzeLiveNow=()=>{
+    const image=takeActiveFrame()
+    if(image)onAnalyzeLiveFrame(image,effectiveResolution)
   }
   const capture=()=>{
     const video=videoRef.current
@@ -191,7 +264,7 @@ export function LumiaCameraViewfinder({
         <span className="lumia-camera-viewfinder-title">LUMIA VISION</span>
         <span className={'lumia-camera-viewfinder-status'+(live?' is-live':' is-still')}>
           <span className="lumia-camera-viewfinder-dot" aria-hidden="true"/>
-          {live?'EN VIVO · SIN ANALIZAR':fileMode?'ARCHIVO LOCAL · SIN ANALIZAR':'FOTOGRAMA CAPTURADO'}
+          {visionActive?'VISIÓN ACTIVA · CÁMARA ABIERTA':live?'EN VIVO · SIN ANALIZAR':fileMode?'ARCHIVO LOCAL · SIN ANALIZAR':'FOTOGRAMA CAPTURADO'}
         </span>
         <button type="button" className="lumia-camera-viewfinder-close"
           aria-label="Cerrar visor y liberar cámara" title="Cerrar cámara"
@@ -213,7 +286,7 @@ export function LumiaCameraViewfinder({
               aria-label="Seleccionar cámara de LUMIA"
               title="Cambiar entre webcam integrada, cámaras USB y cámaras virtuales"
               value={deviceChoice}
-              disabled={!ready&&!error}
+              disabled={visionActive||(!ready&&!error)}
               onChange={(event)=>{
                 setReady(false)
                 setDeviceChoice(event.target.value)
@@ -321,6 +394,18 @@ export function LumiaCameraViewfinder({
           {fileError&&<p className="lumia-vision-file-error" role="alert">{fileError}</p>}
         </section>
       )}
+      {live&&visionActiveAvailable&&(
+        <section className="lumia-camera-followup" aria-label="Visión activa de LUMIA">
+          <p className="lumia-camera-followup-status" role="status">
+            {visionActive
+              ? `VISIÓN ACTIVA · ${visionSamples} fotograma(s) · nueva imagen cada 12 s · cierre automático en 3 minutos`
+              : 'Visión activa opcional: captura un fotograma cada 12 s en memoria. Solo se analiza cuando preguntes o pulses Analizar ahora.'}
+          </p>
+          {!visionActive&&<button type="button" className="lumia-camera-viewfinder-primary"
+            disabled={!ready} onClick={beginActive}>Activar visión</button>}
+          {visionActive&&<p className="lumia-camera-followup-privacy">Cámara visible · una imagen reciente · sin grabación ni análisis automático · cerrar detiene todo.</p>}
+        </section>
+      )}
       {signalWarning&&live&&(
         <p className="lumia-camera-signal-warning" role="status">
           {signalWarning}
@@ -390,14 +475,14 @@ export function LumiaCameraViewfinder({
         ) : live ? (
           <>
             <span className="lumia-camera-viewfinder-help">
-              Encuadra el objeto. Nada se envía hasta capturar.
+              {visionActive?'Pregunta por voz lo que ves; la cámara permanece abierta.':'Encuadra el objeto. Nada se envía hasta capturar.'}
             </span>
-            <button type="button" className="lumia-camera-viewfinder-primary"
-              disabled={!ready} onClick={capture}>
-              Capturar y analizar
-            </button>
+            {visionActive ? <button type="button" className="lumia-camera-viewfinder-primary"
+              disabled={!ready} onClick={analyzeLiveNow}>Analizar ahora</button>
+              : <button type="button" className="lumia-camera-viewfinder-primary"
+                disabled={!ready} onClick={capture}>Capturar y analizar</button>}
             <button type="button" className="lumia-camera-viewfinder-secondary"
-              onClick={close}>Cerrar cámara</button>
+              onClick={close}>{visionActive?'Detener visión':'Cerrar cámara'}</button>
           </>
         ) : (
           <>
