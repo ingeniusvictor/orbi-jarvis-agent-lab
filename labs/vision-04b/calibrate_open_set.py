@@ -20,9 +20,10 @@ from open_set_calibration import (
     MIN_UNKNOWN_PER_GROUP, assess_open_set,
 )
 from verify_pair import (
-    ALLOWED_EXTENSIONS, configure_cpu_environment, extract_single_embedding,
+    ALLOWED_EXTENSIONS, LabError, configure_cpu_environment, extract_single_embedding,
     validate_photo,
 )
+from face_crop_gui import CropError, choose_face_crop
 
 CONSENT_PHRASE = "ACEPTO CALIBRAR ROSTROS ADULTOS"
 MAX_UNKNOWN_GROUPS = 12
@@ -100,15 +101,30 @@ def score_dataset(
     genuine: list[str],
     unknown: dict[str,list[str]],
     backend: Any,
+    *,
+    manual_crop: bool = False,
+    detector_backend: str = "opencv",
 ) -> dict[str,object]:
     """In-memory embeddings only. The vault never leaves this process."""
-    def score(path: str) -> float:
-        vector = extract_single_embedding(backend,path)
+    def score(path: str, slot: str) -> float:
+        # The opt-in ROI is not persisted or transmitted and never bypasses
+        # mandatory one-face detection within the selected rectangle.
+        image = choose_face_crop(path, slot) if manual_crop else path
+        vector = extract_single_embedding(
+            backend, image, detector_backend=detector_backend,
+        )
         return min(cosine_distance(vector,t) for t in record["templates"])
     start = time.perf_counter()
-    genuine_scores = [score(path) for path in genuine]
+    genuine_scores = [
+        score(path, f"CONOCIDO {i}/{len(genuine)}")
+        for i, path in enumerate(genuine, start=1)
+    ]
     unknown_scores = {
-        group: [score(path) for path in paths] for group,paths in unknown.items()
+        group: [
+            score(path, f"DESCONOCIDO {group_i}.{photo_i}/{len(paths)}")
+            for photo_i, path in enumerate(paths, start=1)
+        ]
+        for group_i, (group, paths) in enumerate(unknown.items(), start=1)
     }
     result = assess_open_set(genuine_scores,unknown_scores)
     result["elapsed_ms"] = round((time.perf_counter()-start)*1000)
@@ -137,6 +153,9 @@ def main(argv: list[str]|None=None)->int:
                         help="Carpeta de fotos NUEVAS del adulto registrado (min. 6)")
     parser.add_argument("--unknown-dir",required=True,
                         help="Contiene tres o más carpetas, una por adulto desconocido")
+    parser.add_argument("--manual-crop", action="store_true",
+                        help="Seleccionar región facial en cada foto, exclusivamente RAM")
+    parser.add_argument("--detector-backend", choices=("opencv", "yunet"), default="opencv")
     args=parser.parse_args(argv)
     try:
         genuine,unknown=collect_dataset(args.genuine_dir,args.unknown_dir)
@@ -146,13 +165,18 @@ def main(argv: list[str]|None=None)->int:
         configure_cpu_environment()
         record=load(default_vault_path(),WindowsDpapi())
         from deepface import DeepFace
-        result=score_dataset(record,genuine,unknown,DeepFace)
+        result=score_dataset(
+            record, genuine, unknown, DeepFace,
+            manual_crop=args.manual_crop,
+            detector_backend=args.detector_backend,
+        )
         print(json.dumps(result,ensure_ascii=False))
         return 0
     except Exception as err:
         # No photo paths, group names, labels or embeddings on stderr.
+        code = err.code if isinstance(err, (CropError, LabError)) else type(err).__name__
         print(json.dumps({
-            "lab":"VISION-04C.1","ok":False,"error":type(err).__name__,
+            "lab":"VISION-04C.1","ok":False,"error_code":code,
             "hint":"Prueba local cancelada o datos insuficientes. Revisa el manual.",
         },ensure_ascii=False),file=sys.stderr)
         return 1
