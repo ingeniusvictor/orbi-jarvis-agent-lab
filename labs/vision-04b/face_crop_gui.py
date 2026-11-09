@@ -96,11 +96,15 @@ def choose_face_crop(photo_path: str, photo_slot: str) -> Any:
     last: list[tuple[float, float] | None] = [None]
     rect_id: list[int | None] = [None]
     try:
-        root.title(f"LUMIA · Foto {photo_slot} · Seleccionar rostro (solo memoria)")
+        # Source filename is visible ONLY on the user's own screen; never logged.
+        source_name = Path(photo_path).name
+        root.title(f"LUMIA · FOTO {photo_slot} · {source_name} · Solo memoria")
         root.resizable(False, False)
         tk.Label(
             root, text=(
-                f"FOTO {photo_slot}: arrastra un rectángulo alrededor de UN SOLO rostro.\n"
+                f"FOTO {photo_slot} | Archivo local: {source_name}\n"
+                "Verifica que A y B son DOS FOTOGRAFÍAS DIFERENTES.\n"
+                "Arrastra un rectángulo alrededor de UN SOLO rostro.\n"
                 "Incluye frente, ojos, nariz y mentón. No incluyas otras caras.\n"
                 "Esta selección no guarda imágenes. Cerrar = cancelar."
             ),
