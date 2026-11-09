@@ -17,6 +17,7 @@ import type {VisionReplyMode} from '../lib/vision-context-vi023'
 import {chooseVisionResolution} from '../lib/vision-routing-amr024'
 import {ACTIVE_VISION_SAMPLE_MS,ACTIVE_VISION_MAX_SESSION_MS,type ActiveVisionFrame} from '../lib/vision-active-vi031'
 import {OpticalSentinel,SENTINEL_WIDTH,SENTINEL_HEIGHT,SENTINEL_INTERVAL_MS,toSentinelLuma,type SentinelZone} from '../lib/vision-sentinel-vi032'
+import {FaceCountGate,FACE_DETECTOR_INTERVAL_MS,FACE_DETECTOR_MAX_WIDTH,FACE_DETECTOR_MAX_HEIGHT,type FaceBox} from '../lib/vision-faces-vi04'
 
 type Props={
   live:boolean
@@ -26,6 +27,7 @@ type Props={
   onCaptured:(image:LocalVisualImage,resolution:VisionResolution)=>void
   visionActiveAvailable:boolean
   sentinelAvailable:boolean
+  faceDetectorAvailable:boolean
   onActiveVisionChange:(active:boolean)=>void
   onActiveVisionFrame:(image:LocalVisualImage,resolution:VisionResolution,at:number)=>void
   onRegisterActiveCapture:(fn:(()=>ActiveVisionFrame|null)|null)=>void
@@ -52,7 +54,7 @@ type Props={
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
-  visionActiveAvailable,sentinelAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,onRegisterActiveCapture,
+  visionActiveAvailable,sentinelAvailable,faceDetectorAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,onRegisterActiveCapture,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
   visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
   visualDetailOffer,visualDetailPurpose,visualDetailBusy,onRequestDetailedReanalysis,
@@ -85,6 +87,14 @@ export function LumiaCameraViewfinder({
   const [sentinelEvents,setSentinelEvents]=useState(0)
   const [visionActive,setVisionActive]=useState(false)
   const [visionSamples,setVisionSamples]=useState(0)
+  const faceGateRef=useRef(new FaceCountGate())
+  const [faceEnabled,setFaceEnabled]=useState(false)
+  const [faceStatus,setFaceStatus]=useState<'off'|'loading'|'ready'|'error'>('off')
+  const [faceError,setFaceError]=useState('')
+  const [faceBoxes,setFaceBoxes]=useState<FaceBox[]>([])
+  const [faceCount,setFaceCount]=useState<number|null>(null)
+  const [faceLatency,setFaceLatency]=useState<number|null>(null)
+  const [faceVideoSize,setFaceVideoSize]=useState({width:1280,height:720})
   const [ready,setReady]=useState(false)
   const [error,setError]=useState('')
   const [devices,setDevices]=useState<Array<{deviceId:string;label:string}>>([])
@@ -104,6 +114,10 @@ export function LumiaCameraViewfinder({
     if(sentinelTimerRef.current!==null){window.clearInterval(sentinelTimerRef.current);sentinelTimerRef.current=null}
     sentinelRef.current.reset()
     sentinelCanvasRef.current=null
+    setFaceEnabled(false)
+    faceGateRef.current.reset()
+    setFaceBoxes([])
+    setFaceCount(null)
     const wasActive=activeRef.current
     activeRef.current=false
     if(wasActive){onActiveRef.current(false);setVisionActive(false)}
@@ -181,6 +195,7 @@ export function LumiaCameraViewfinder({
       await video.play()
       if(cancelled){release();return}
       setActiveSource(camera.getCurrentCameraSource()?.label??'Cámara sin nombre')
+      setFaceVideoSize({width:video.videoWidth||1280,height:video.videoHeight||720})
       setReady(true)
       try{
         const detected=await camera.listCameraDevices()
