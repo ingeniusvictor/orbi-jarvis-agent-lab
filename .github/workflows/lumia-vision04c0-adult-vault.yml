@@ -1,0 +1,27 @@
+name: LUMIA VI-04C.0 DPAPI Adult Vault Lab
+on:
+  pull_request:
+    paths:
+      - 'labs/vision-04b/**'
+      - '.github/workflows/lumia-vision04c0-adult-vault.yml'
+  workflow_dispatch:
+jobs:
+  secure-vault-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m compileall -q labs/vision-04b
+      - run: python -m unittest discover -s labs/vision-04b/tests -p "test_*.py" -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
