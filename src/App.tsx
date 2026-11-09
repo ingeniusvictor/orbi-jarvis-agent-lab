@@ -17,6 +17,7 @@ import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} f
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode,type VisualFrameSource} from './lib/vision-context-vi023'
 import {requiresFreshVisualObservation,frozenVisualTruthReply} from './lib/vision-temporal-vi030'
+import {isActiveVisionQuestion,asksActiveVisionChange,recentActiveVisionFrame,type ActiveVisionFrame} from './lib/vision-active-vi031'
 import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -110,6 +111,8 @@ const VISION_CONTEXT_AMR025_ENABLED = import.meta.env.VITE_LUMIA_VISION_CONTEXT_
 const VISION_ADAPTIVE_AMR027_ENABLED = import.meta.env.VITE_LUMIA_VISION_ADAPTIVE_AMR027 === '1'
 /** VI-03.0 pilot: opt-in temporal truth on previously authorized stills. */
 const VISION_TEMPORAL_VI030_ENABLED = import.meta.env.VITE_LUMIA_VISION_TEMPORAL_VI030 === '1'
+/** VI-03.1 remains off unless explicitly enabled by the owner's launcher. */
+const VISION_ACTIVE_VI031_ENABLED = import.meta.env.VITE_LUMIA_VISION_ACTIVE_VI031 === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -166,6 +169,8 @@ export default function App() {
   const pendingReferenceQuestion = useRef<string|null>(null)
   const detailedCameraQuestion = useRef<string|null>(null)
   const visualSession = useRef(new EphemeralVisualContext())
+  const activeVisionAuthorized = useRef(false)
+  const activeVisionLatest = useRef<ActiveVisionFrame|null>(null)
   const activeVisualReply = useRef<string|null>(null)
   const cameraCaptureOwner = useRef<string|null>(null)
   // Either an authorized webcam frame or a manually selected file is transient memory, never transcript/localStorage.
@@ -339,16 +344,25 @@ export default function App() {
       // the webcam again. Explicit new-camera commands still start a new shot.
       // A single concise noun-phrase answer can resolve the reference
       // clarification LUMIA just asked. The session must still be authorized.
+      // VI-03.1: an explicitly enabled observation session only keeps the
+      // latest JPEG in memory. A scene question opts into sending that JPEG;
+      // ordinary conversation does not perform image inference.
+      const activeVisionQuestion=VISION_ACTIVE_VI031_ENABLED &&
+        activeVisionAuthorized.current && !image && !cameraRequested &&
+        isActiveVisionQuestion(said)
+      const liveFrame=activeVisionQuestion
+        ? recentActiveVisionFrame(true,activeVisionLatest.current) : null
+      const activeFrameMissing=activeVisionQuestion && !liveFrame
       const pendingReference=pendingReferenceQuestion.current
       const resolvingReference=Boolean(VISION_CONTEXT_AMR025_ENABLED && pendingReference &&
         !image && !cameraRequested && isVisualReferenceAnswer(said))
       // VI-03.0: a question about what changed must NOT silently reuse a
       // frozen JPEG as if LUMIA were looking through a live camera.
       // Explicit user-requested capture still has precedence via cameraRequested.
-      const temporalQuestion = VISION_TEMPORAL_VI030_ENABLED && CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested &&
+      const temporalQuestion = VISION_TEMPORAL_VI030_ENABLED && CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !image && !cameraRequested &&
         !fromCameraPreview && visualSession.current.hasAnalyzedFrame() &&
         requiresFreshVisualObservation(said)
-      const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !image && !cameraRequested
+      const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !image && !cameraRequested
         ? forceVisualFollowUp || resolvingReference || temporalQuestion
           ? visualSession.current.getAuthorizedFrame()
           : visualSession.current.getForFollowUp(said)
@@ -365,7 +379,11 @@ export default function App() {
       const groupUpgrade=Boolean(frameSource && contextAction==='proceed' &&
         shouldOfferGroupDetail(visualQuestion,frameSource.resolution,
           VISION_ADAPTIVE_AMR027_ENABLED && visionAutoEnabled))
-      let contextualReply:string|null=null
+      let contextualReply:string|null=activeFrameMissing
+        ? 'La visión activa aún no tiene un fotograma reciente disponible. Comprueba que la cámara funciona o vuelve a activar la sesión.'
+        : activeVisionQuestion && asksActiveVisionChange(said)
+        ? 'Tengo una captura reciente, pero no una comparación verificada entre dos instantes. Por eso no puedo asegurar qué cambió o si el objeto sigue igual. Puedo describir lo que se ve ahora.'
+        : null
       if(temporalQuestion && visualFollowUp){
         // No new camera permission, frame, Ollama vision pass, or stale scene claim.
         contextualReply=frozenVisualTruthReply(frameSource?.kind??'camera')
@@ -408,9 +426,9 @@ export default function App() {
         setCameraPreviewOpen(false)
         setVisionFileMode(false)
       }
-      const cameraIntent = CAMERA_VISION_VI02_ENABLED && !image && !visualFollowUp
+      const cameraIntent = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !image && !visualFollowUp
         ? parseLumiaCameraIntent(said) : null
-      let visualImage=image ?? visualFollowUp?.image
+      let visualImage=image ?? liveFrame?.image ?? visualFollowUp?.image
       let visualGeneration:number|null=null
       let visualInferenceFailed=false
       let captureFailure=''
@@ -457,8 +475,8 @@ export default function App() {
       // creates the same five-minute follow-up session. Composer attachments
       // outside the viewer remain one-shot and are never retained silently.
       if(visualImage && !visualFollowUp &&
-         (cameraIntent || cameraRequested || fromCameraPreview)){
-        const source=pendingVisualSource.current ?? {kind:'camera' as const,resolution:visionResolution}
+         (cameraIntent || cameraRequested || fromCameraPreview || liveFrame)){
+        const source=pendingVisualSource.current ?? {kind:'camera' as const,resolution:liveFrame?.resolution??visionResolution}
         pendingVisualSource.current=null
         visualGeneration=visualSession.current.begin(visualImage,Date.now(),source)
         setVisualDetailOffer(null)
@@ -505,8 +523,9 @@ export default function App() {
             (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')+
             (visionTracingEnabled()?visualPrecisionInstruction(visualQuestion):'')
           : visualImage
-          ? (cameraIntent || cameraRequested || fromCameraPreview
+          ? (cameraIntent || cameraRequested || fromCameraPreview || liveFrame
               ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
+              (liveFrame ? ' Este es solo el fotograma más reciente de la sesión autorizada, no vídeo ni percepción continua. No atribuyas movimiento, cambios o persistencia de personas u objetos respecto de momentos anteriores sin comparar dos imágenes. ' : '') +
               visualReliabilityInstruction(cameraIntent?.question ?? said) +
               visualModeInstruction(visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
               (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')+
@@ -555,7 +574,7 @@ export default function App() {
           }
         },
       }, visualImage).catch((err:unknown) => {
-        if (!cameraIntent && !cameraRequested && !fromCameraPreview && !visualFollowUp) throw err
+        if (!cameraIntent && !cameraRequested && !fromCameraPreview && !visualFollowUp && !liveFrame) throw err
         if (stale()) throw err
         visualInferenceFailed=true
         // Never claim visual understanding if Ollama rejected the image.
@@ -1483,6 +1502,8 @@ export default function App() {
     setCameraPreviewOpen(true)
   }
   const closeCameraViewfinder = () => {
+    activeVisionAuthorized.current=false
+    activeVisionLatest.current=null
     // Closing the viewer discards the image and revokes visual follow-ups.
     // If Qwen is still using that image, interrupt that visual reply too.
     if(activeVisualReply.current){
@@ -1533,6 +1554,30 @@ export default function App() {
     setVisionStillSource('camera')
     setCameraPreviewOpen(true)
   }
+  const changeActiveVision = (enabled:boolean) => {
+    if(!enabled){
+      activeVisionAuthorized.current=false
+      activeVisionLatest.current=null
+      return
+    }
+    if(!VISION_ACTIVE_VI031_ENABLED || !cameraPreviewOpen || experimentOwner.current)return
+    activeVisionLatest.current=null
+    activeVisionAuthorized.current=true
+  }
+  const receiveActiveVisionFrame = (image:LocalVisualImage,resolution:VisionResolution,at:number) => {
+    if(!activeVisionAuthorized.current || !cameraPreviewOpen)return
+    activeVisionLatest.current={image,resolution,capturedAt:at}
+  }
+  const analyzeActiveVisionFrame = (image:LocalVisualImage,resolution:VisionResolution) => {
+    if(!VISION_ACTIVE_VI031_ENABLED || !activeVisionAuthorized.current || experimentOwner.current)return
+    if(store.getState().phase==='offline' || store.getState().phase==='boot' || activeVisualReply.current)return
+    pendingVisualSource.current={kind:'camera',resolution}
+    // Deliberate visual question; keep the authorized live preview open.
+    silence()
+    interrupt()
+    void respond('Lumi, describe lo que ves en este fotograma reciente y qué no puedes distinguir.',image,false,true)
+  }
+
   const analyzeCameraViewfinderFrame = (image:LocalVisualImage,resolution:VisionResolution=visionResolution) => {
     pendingVisualSource.current={kind:'camera',resolution}
     const question=detailedCameraQuestion.current ?? 'Lumi, describe exactamente lo que aparece en esta imagen y dime qué no puedes distinguir.'
@@ -1762,6 +1807,10 @@ export default function App() {
           stillSource={visionStillSource}
           still={cameraStill}
           onCaptured={analyzeCameraViewfinderFrame}
+          visionActiveAvailable={VISION_ACTIVE_VI031_ENABLED}
+          onActiveVisionChange={changeActiveVision}
+          onActiveVisionFrame={receiveActiveVisionFrame}
+          onAnalyzeLiveFrame={analyzeActiveVisionFrame}
           onFileCaptured={analyzeVisionFile}
           onSelectFileMode={selectVisionFileMode}
           onSelectCameraMode={selectVisionCameraMode}
