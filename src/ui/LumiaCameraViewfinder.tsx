@@ -15,7 +15,7 @@ import {prepareVisualCameraFrame,prepareVisualImage,VISION_RESOLUTION_CHOICES,ty
 import {inspectCameraSignal,connectedOrVirtualCameraHint} from '../lib/vision-camera-signal-vi022'
 import type {VisionReplyMode} from '../lib/vision-context-vi023'
 import {chooseVisionResolution} from '../lib/vision-routing-amr024'
-import {ACTIVE_VISION_SAMPLE_MS,ACTIVE_VISION_MAX_SESSION_MS} from '../lib/vision-active-vi031'
+import {ACTIVE_VISION_SAMPLE_MS,ACTIVE_VISION_MAX_SESSION_MS,type ActiveVisionFrame} from '../lib/vision-active-vi031'
 import {OpticalSentinel,SENTINEL_WIDTH,SENTINEL_HEIGHT,SENTINEL_INTERVAL_MS,toSentinelLuma,type SentinelZone} from '../lib/vision-sentinel-vi032'
 
 type Props={
@@ -28,6 +28,7 @@ type Props={
   sentinelAvailable:boolean
   onActiveVisionChange:(active:boolean)=>void
   onActiveVisionFrame:(image:LocalVisualImage,resolution:VisionResolution,at:number)=>void
+  onRegisterActiveCapture:(fn:(()=>ActiveVisionFrame|null)|null)=>void
   onAnalyzeLiveFrame:(image:LocalVisualImage,resolution:VisionResolution)=>void
   onFileCaptured:(image:LocalVisualImage,originalFile:File|null,resolution:VisionResolution)=>void
   onSelectFileMode:()=>void
@@ -51,7 +52,7 @@ type Props={
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
-  visionActiveAvailable,sentinelAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,
+  visionActiveAvailable,sentinelAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,onRegisterActiveCapture,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
   visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
   visualDetailOffer,visualDetailPurpose,visualDetailBusy,onRequestDetailedReanalysis,
@@ -79,6 +80,7 @@ export function LumiaCameraViewfinder({
   const sentinelRef=useRef(new OpticalSentinel())
   const sentinelZoneRef=useRef<SentinelZone>('center')
   const lastActiveShotRef=useRef(0)
+  const captureForVoiceRef=useRef<()=>ActiveVisionFrame|null>(()=>null)
   const [sentinelZone,setSentinelZone]=useState<SentinelZone>('center')
   const [sentinelEvents,setSentinelEvents]=useState(0)
   const [visionActive,setVisionActive]=useState(false)
@@ -284,6 +286,17 @@ export function LumiaCameraViewfinder({
     setSentinelZone(zone)
     setSentinelEvents(0)
   }
+  // A user voice request captures the *current* shared webcam frame. No
+  // second getUserMedia and no reused 12-second snapshot presented as current.
+  captureForVoiceRef.current=()=>{
+    if(!activeRef.current)return null
+    const image=takeActiveFrame()
+    return image ? {image,resolution:effectiveResolution,capturedAt:lastActiveShotRef.current} : null
+  }
+  useEffect(()=>{
+    onRegisterActiveCapture(()=>captureForVoiceRef.current())
+    return ()=>onRegisterActiveCapture(null)
+  },[onRegisterActiveCapture])
   const beginActive=()=>{
     if(!visionActiveAvailable||!live||!ready||activeRef.current)return
     activeRef.current=true

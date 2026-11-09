@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Scene } from './scene/Scene'
 import { Hud } from './ui/Hud'
 import { Boot } from './ui/Boot'
@@ -18,6 +18,7 @@ import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-f
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode,type VisualFrameSource} from './lib/vision-context-vi023'
 import {requiresFreshVisualObservation,frozenVisualTruthReply} from './lib/vision-temporal-vi030'
 import {isActiveVisionQuestion,asksActiveVisionChange,recentActiveVisionFrame,type ActiveVisionFrame} from './lib/vision-active-vi031'
+import {classifyFreshCameraSpeech,freshCameraScenePrompt} from './lib/vision-voice-grounding-vi032b'
 import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -116,6 +117,7 @@ const VISION_ACTIVE_VI031_ENABLED = import.meta.env.VITE_LUMIA_VISION_ACTIVE_VI0
 /** VI-03.2A has no AI model: CPU-only optical change detection on the shared camera. */
 const VISION_SENTINEL_VI032_ENABLED = VISION_ACTIVE_VI031_ENABLED &&
   import.meta.env.VITE_LUMIA_VISION_SENTINEL_VI032 === '1'
+const VISION_FRESH_VOICE_VI032B_ENABLED = import.meta.env.VITE_LUMIA_VISION_FRESH_VOICE_VI032B === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -174,6 +176,10 @@ export default function App() {
   const visualSession = useRef(new EphemeralVisualContext())
   const activeVisionAuthorized = useRef(false)
   const activeVisionLatest = useRef<ActiveVisionFrame|null>(null)
+  const activeVisionCapture = useRef<(()=>ActiveVisionFrame|null)|null>(null)
+  const registerActiveVisionCapture = useCallback((fn:(()=>ActiveVisionFrame|null)|null)=>{
+    activeVisionCapture.current=fn
+  },[])
   const activeVisualReply = useRef<string|null>(null)
   const cameraCaptureOwner = useRef<string|null>(null)
   // Either an authorized webcam frame or a manually selected file is transient memory, never transcript/localStorage.
@@ -350,22 +356,46 @@ export default function App() {
       // VI-03.1: an explicitly enabled observation session only keeps the
       // latest JPEG in memory. A scene question opts into sending that JPEG;
       // ordinary conversation does not perform image inference.
+      const voiceIntent=VISION_FRESH_VOICE_VI032B_ENABLED && !image && !cameraRequested
+        ? classifyFreshCameraSpeech(said) : 'none'
+      // One Whisper mishearing ("qué es ahora") is ambiguous when the
+      // camera is off. Never reinterpret ordinary conversation as a look.
+      const ambiguousVoice=/(?:^|\s)que es ahora\W*$/.test(said
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase())
+      const freshSceneRequested=voiceIntent!=='none' &&
+        (!ambiguousVoice || activeVisionAuthorized.current)
       const activeVisionQuestion=VISION_ACTIVE_VI031_ENABLED &&
         activeVisionAuthorized.current && !image && !cameraRequested &&
-        isActiveVisionQuestion(said)
+        (freshSceneRequested || isActiveVisionQuestion(said))
+      // VI-03.2B: take the current webcam frame at the question, NOT the
+      // cached frame from 12 seconds earlier. No secondary camera lease.
+      const rawLiveFrame=activeVisionQuestion
+        ? VISION_FRESH_VOICE_VI032B_ENABLED
+          ? activeVisionCapture.current?.() ?? null
+          : activeVisionLatest.current
+        : null
       const liveFrame=activeVisionQuestion
-        ? recentActiveVisionFrame(true,activeVisionLatest.current) : null
-      const activeFrameMissing=activeVisionQuestion && !liveFrame
+        ? recentActiveVisionFrame(true,rawLiveFrame) : null
+      const activeFrameMissing=(activeVisionQuestion || freshSceneRequested) && !liveFrame
+      if(VISION_FRESH_VOICE_VI032B_ENABLED && (freshSceneRequested || activeVisionQuestion)){
+        console.info('[lumia:vision-vi032b]',JSON.stringify({
+          route:liveFrame?'live-fresh':activeVisionAuthorized.current?'camera-not-ready':'camera-not-active',
+          frameAgeMs:liveFrame?Date.now()-liveFrame.capturedAt:null,
+          resolution:liveFrame?.resolution??null,
+          attachedJPEG:Boolean(liveFrame),
+          visionActive:activeVisionAuthorized.current,
+        }))
+      }
       const pendingReference=pendingReferenceQuestion.current
       const resolvingReference=Boolean(VISION_CONTEXT_AMR025_ENABLED && pendingReference &&
         !image && !cameraRequested && isVisualReferenceAnswer(said))
       // VI-03.0: a question about what changed must NOT silently reuse a
       // frozen JPEG as if LUMIA were looking through a live camera.
       // Explicit user-requested capture still has precedence via cameraRequested.
-      const temporalQuestion = VISION_TEMPORAL_VI030_ENABLED && CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !image && !cameraRequested &&
+      const temporalQuestion = VISION_TEMPORAL_VI030_ENABLED && CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !freshSceneRequested && !image && !cameraRequested &&
         !fromCameraPreview && visualSession.current.hasAnalyzedFrame() &&
         requiresFreshVisualObservation(said)
-      const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !image && !cameraRequested
+      const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !freshSceneRequested && !image && !cameraRequested
         ? forceVisualFollowUp || resolvingReference || temporalQuestion
           ? visualSession.current.getAuthorizedFrame()
           : visualSession.current.getForFollowUp(said)
@@ -383,7 +413,9 @@ export default function App() {
         shouldOfferGroupDetail(visualQuestion,frameSource.resolution,
           VISION_ADAPTIVE_AMR027_ENABLED && visionAutoEnabled))
       let contextualReply:string|null=activeFrameMissing
-        ? 'La visión activa aún no tiene un fotograma reciente disponible. Comprueba que la cámara funciona o vuelve a activar la sesión.'
+        ? activeVisionAuthorized.current
+          ? 'La visión activa está encendida, pero no pude capturar una imagen actual. Revisa la webcam; no voy a describir una foto antigua como si fuera nueva.'
+          : 'La visión activa está apagada o terminó su sesión. Abre LUMIA VISION y pulsa Activar visión para que pueda mirar nuevamente. No puedo comprobar qué hay frente a la cámara ahora.'
         : activeVisionQuestion && asksActiveVisionChange(said)
         ? 'Tengo una captura reciente, pero no una comparación verificada entre dos instantes. Por eso no puedo asegurar qué cambió o si el objeto sigue igual. Puedo describir lo que se ve ahora.'
         : null
@@ -429,7 +461,7 @@ export default function App() {
         setCameraPreviewOpen(false)
         setVisionFileMode(false)
       }
-      const cameraIntent = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !image && !visualFollowUp
+      const cameraIntent = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !freshSceneRequested && !image && !visualFollowUp
         ? parseLumiaCameraIntent(said) : null
       let visualImage=image ?? liveFrame?.image ?? visualFollowUp?.image
       let visualGeneration:number|null=null
@@ -526,9 +558,11 @@ export default function App() {
             (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')+
             (visionTracingEnabled()?visualPrecisionInstruction(visualQuestion):'')
           : visualImage
-          ? (cameraIntent || cameraRequested || fromCameraPreview || liveFrame
+          ? (liveFrame && VISION_FRESH_VOICE_VI032B_ENABLED
+              ? cameraVisionPrompt(freshCameraScenePrompt(said,voiceIntent==='visual-correction'))
+              : cameraIntent || cameraRequested || fromCameraPreview || liveFrame
               ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
-              (liveFrame ? ' Este es solo el fotograma más reciente de la sesión autorizada, no vídeo ni percepción continua. No atribuyas movimiento, cambios o persistencia de personas u objetos respecto de momentos anteriores sin comparar dos imágenes. ' : '') +
+              (liveFrame ? ' Es un único fotograma actual, no vídeo. No atribuyas movimiento ni cambios entre instantes sin comparar dos imágenes. ' : '') +
               visualReliabilityInstruction(cameraIntent?.question ?? said) +
               visualModeInstruction(visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
               (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')+
@@ -1507,6 +1541,7 @@ export default function App() {
   const closeCameraViewfinder = () => {
     activeVisionAuthorized.current=false
     activeVisionLatest.current=null
+    activeVisionCapture.current=null
     // Closing the viewer discards the image and revokes visual follow-ups.
     // If Qwen is still using that image, interrupt that visual reply too.
     if(activeVisualReply.current){
@@ -1814,6 +1849,7 @@ export default function App() {
           sentinelAvailable={VISION_SENTINEL_VI032_ENABLED}
           onActiveVisionChange={changeActiveVision}
           onActiveVisionFrame={receiveActiveVisionFrame}
+          onRegisterActiveCapture={registerActiveVisionCapture}
           onAnalyzeLiveFrame={analyzeActiveVisionFrame}
           onFileCaptured={analyzeVisionFile}
           onSelectFileMode={selectVisionFileMode}
