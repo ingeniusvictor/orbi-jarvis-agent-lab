@@ -122,6 +122,42 @@ class OpenSetCalibrationTests(unittest.TestCase):
         self.assertNotIn("embedding",output)
         self.assertIn("elapsed_ms",result)
 
+    def test_opt_in_manual_crop_scores_each_frame_without_saving_images(self):
+        from unittest.mock import call
+        record=create_record("Private adult",[[1.0]+[0.0]*127]*3)
+        real=["g1.jpg", "g2.jpg", "g3.jpg", "g4.jpg", "g5.jpg", "g6.jpg"]
+        unknown={
+            "private_a":[f"a{i}.jpg" for i in range(4)],
+            "private_b":[f"b{i}.jpg" for i in range(4)],
+            "private_c":[f"c{i}.jpg" for i in range(4)],
+        }
+        with patch.object(cli, "choose_face_crop", return_value="IN_MEMORY_BGR") as crop, \
+             patch.object(cli, "extract_single_embedding", return_value=[1.0]+[0.0]*127) as extracted:
+            result=cli.score_dataset(
+                record, real, unknown, SyntheticBackend,
+                manual_crop=True, detector_backend="yunet",
+            )
+        self.assertEqual(crop.call_count,18)
+        self.assertEqual(extracted.call_count,18)
+        self.assertTrue(all(x.args[1]=="IN_MEMORY_BGR" for x in extracted.call_args_list))
+        self.assertTrue(all(x.kwargs["detector_backend"]=="yunet" for x in extracted.call_args_list))
+        self.assertEqual(result["known_subject_images"],6)
+        self.assertEqual(result["unknown_images"],12)
+        self.assertFalse(result["production_approved"])
+        self.assertNotIn("private_a",str(result))
+        self.assertNotIn("IN_MEMORY_BGR",str(result))
+
+    def test_default_calibration_leaves_manual_crop_disabled(self):
+        record=create_record("Adult",[[1.0]+[0.0]*127]*3)
+        unknown={
+            "adult_a":["u1.jpg"]*4,
+            "adult_b":["u2.jpg"]*4,
+            "adult_c":["u3.jpg"]*4,
+        }
+        with patch.object(cli,"choose_face_crop") as crop:
+            cli.score_dataset(record,["g.jpg"]*6,unknown,SyntheticBackend)
+        crop.assert_not_called()
+
     def test_no_runtime_camera_connection(self):
         project=HERE.parents[1]
         app=(project/"src/App.tsx").read_text(encoding="utf8")
