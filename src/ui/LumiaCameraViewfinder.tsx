@@ -69,9 +69,9 @@ export function LumiaCameraViewfinder({
   const onFrameRef=useRef(onActiveVisionFrame)
   onFrameRef.current=onActiveVisionFrame
   const activeRef=useRef(false)
-  const sampleTimerRef=useRef<ReturnType<typeof setInterval>|null>(null)
-  const sessionTimerRef=useRef<ReturnType<typeof setTimeout>|null>(null)
-  const previewExpiryRef=useRef<ReturnType<typeof setTimeout>|null>(null)
+  const sampleTimerRef=useRef<number|null>(null)
+  const sessionTimerRef=useRef<number|null>(null)
+  const previewExpiryRef=useRef<number|null>(null)
   const [visionActive,setVisionActive]=useState(false)
   const [visionSamples,setVisionSamples]=useState(0)
   const [ready,setReady]=useState(false)
