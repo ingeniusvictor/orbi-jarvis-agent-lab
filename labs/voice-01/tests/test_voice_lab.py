@@ -1,0 +1,146 @@
+"""VOICE-00/01 synthetic tests: no microphone, no downloaded models."""
+from __future__ import annotations
+import io
+import sys
+import unittest
+import wave
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import offline_diarization as voice
+import voice00_metrics as metrics
+
+
+def make_wav(seconds=1.0, rate=16000, channels=1):
+    out = io.BytesIO()
+    with wave.open(out, "wb") as w:
+        w.setnchannels(channels)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(b"\0" * int(rate * seconds * 2 * channels))
+    return out.getvalue()
+
+
+def rttm(start, duration, speaker):
+    return f"SPEAKER anonymous 1 {start} {duration} <NA> <NA> {speaker} <NA> <NA>"
+
+
+class VoiceLabTests(unittest.TestCase):
+    def test_doctor_requires_no_models(self):
+        self.assertEqual(voice.main(["--doctor"]), 0)
+
+    def test_explicit_consent_required(self):
+        self.assertEqual(voice.main([]), 1)
+
+    def test_pcm16_valid_and_rejected_formats(self):
+        with TemporaryDirectory() as directory:
+            p = Path(directory) / "private.wav"
+            p.write_bytes(make_wav())
+            audio, seconds = voice.read_pcm16_mono(str(p))
+            self.assertEqual(len(audio), 32000)
+            self.assertEqual(seconds, 1.0)
+            p.write_bytes(make_wav(channels=2))
+            with self.assertRaises(voice.LabError) as err:
+                voice.read_pcm16_mono(str(p))
+            self.assertEqual(str(err.exception), "UNSUPPORTED_WAV_FORMAT")
+            p.write_bytes(make_wav(rate=8000))
+            with self.assertRaises(voice.LabError):
+                voice.read_pcm16_mono(str(p))
+
+    def test_rttm_permuted_speakers_have_zero_error(self):
+        a = metrics.parse_rttm("\n".join([
+            rttm(0, 1, "a"), rttm(1, 1, "b"),
+        ]))
+        b = metrics.parse_rttm("\n".join([
+            rttm(0, 1, "speaker_7"), rttm(1, 1, "speaker_9"),
+        ]))
+        out = metrics.assess(a, b)
+        self.assertEqual(out["error_fraction"], 0)
+        self.assertEqual(out["predicted_speaker_count"], 2)
+
+    def test_misses_and_false_alarms_measured(self):
+        out = metrics.assess(
+            metrics.parse_rttm(rttm(0, 1, "a")),
+            metrics.parse_rttm(rttm(1, 1, "b")),
+        )
+        self.assertGreater(out["error_fraction"], 0.99)
+        self.assertGreater(out["miss_frames"], 0)
+        self.assertGreater(out["false_alarm_frames"], 0)
+
+    def test_overlap_excluded_and_reported(self):
+        out = metrics.assess(
+            metrics.parse_rttm("\n".join([
+                rttm(0, 1, "a"),
+                rttm(0.5, 0.5, "b"),
+            ])),
+            metrics.parse_rttm(rttm(0, 1, "x")),
+        )
+        self.assertEqual(out["reference_overlap_frames_skipped"], 50)
+        self.assertEqual(out["error_fraction"], 0)
+
+    def test_nonfinite_rttm_and_more_than_four_speakers_rejected(self):
+        for start in ["-1", "nan", "inf", "1000"]:
+            with self.assertRaises(metrics.MetricError):
+                metrics.parse_rttm(rttm(start, 1, "a"))
+        with self.assertRaises(metrics.MetricError):
+            metrics.parse_rttm("\n".join(rttm(0, 1, str(i)) for i in range(5)))
+
+    def test_sherpa_backend_contract_without_models(self):
+        class FakeArray:
+            def astype(self, _type):
+                return self
+            def __truediv__(self, _value):
+                return self
+        class FakeNumpy:
+            float32 = "float32"
+            @staticmethod
+            def frombuffer(_audio, dtype=None):
+                self_type = FakeArray()
+                return self_type
+        class FakeConfig:
+            def validate(self):
+                return True
+        class FakeSherpa:
+            @staticmethod
+            def OfflineSpeakerDiarizationConfig(**_):
+                return FakeConfig()
+            @staticmethod
+            def OfflineSpeakerSegmentationModelConfig(**_):
+                return object()
+            @staticmethod
+            def OfflineSpeakerSegmentationPyannoteModelConfig(**_):
+                return object()
+            @staticmethod
+            def SpeakerEmbeddingExtractorConfig(**_):
+                return object()
+            @staticmethod
+            def FastClusteringConfig(**_):
+                return object()
+            @staticmethod
+            def OfflineSpeakerDiarization(_config):
+                class Diarizer:
+                    sample_rate = 16000
+                    def process(self, _samples):
+                        class Result(list):
+                            def sort_by_start_time(self):
+                                return self
+                        def segment(a, b, s):
+                            return type("Segment", (), {"start": a, "end": b,
+                                                         "speaker": s})()
+                        return Result([segment(0, 1, 9), segment(1, 2, 3),
+                                       segment(2, 3, 9)])
+                return Diarizer()
+
+        turns, speakers = voice.diarize(
+            make_wav(), "dummy-seg", "dummy-emb",
+            backend=FakeSherpa, numpy_module=FakeNumpy,
+        )
+        self.assertEqual(speakers, 2)
+        self.assertEqual([t["speaker"] for t in turns],
+                         ["speaker_0", "speaker_1", "speaker_0"])
+        self.assertNotIn("9", str(turns))
+
+
+if __name__ == "__main__":
+    unittest.main()
