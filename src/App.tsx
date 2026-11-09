@@ -356,22 +356,46 @@ export default function App() {
       // VI-03.1: an explicitly enabled observation session only keeps the
       // latest JPEG in memory. A scene question opts into sending that JPEG;
       // ordinary conversation does not perform image inference.
+      const voiceIntent=VISION_FRESH_VOICE_VI032B_ENABLED && !image && !cameraRequested
+        ? classifyFreshCameraSpeech(said) : 'none'
+      // One Whisper mishearing ("qué es ahora") is ambiguous when the
+      // camera is off. Never reinterpret ordinary conversation as a look.
+      const ambiguousVoice=/(?:^|\s)que es ahora\s*$/.test(said
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase())
+      const freshSceneRequested=voiceIntent!=='none' &&
+        (!ambiguousVoice || activeVisionAuthorized.current)
       const activeVisionQuestion=VISION_ACTIVE_VI031_ENABLED &&
         activeVisionAuthorized.current && !image && !cameraRequested &&
-        isActiveVisionQuestion(said)
+        (freshSceneRequested || isActiveVisionQuestion(said))
+      // VI-03.2B: take the current webcam frame at the question, NOT the
+      // cached frame from 12 seconds earlier. No secondary camera lease.
+      const rawLiveFrame=activeVisionQuestion
+        ? VISION_FRESH_VOICE_VI032B_ENABLED
+          ? activeVisionCapture.current?.() ?? null
+          : activeVisionLatest.current
+        : null
       const liveFrame=activeVisionQuestion
-        ? recentActiveVisionFrame(true,activeVisionLatest.current) : null
-      const activeFrameMissing=activeVisionQuestion && !liveFrame
+        ? recentActiveVisionFrame(true,rawLiveFrame) : null
+      const activeFrameMissing=(activeVisionQuestion || freshSceneRequested) && !liveFrame
+      if(VISION_FRESH_VOICE_VI032B_ENABLED && (freshSceneRequested || activeVisionQuestion)){
+        console.info('[lumia:vision-vi032b]',JSON.stringify({
+          route:liveFrame?'live-fresh':activeVisionAuthorized.current?'camera-not-ready':'camera-not-active',
+          frameAgeMs:liveFrame?Date.now()-liveFrame.capturedAt:null,
+          resolution:liveFrame?.resolution??null,
+          attachedJPEG:Boolean(liveFrame),
+          visionActive:activeVisionAuthorized.current,
+        }))
+      }
       const pendingReference=pendingReferenceQuestion.current
       const resolvingReference=Boolean(VISION_CONTEXT_AMR025_ENABLED && pendingReference &&
         !image && !cameraRequested && isVisualReferenceAnswer(said))
       // VI-03.0: a question about what changed must NOT silently reuse a
       // frozen JPEG as if LUMIA were looking through a live camera.
       // Explicit user-requested capture still has precedence via cameraRequested.
-      const temporalQuestion = VISION_TEMPORAL_VI030_ENABLED && CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !image && !cameraRequested &&
+      const temporalQuestion = VISION_TEMPORAL_VI030_ENABLED && CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !freshSceneRequested && !image && !cameraRequested &&
         !fromCameraPreview && visualSession.current.hasAnalyzedFrame() &&
         requiresFreshVisualObservation(said)
-      const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !image && !cameraRequested
+      const visualFollowUp = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !freshSceneRequested && !image && !cameraRequested
         ? forceVisualFollowUp || resolvingReference || temporalQuestion
           ? visualSession.current.getAuthorizedFrame()
           : visualSession.current.getForFollowUp(said)
@@ -435,7 +459,7 @@ export default function App() {
         setCameraPreviewOpen(false)
         setVisionFileMode(false)
       }
-      const cameraIntent = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !image && !visualFollowUp
+      const cameraIntent = CAMERA_VISION_VI02_ENABLED && !activeVisionQuestion && !freshSceneRequested && !image && !visualFollowUp
         ? parseLumiaCameraIntent(said) : null
       let visualImage=image ?? liveFrame?.image ?? visualFollowUp?.image
       let visualGeneration:number|null=null
