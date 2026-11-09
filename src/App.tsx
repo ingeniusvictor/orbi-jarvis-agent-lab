@@ -360,7 +360,7 @@ export default function App() {
         ? classifyFreshCameraSpeech(said) : 'none'
       // One Whisper mishearing ("qué es ahora") is ambiguous when the
       // camera is off. Never reinterpret ordinary conversation as a look.
-      const ambiguousVoice=/(?:^|\s)que es ahora\s*$/.test(said
+      const ambiguousVoice=/(?:^|\s)que es ahora\W*$/.test(said
         .normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase())
       const freshSceneRequested=voiceIntent!=='none' &&
         (!ambiguousVoice || activeVisionAuthorized.current)
