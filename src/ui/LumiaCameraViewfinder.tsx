@@ -16,6 +16,7 @@ import {inspectCameraSignal,connectedOrVirtualCameraHint} from '../lib/vision-ca
 import type {VisionReplyMode} from '../lib/vision-context-vi023'
 import {chooseVisionResolution} from '../lib/vision-routing-amr024'
 import {ACTIVE_VISION_SAMPLE_MS,ACTIVE_VISION_MAX_SESSION_MS} from '../lib/vision-active-vi031'
+import {OpticalSentinel,SENTINEL_WIDTH,SENTINEL_HEIGHT,SENTINEL_INTERVAL_MS,toSentinelLuma,type SentinelZone} from '../lib/vision-sentinel-vi032'
 
 type Props={
   live:boolean
@@ -24,6 +25,7 @@ type Props={
   still:LocalVisualImage|null
   onCaptured:(image:LocalVisualImage,resolution:VisionResolution)=>void
   visionActiveAvailable:boolean
+  sentinelAvailable:boolean
   onActiveVisionChange:(active:boolean)=>void
   onActiveVisionFrame:(image:LocalVisualImage,resolution:VisionResolution,at:number)=>void
   onAnalyzeLiveFrame:(image:LocalVisualImage,resolution:VisionResolution)=>void
@@ -49,7 +51,7 @@ type Props={
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
-  visionActiveAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,
+  visionActiveAvailable,sentinelAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
   visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
   visualDetailOffer,visualDetailPurpose,visualDetailBusy,onRequestDetailedReanalysis,
@@ -72,6 +74,13 @@ export function LumiaCameraViewfinder({
   const sampleTimerRef=useRef<number|null>(null)
   const sessionTimerRef=useRef<number|null>(null)
   const previewExpiryRef=useRef<number|null>(null)
+  const sentinelTimerRef=useRef<number|null>(null)
+  const sentinelCanvasRef=useRef<HTMLCanvasElement|null>(null)
+  const sentinelRef=useRef(new OpticalSentinel())
+  const sentinelZoneRef=useRef<SentinelZone>('center')
+  const lastActiveShotRef=useRef(0)
+  const [sentinelZone,setSentinelZone]=useState<SentinelZone>('center')
+  const [sentinelEvents,setSentinelEvents]=useState(0)
   const [visionActive,setVisionActive]=useState(false)
   const [visionSamples,setVisionSamples]=useState(0)
   const [ready,setReady]=useState(false)
@@ -90,6 +99,9 @@ export function LumiaCameraViewfinder({
   const endActive=()=>{
     if(sampleTimerRef.current!==null){window.clearInterval(sampleTimerRef.current);sampleTimerRef.current=null}
     if(sessionTimerRef.current!==null){window.clearTimeout(sessionTimerRef.current);sessionTimerRef.current=null}
+    if(sentinelTimerRef.current!==null){window.clearInterval(sentinelTimerRef.current);sentinelTimerRef.current=null}
+    sentinelRef.current.reset()
+    sentinelCanvasRef.current=null
     const wasActive=activeRef.current
     activeRef.current=false
     if(wasActive){onActiveRef.current(false);setVisionActive(false)}
@@ -98,6 +110,9 @@ export function LumiaCameraViewfinder({
   useEffect(()=>()=>{
     if(sampleTimerRef.current!==null)window.clearInterval(sampleTimerRef.current)
     if(sessionTimerRef.current!==null)window.clearTimeout(sessionTimerRef.current)
+    if(sentinelTimerRef.current!==null)window.clearInterval(sentinelTimerRef.current)
+    sentinelCanvasRef.current=null
+    sentinelRef.current.reset()
     if(activeRef.current){activeRef.current=false;onActiveRef.current(false)}
   },[])
   useEffect(()=>{if(!live)endActive()},[live])
@@ -216,7 +231,9 @@ export function LumiaCameraViewfinder({
     }
     try{
       const image=prepareVisualCameraFrame(video,effectiveResolution)
-      onFrameRef.current(image,effectiveResolution,Date.now())
+      const shotAt=Date.now()
+      onFrameRef.current(image,effectiveResolution,shotAt)
+      lastActiveShotRef.current=shotAt
       setVisionSamples(n=>n+1)
       return image
     }catch(err){
@@ -225,11 +242,56 @@ export function LumiaCameraViewfinder({
       return null
     }
   }
+  /** Two samples per second are not needed for change detection on this CPU.
+   * A 96x54 RGBA copy at 750ms is sufficient for an initial owner pilot.
+   * Only motion metadata stays in the browser; Ollama is NEVER called here. */
+  const sampleSentinel=()=>{
+    const video=videoRef.current
+    if(!sentinelAvailable||!activeRef.current||!ready||!video||document.visibilityState==='hidden')return
+    if(camera.cameraStream()?.getVideoTracks()[0]?.readyState!=='live'){
+      closeRef.current()
+      return
+    }
+    try{
+      let canvas=sentinelCanvasRef.current
+      if(!canvas){
+        canvas=document.createElement('canvas')
+        canvas.width=SENTINEL_WIDTH
+        canvas.height=SENTINEL_HEIGHT
+        sentinelCanvasRef.current=canvas
+      }
+      const ctx=canvas.getContext('2d',{willReadFrequently:true})
+      if(!ctx)return
+      ctx.drawImage(video,0,0,SENTINEL_WIDTH,SENTINEL_HEIGHT)
+      const luma=toSentinelLuma(ctx.getImageData(0,0,SENTINEL_WIDTH,SENTINEL_HEIGHT).data)
+      const now=Date.now()
+      const observed=sentinelRef.current.observe(luma,sentinelZoneRef.current,now)
+      if(observed.status==='event'){
+        setSentinelEvents(n=>n+1)
+        // An event makes a fresher local JPEG available to voice queries.
+        // Never calls Ollama, speaks, opens another camera or queues an inference.
+        if(now-lastActiveShotRef.current>=3_000)takeActiveFrame()
+      }
+    }catch{
+      // Fail closed: an unreadable stream should not remain in observation.
+      closeRef.current()
+    }
+  }
+  const chooseSentinelZone=(zone:SentinelZone)=>{
+    if(zone===sentinelZoneRef.current)return
+    sentinelZoneRef.current=zone
+    sentinelRef.current.reset()
+    setSentinelZone(zone)
+    setSentinelEvents(0)
+  }
   const beginActive=()=>{
     if(!visionActiveAvailable||!live||!ready||activeRef.current)return
     activeRef.current=true
     setVisionActive(true)
     setVisionSamples(0)
+    setSentinelEvents(0)
+    sentinelRef.current.reset()
+    lastActiveShotRef.current=0
     onActiveRef.current(true)
     // The owner explicitly opted in; replace the preview's 90 s expiry
     // with one bounded 3-minute observation session. No indefinite lease.
@@ -237,6 +299,10 @@ export function LumiaCameraViewfinder({
     takeActiveFrame()
     if(!activeRef.current)return
     sampleTimerRef.current=window.setInterval(()=>{void takeActiveFrame()},ACTIVE_VISION_SAMPLE_MS)
+    if(sentinelAvailable){
+      sampleSentinel()
+      sentinelTimerRef.current=window.setInterval(sampleSentinel,SENTINEL_INTERVAL_MS)
+    }
     sessionTimerRef.current=window.setTimeout(()=>closeRef.current(),ACTIVE_VISION_MAX_SESSION_MS)
   }
   const analyzeLiveNow=()=>{
@@ -287,6 +353,18 @@ export function LumiaCameraViewfinder({
           <span role="status">{visionActive
             ? `${visionSamples} capturas · cada 12 s · máximo 3 min`
             : 'Foto periódica en memoria · análisis solo al preguntar'}</span>
+        </div>
+      )}
+      {live&&sentinelAvailable&&visionActive&&(
+        <div className="lumia-vision-sentinel-panel" role="group" aria-label="Centinela óptico CPU">
+          <span role="status">CENTINELA CPU · cambios ópticos: {sentinelEvents}</span>
+          <div className="lumia-vision-sentinel-zones" role="group" aria-label="Zona de observación">
+            <button type="button" aria-pressed={sentinelZone==='center'}
+              onClick={()=>chooseSentinelZone('center')}>Centro</button>
+            <button type="button" aria-pressed={sentinelZone==='full'}
+              onClick={()=>chooseSentinelZone('full')}>Toda la imagen</button>
+          </div>
+          <small>Detecta variaciones de imagen, no personas. Qwen 2B solo al preguntar.</small>
         </div>
       )}
       <div className="lumia-camera-source">
@@ -365,8 +443,16 @@ export function LumiaCameraViewfinder({
       )}
       <div className="lumia-camera-viewfinder-viewport">
         {live ? (
-          <video ref={videoRef} className="lumia-camera-viewfinder-video"
-            muted playsInline autoPlay aria-label="Vista real de la webcam, sin espejo"/>
+          <>
+            <video ref={videoRef} className="lumia-camera-viewfinder-video"
+              muted playsInline autoPlay aria-label="Vista real de la webcam, sin espejo"/>
+            {visionActive&&sentinelAvailable&&sentinelZone==='center'&&(
+              <svg className="lumia-vision-sentinel-overlay" viewBox="0 0 100 100"
+                preserveAspectRatio="none" aria-hidden="true">
+                <polygon points="16,15 84,15 84,88 16,88"/>
+              </svg>
+            )}
+          </>
         ) : fileMode && fileImage ? (
           <img className="lumia-camera-viewfinder-frame"
             src={`data:image/jpeg;base64,${fileImage.data}`}
