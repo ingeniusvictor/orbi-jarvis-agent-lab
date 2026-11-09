@@ -364,7 +364,7 @@ export function LumiaCameraViewfinder({
             <button type="button" aria-pressed={sentinelZone==='full'}
               onClick={()=>chooseSentinelZone('full')}>Toda la imagen</button>
           </div>
-          <small>Detecta variaciones de imagen, no personas. Qwen 2B solo al preguntar.</small>
+          <small>Detecta cambios ópticos, no personas. Cerebro 2B predeterminado, análisis solo al preguntar.</small>
         </div>
       )}
       <div className="lumia-camera-source">
