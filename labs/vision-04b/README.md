@@ -1,5 +1,8 @@
 # LUMIA VI-04B — laboratorio aislado DeepFace SFace / ONNX CPU
 
+> **CONTINUIDAD OFICIAL (09-11-2026):** [Resumen completo de resultados reales en ASUS, estado de PR #74–#77, CI, límites de seguridad y tareas pendientes](../../docs/lumia-convergence/39-VISION04-CONTINUIDAD-20261109.md). **Leer antes de reanudar o abrir otro chat.** El par positivo real y el negativo ya fueron medidos; C0/C1 siguen sin registro/calibración físicos y la última auditoría del runtime ASUS aún está pendiente.
+
+
 **Estado:** piloto de comparación de dos fotografías adultas autorizadas, NO reconocimiento en vivo ni registro de identidades. No fusionar con main sin validar en ASUS.
 
 ## Origen y modelos
