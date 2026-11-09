@@ -11,7 +11,7 @@ const TARGET=resolve('public/models/vision/blaze_face_short_range.tflite')
 const MIN_BYTES=40_000
 const MAX_BYTES=4_000_000
 
-async function main():Promise<void>{
+async function main(){
   try{
     const current=await stat(TARGET)
     if(current.isFile() && current.size>=MIN_BYTES && current.size<=MAX_BYTES){
