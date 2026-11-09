@@ -17,7 +17,7 @@ import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} f
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode,type VisualFrameSource} from './lib/vision-context-vi023'
 import {requiresFreshVisualObservation,frozenVisualTruthReply} from './lib/vision-temporal-vi030'
-import {isActiveVisionQuestion,recentActiveVisionFrame,type ActiveVisionFrame} from './lib/vision-active-vi031'
+import {isActiveVisionQuestion,asksActiveVisionChange,recentActiveVisionFrame,type ActiveVisionFrame} from './lib/vision-active-vi031'
 import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -380,7 +380,10 @@ export default function App() {
         shouldOfferGroupDetail(visualQuestion,frameSource.resolution,
           VISION_ADAPTIVE_AMR027_ENABLED && visionAutoEnabled))
       let contextualReply:string|null=activeFrameMissing
-        ? 'La visión activa aún no tiene un fotograma reciente disponible. Comprueba que la cámara funciona o vuelve a activar la sesión.' : null
+        ? 'La visión activa aún no tiene un fotograma reciente disponible. Comprueba que la cámara funciona o vuelve a activar la sesión.'
+        : activeVisionQuestion && asksActiveVisionChange(said)
+        ? 'Tengo una captura reciente, pero no una comparación verificada entre dos instantes. Por eso no puedo asegurar qué cambió o si el objeto sigue igual. Puedo describir lo que se ve ahora.'
+        : null
       if(temporalQuestion && visualFollowUp){
         // No new camera permission, frame, Ollama vision pass, or stale scene claim.
         contextualReply=frozenVisualTruthReply(frameSource?.kind??'camera')
