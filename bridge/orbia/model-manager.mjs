@@ -301,7 +301,7 @@ export function parseModelControl(prompt, history = []) {
   if (avatarDomain) return null
 
   const patterns = [
-    /(?:puedes |podrias |puede )?(?:cambiar|cambia|cambiate) (?:al modelo |de modelo a |de modelo al |de modelo por |a |al |por )(.+)/i,
+    /(?:puedes |podrias |puede )?(?:cambiar|cambia|c[aá]mbiate) (?:al modelo |de modelo a |de modelo al |de modelo por |a |al |por )(.+)/i,
     /(?:quiero |quisiera )?(?:cambiar|cambiarme) (?:de modelo )?(?:a |al |por )(.+)/i,
     /(?:quiero que |por favor )?(?:uses|usa|utiliza|activa|pon) (?:el modelo |modelo |a )?(.+)/i,
     /(?:ponte|pasate|pasa) (?:al modelo |a )(.+)/i,
