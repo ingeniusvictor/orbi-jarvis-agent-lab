@@ -1,0 +1,29 @@
+name: LUMIA VI-03.2 CPU Sentinel (2B Native)
+on:
+  pull_request:
+    paths:
+      - 'src/lib/vision-sentinel-vi032.ts'
+      - 'src/ui/LumiaCameraViewfinder.tsx'
+      - 'src/App.tsx'
+      - 'src/index.css'
+      - 'INICIAR_LUMIA_ASUS_SENTINEL_CPU_2B_VI032.cmd'
+      - 'scripts/certify-lumia-vision032-sentinel-cpu.ts'
+      - '.github/workflows/lumia-vision032-sentinel-cpu.yml'
+  workflow_dispatch:
+jobs:
+  certify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/certify-lumia-vision032-sentinel-cpu.ts
+      - run: npx tsx scripts/certify-lumia-vision031-active-session.ts
+      - run: npm run build
