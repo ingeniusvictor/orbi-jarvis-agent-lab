@@ -234,6 +234,89 @@ export function LumiaCameraViewfinder({
     }
   },[live,deviceChoice])
 
+  // VISION-04A: FaceDetector runs in a dedicated Web Worker on the CPU.
+  // It NEVER requests its own camera, performs recognition, or records faces.
+  useEffect(()=>{
+    if(!faceDetectorAvailable||!faceEnabled||!live||!visionActive||!ready)return
+    let cancelled=false
+    let workerReady=false
+    let busy=false
+    let sequence=0
+    let sampleTimer:number|null=null
+    let responseTimer:number|null=null
+    const worker=new Worker(new URL('../lib/vision-face-worker-vi04.ts',import.meta.url),{type:'module'})
+    faceGateRef.current.reset()
+    setFaceCount(null)
+    setFaceBoxes([])
+    setFaceError('')
+    setFaceStatus('loading')
+
+    const fail=(reason:string)=>{
+      if(cancelled)return
+      workerReady=false
+      setFaceStatus('error')
+      setFaceError(reason.slice(0,160))
+      setFaceBoxes([])
+      setFaceCount(null)
+      if(sampleTimer!==null){window.clearInterval(sampleTimer);sampleTimer=null}
+      if(responseTimer!==null){window.clearTimeout(responseTimer);responseTimer=null}
+      worker.terminate()
+    }
+    const sample=async()=>{
+      if(cancelled||!workerReady||busy||document.visibilityState!=='visible')return
+      const video=videoRef.current
+      if(!video||video.readyState<2||video.videoWidth===0||video.videoHeight===0)return
+      busy=true
+      try{
+        const scale=Math.min(1,FACE_DETECTOR_MAX_WIDTH/video.videoWidth,
+          FACE_DETECTOR_MAX_HEIGHT/video.videoHeight)
+        const width=Math.max(1,Math.round(video.videoWidth*scale))
+        const height=Math.max(1,Math.round(video.videoHeight*scale))
+        const bitmap=await createImageBitmap(video,{
+          resizeWidth:width,resizeHeight:height,resizeQuality:'medium',
+        })
+        if(cancelled||!workerReady){bitmap.close();busy=false;return}
+        worker.postMessage({
+          type:'FRAME',bitmap,timestampMs:performance.now(),sequence:++sequence,
+        },[bitmap])
+        responseTimer=window.setTimeout(()=>fail('La detección facial tardó demasiado y fue detenida.'),6_000)
+      }catch(err){
+        busy=false
+        fail(err instanceof Error?err.message:'No pude preparar el video para el detector.')
+      }
+    }
+    worker.onmessage=(event:MessageEvent<{
+      type:string;sequence?:number;faces?:FaceBox[];elapsedMs?:number;message?:string
+    }>)=>{
+      if(cancelled)return
+      const msg=event.data
+      if(msg.type==='READY'){
+        workerReady=true
+        setFaceStatus('ready')
+        void sample()
+        sampleTimer=window.setInterval(()=>{void sample()},FACE_DETECTOR_INTERVAL_MS)
+      }else if(msg.type==='RESULT'){
+        if(responseTimer!==null){window.clearTimeout(responseTimer);responseTimer=null}
+        busy=false
+        if(msg.sequence!==sequence||!Array.isArray(msg.faces))return
+        setFaceBoxes(msg.faces)
+        setFaceCount(faceGateRef.current.observe(msg.faces.length,Date.now()))
+        setFaceLatency(Number.isFinite(msg.elapsedMs)?Math.round(msg.elapsedMs!):null)
+      }else if(msg.type==='ERROR'){
+        fail(msg.message||'No se pudo ejecutar el detector facial.')
+      }
+    }
+    worker.onerror=()=>fail('Falló el proceso local de detección facial.')
+    worker.postMessage({type:'INIT'})
+    return ()=>{
+      cancelled=true
+      if(sampleTimer!==null)window.clearInterval(sampleTimer)
+      if(responseTimer!==null)window.clearTimeout(responseTimer)
+      worker.terminate()
+      faceGateRef.current.reset()
+    }
+  },[faceDetectorAvailable,faceEnabled,live,visionActive,ready])
+
   const close=()=>{
     endActive()
     releaseRef.current?.()
