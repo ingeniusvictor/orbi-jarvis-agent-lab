@@ -1,0 +1,27 @@
+name: LUMIA VI-03.1 Active Vision Session
+on:
+  pull_request:
+    paths:
+      - 'src/App.tsx'
+      - 'src/ui/LumiaCameraViewfinder.tsx'
+      - 'src/lib/vision-active-vi031.ts'
+      - 'scripts/certify-lumia-vision031-active-session.ts'
+      - 'INICIAR_LUMIA_ASUS_VISION_ACTIVA_VI031.cmd'
+      - '.github/workflows/lumia-vision031-active-session.yml'
+  workflow_dispatch:
+jobs:
+  certify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/certify-lumia-vision031-active-session.ts
+      - run: npm run build
