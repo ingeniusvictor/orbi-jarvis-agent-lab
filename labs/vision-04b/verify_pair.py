@@ -29,7 +29,7 @@ def configure_cpu_environment() -> Path:
     os.environ["DEEPFACE_BACKEND_ENGINE"] = "onnx"
     os.environ["DEEPFACE_ONNX_PROVIDERS"] = "cpu"
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-    root = (Path(os.environ.get("LOCALAPPDATA", Path.home())) /
+    root = (Path(os.environ.get("LOCALAPPDATA") or str(Path.home())) /
             "ORBI" / "LUMIA-FACE-LAB-VI04B").resolve()
     root.mkdir(parents=True, exist_ok=True)
     os.environ["DEEPFACE_HOME"] = str(root)
@@ -131,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         result = evaluate_pair(DeepFace, photo_a, photo_b)
         print(json.dumps(result, ensure_ascii=False))
         return 0
-    except (LabError, ValueError, RuntimeError, ImportError, KeyError, OSError) as err:
+    except Exception as err:
         # Do not print file paths, traceback, embeddings or raw image content.
         print(json.dumps({
             "lab": "VISION-04B", "ok": False,
