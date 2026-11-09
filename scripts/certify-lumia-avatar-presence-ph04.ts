@@ -9,6 +9,7 @@ import {
 } from '../src/scene/lumia-motion-r8/avatar-presence-ph04'
 import {R8BodyCompanion} from '../src/scene/lumia-motion-r8/portal-body-companion'
 import * as THREE from 'three'
+import {parseModelControl} from '../bridge/orbia/model-manager.mjs'
 
 const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8')
 assert.equal(motionCatalog.length,17)
@@ -52,10 +53,21 @@ const asusVoiceCommands:Array<[string,string]> = [
   ['Lumi, puedes cambiar a medio cuerpo', 'bust-vrm'],
   ['Lumi, necesito que cambies a solo rostro', 'head-vrm'],
   ['Lumi, quiero que cambies a la vista principal', 'head-vrm'],
+  // Real 2026-11-09 Whisper output: prefixes misheard; model router must not hijack.
+  ['Lumiar cambia a la versión de medio cuerpo.', 'bust-vrm'],
+  ['Silumia, usa la vista de medio cuerpo.', 'bust-vrm'],
+  ['Lumia, usa la vista de medio cuerpo.', 'bust-vrm'],
 ]
 for (const [said,view] of asusVoiceCommands) {
   assert.deepEqual(parseLumiaAvatarAction(said), {kind:'view',view}, 'ASUS STT: '+said)
+  assert.equal(parseModelControl(said),null,'Avatar turn may NOT change Ollama: '+said)
 }
+const realAvatarInquiry =
+  'Lumia, preparamos para ti tres formas de visualizar la forma de solo rostro, ' +
+  'la forma medio cuerpo y la forma de cuerpo completo. Puedes corroborar eso?'
+assert.deepEqual(parseLumiaAvatarAction(realAvatarInquiry),{kind:'list-views'})
+assert.equal(parseModelControl(realAvatarInquiry),null)
+assert.match(respondToLumiaAvatarAction({kind:'list-views'}),/solo rostro, medio cuerpo y cuerpo completo/)
 const ambiguousViewTranscripts=[
   'Solo quiero probar que puedas cambiar entre la vista cuerpo completo y la vista de...',
   'Lumi, puedes cambiar entre las tres vistas',

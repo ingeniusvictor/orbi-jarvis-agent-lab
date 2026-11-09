@@ -50,7 +50,7 @@ export function avatarViewLabel(view: LumiaAvatarView): string {
 }
 
 export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null {
-  const said = fold(prompt).replace(/^(?:(?:hola|oye|hey)\s+)?(?:lumi|lumia|lo mi)\s+/, '')
+  const said = fold(prompt).replace(/^(?:(?:hola|oye|hey)\s+)?(?:lumi|lumia|lumiar|silumia|si lumia|lo mi)\s+/, '')
   if (!said) return null
 
   // A live demo needs explicit owner intent and an avatar-related target.
@@ -77,6 +77,15 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
       /^(?:no sabia|no se|sabia|entonces|es verdad|puedes|tienes|me puedes|que capacidad|como funciona|cuentame|explicame)\b/.test(said)) {
     return { kind: 'animation-info' }
   }
+
+  // Owner's real ASUS question: "preparamos para ti tres formas ... puedes
+  // corroborar eso?". Report the actual in-app view catalog; do NOT ask Qwen
+  // to invent UI capabilities or treat named views as a switch destination.
+  const viewCatalogInquiry =
+    /\b(?:tres|3)\s+(?:formas|vistas|modos|presentaciones)\b/.test(said) &&
+    /\b(?:visualizar|visualizacion|vista|vistas|rostro|cuerpo)\b/.test(said) &&
+    /\b(?:puedes|podrias|corroborar|verificar|confirmar|tienes|preparamos|disponibles)\b/.test(said)
+  if (viewCatalogInquiry) return { kind: 'list-views' }
 
   // Read-only questions are allowed and never cause a view or gesture change.
   if (/^(?:que|cuales|cuantas|como|dime|cuentame|comentame|explicame)\b/.test(said)) {
@@ -116,7 +125,7 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
   // rostro". This may be treated as a command, but NOT as a command embedded
   // inside a longer discussion or third-party quotation.
   const shorthand = /^(?:vista|bista|version)\s+(?:(?:de|a|la|solo)\s+){0,2}(?:solo\s+rostro|rostro|medio\s+cuerpo|cuerpo\s+intermedio|cuerpo\s+completo|corrup\s+completo)\s*(?:por\s+favor)?$/.test(said)
-  const directChange = /^(?:ahora\s+)?(?:por\s+favor\s+)?(?:(?:me\s+)?(?:puedes|podrias|podria)\s+)?(?:cambia|cambio|cambiame|cambiar|cambiarme|cambias|cambies|cambiate|activa|activame|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero\s+verte|dejame\s+verte|vuelve|regresa|retorna)\b/.test(said)
+  const directChange = /^(?:ahora\s+)?(?:por\s+favor\s+)?(?:(?:me\s+)?(?:puedes|podrias|podria)\s+)?(?:cambia|cambio|cambiame|cambiar|cambiarme|cambias|cambies|cambiate|activa|activame|usa|utiliza|elige|ponte|pon|muestra|muestrate|pasa|pasate|colocate|quiero\s+verte|dejame\s+verte|vuelve|regresa|retorna)\b/.test(said)
   const requestedChange = /^(?:necesito|quiero|quisiera|me\s+gustaria)\s+que\s+(?:(?:me|te)\s+)?(?:cambia|cambias|cambies|cambiaras|cambiar)\b/.test(said)
 
   if (viewContext && (shorthand || directChange || requestedChange)) {

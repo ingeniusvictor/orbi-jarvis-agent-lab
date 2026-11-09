@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -98,6 +99,57 @@ class AdultEnrollmentContractTests(unittest.TestCase):
                 cli.check_photos(originals)
             with self.assertRaises(VaultError):
                 cli.check_photos(originals[:2])
+
+    def test_opt_in_manual_crop_enrollment_has_three_private_in_memory_selections(self):
+        with TemporaryDirectory() as directory:
+            base = Path(directory)
+            images = []
+            for number in range(3):
+                p = base / f"secret_subject_{number}.jpg"
+                p.write_bytes(f"SYNTHETIC-SAMPLE-{number}".encode("ascii"))
+                images.append(str(p))
+            vault = base / "private" / "adult-vault.dpapi"
+            args = SimpleNamespace(
+                photos=images, label="Adulto piloto",
+                manual_crop=True, detector_backend="opencv",
+            )
+            fake_deepface = ModuleType("deepface")
+            fake_deepface.DeepFace = object()
+            with patch.dict(sys.modules, {"deepface": fake_deepface}), \
+                 patch.object(cli, "confirmed") as consent, \
+                 patch.object(cli, "choose_face_crop", side_effect=lambda _p, _slot: "BGR-CROP") as selected, \
+                 patch.object(cli, "extract_single_embedding", return_value=embed(0)) as extracted:
+                result = cli.command_enroll(args, vault, FakeCipher())
+            self.assertTrue(result["saved_encrypted"])
+            self.assertFalse(result["recognition_enabled_in_lumia"])
+            self.assertEqual(selected.call_count, 3)
+            self.assertEqual(extracted.call_count, 3)
+            self.assertTrue(all(c.args[1] == "BGR-CROP" for c in extracted.call_args_list))
+            self.assertTrue(all(c.kwargs["detector_backend"] == "opencv" for c in extracted.call_args_list))
+            consent.assert_called_once()
+            self.assertNotIn(b"secret_subject", vault.read_bytes())
+            self.assertEqual(len(load(vault, FakeCipher())["templates"]), 3)
+
+    def test_enrollment_without_manual_crop_never_opens_gui(self):
+        with TemporaryDirectory() as directory:
+            base = Path(directory)
+            photos=[]
+            for i in range(3):
+                p=base/f"local_{i}.jpg"
+                p.write_bytes(f"SYNTHETIC-{i}".encode())
+                photos.append(str(p))
+            args=SimpleNamespace(photos=photos, label="Adulto piloto",
+                                 manual_crop=False, detector_backend="yunet")
+            fake=ModuleType("deepface")
+            fake.DeepFace=object()
+            with patch.dict(sys.modules, {"deepface":fake}), \
+                 patch.object(cli,"confirmed"), \
+                 patch.object(cli,"choose_face_crop") as crop, \
+                 patch.object(cli,"extract_single_embedding",return_value=embed(1)) as extracted:
+                cli.command_enroll(args,base/"new.dpapi",FakeCipher())
+            crop.assert_not_called()
+            self.assertEqual(extracted.call_count,3)
+            self.assertTrue(all(c.kwargs["detector_backend"]=="yunet" for c in extracted.call_args_list))
 
     def test_no_noninteractive_enrollment_or_deletion(self):
         with patch.object(cli.sys.stdin, "isatty", return_value=False):
