@@ -1,3 +1,7 @@
+> **LUMIA ASUS — continuidad técnica, 9 de noviembre de 2026:** Este README histórico describe el proyecto JARVIS/Claude original, **no** el entorno local piloto de la ASUS. Para estado vigente, pruebas reales SFace, commits, límites, errores corregidos y trabajo pendiente, leer primero [CONTINUIDAD LUMIA VISION-04](docs/lumia-convergence/39-VISION04-CONTINUIDAD-20261109.md). El lanzador ASUS habitual usa Ollama/Qwen3.5 2B, Whisper y Kokoro; el reconocimiento por identidad sigue desactivado. Los PR #74–#77 permanecen en borrador y main no se ha fusionado.
+
+---
+
 # J.A.R.V.I.S.
 
 A browser voice assistant with an Iron Man holographic interface. Say
