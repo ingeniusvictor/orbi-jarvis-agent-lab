@@ -30,6 +30,10 @@ jobs:
           node scripts/certify-lumia-grounded-claims-rc03.mjs
       - name: Certify PH01 head routing and voice events
         run: node scripts/certify-lumia-head-ph01.mjs
+      - name: ASUS real voice commands - model inventory and avatar routing regression
+        run: |
+          node scripts/certify-amr-model-runtime.mjs
+          npx tsx scripts/certify-lumia-avatar-presence-ph04.ts
       - name: Verify legacy avatar still certified
         run: node scripts/certify-lumia-avatar-asset.mjs
       - name: Reject private VRM and Mixamo assets
