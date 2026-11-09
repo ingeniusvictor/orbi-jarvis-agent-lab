@@ -46,6 +46,12 @@ def safe_failure(err: Exception) -> dict[str, Any]:
         "BAD_EMBEDDING": "SFace no devolvió exactamente 128 valores numéricos finitos.",
         "MODEL_RUNTIME_ERROR": "Falló el detector o SFace; verifica pesos y dependencias locales.",
         "VERIFY_RUNTIME_ERROR": "Falló la comparación de embeddings; revisa el entorno local.",
+        "CROP_CANCELLED": "Se canceló la selección manual. No se procesó esa foto.",
+        "CROP_TOO_SMALL": "Selecciona un recuadro que abarque frente, ojos y mentón.",
+        "CROP_INVALID": "El recuadro no es válido; inténtalo nuevamente.",
+        "PHOTO_READ_ERROR": "No se pudo abrir esta fotografía para recorte.",
+        "PHOTO_TOO_LARGE": "La imagen supera el límite de píxeles del recorte.",
+        "GUI_UNAVAILABLE": "No se pudo iniciar la ventana de recorte en Windows.",
     }
     return {
         "lab": "VISION-04B",
@@ -169,6 +175,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--doctor", action="store_true", help="Comprueba el entorno sin cargar fotos")
     parser.add_argument("--image-a", help="Fotografía autorizada de un adulto (primera)")
     parser.add_argument("--image-b", help="Fotografía autorizada de un adulto (segunda)")
+    parser.add_argument("--manual-crop-a", action="store_true",
+                        help="Seleccionar con mouse un SOLO rostro en A; recorte solo RAM")
+    parser.add_argument("--manual-crop-b", action="store_true",
+                        help="Seleccionar con mouse un SOLO rostro en B; recorte solo RAM")
     parser.add_argument(
         "--detector-backend", choices=("opencv", "yunet"), default="opencv",
         help="opencv=Haar inicial; yunet=alternativa OpenCV ONNX para rostros difíciles",
@@ -176,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if not args.doctor and (not args.image_a or not args.image_b):
         parser.error("Indica --image-a y --image-b, o solamente --doctor")
-    if args.doctor and (args.image_a or args.image_b):
+    if args.doctor and (args.image_a or args.image_b or args.manual_crop_a or args.manual_crop_b):
         parser.error("--doctor no debe recibir fotografías")
     configure_cpu_environment()
     try:
@@ -194,9 +204,22 @@ def main(argv: list[str] | None = None) -> int:
         photo_b = validate_photo(args.image_b, "B")
         if photo_a == photo_b:
             raise LabError("Selecciona dos fotografías distintas.", code="SAME_IMAGE")
+        if args.manual_crop_a or args.manual_crop_b:
+            from face_crop_gui import CropError, choose_face_crop
+            def choose(photo_path: str, slot: str):
+                try:
+                    return choose_face_crop(photo_path, slot)
+                except CropError as exc:
+                    raise LabError("Recorte interrumpido.", code=exc.code, photo=slot) from None
+            if args.manual_crop_a:
+                photo_a = choose(photo_a, "A")
+            if args.manual_crop_b:
+                photo_b = choose(photo_b, "B")
         from deepface import DeepFace
-        # All image bytes and embeddings remain within this process.
+        # A manual crop is a BGR numpy image, not a new file. Detection is mandatory.
         result = evaluate_pair(DeepFace, photo_a, photo_b, args.detector_backend)
+        result["manual_crop_a"] = bool(args.manual_crop_a)
+        result["manual_crop_b"] = bool(args.manual_crop_b)
         print(json.dumps(result, ensure_ascii=False))
         return 0
     except Exception as err:
