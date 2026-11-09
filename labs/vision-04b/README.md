@@ -60,3 +60,29 @@ El runtime de LUMIA no cambia. Ejecutar el lanzador VI-04A o AMR-03.0 normalment
 ## Open Source Hands
 
 El repositorio `ingeniusvictor/open-source-hands` ya tiene un plan `docs/PLAN-LUMIA-GESTURE.md` (MEMORY → VISION → GESTURE) y LUMIA ya dispone de hand tracking propio. No sustituir `src/lib/hands.ts` ni abrir otra webcam: el futuro adaptador solo debe consumir landmarks existentes. Este incremento no realiza esa integración.
+
+## Diagnóstico privado de primera comparación (FIX-VI04B-01)
+
+Al probar dos fotos reales, `verify_pair.py` antes ocultaba **todos** los errores como `LabError`. Ahora indica `error_code` y `photo: "A"|"B"` sin revelar rutas, caras, nombres ni vectores:
+
+- `NO_FACE_DETECTED`: Haar/OpenCV no detectó una cara suficientemente frontal en la fotografía indicada. No confundir con que SFace no funciona. Intenta otra foto con buena luz o el detector alternativo `yunet`.
+- `MULTIPLE_FACES`: hay dos o más caras detectadas; utiliza una imagen con una sola persona.
+- `PHOTO_NOT_FOUND`, `PHOTO_UNSUPPORTED`, `PHOTO_SIZE_INVALID` o `SAME_IMAGE`: problema local con la selección de archivos.
+- `BAD_EMBEDDING`: SFace devolvió un vector no finito o de dimensión distinta de 128.
+- `MODEL_RUNTIME_ERROR` o `VERIFY_RUNTIME_ERROR`: error del modelo o de la verificación; no se imprime el mensaje original porque DeepFace puede incluir rutas privadas.
+
+```powershell
+cd C:\Users\ingvm\LUMIA-ASUS
+$labPython = "$env:LOCALAPPDATA\ORBI\LUMIA-FACE-LAB-VI04B\.venv\Scripts\python.exe"
+& $labPython ".\labs\vision-04b\verify_pair.py" --image-a $foto1 --image-b $foto2
+```
+
+El programa sigue rechazando cualquier foto sin cara o con varias. **NO usar `enforce_detection=False` ni `detector_backend=skip`**, pues permitirían comparar la imagen completa en lugar de una cara detectada.
+
+Si el resultado acusa `NO_FACE_DETECTED`, el fork DeepFace revisado ofrece una alternativa con YuNet, usando ONNX en CPU. Se activa solo al solicitarla y puede descargar pesos oficiales adicionales en la primera prueba:
+
+```powershell
+& $labPython ".\labs\vision-04b\verify_pair.py" --image-a $foto1 --image-b $foto2 --detector-backend yunet
+```
+
+No se instaló otro cerebro ni se cambió el servidor LUMIA. Un resultado `match_candidate` es solo diagnóstico experimental, **no una identidad real confirmada**.
