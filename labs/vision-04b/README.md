@@ -128,3 +128,36 @@ Write-Host "Mismos bytes:" $mismosBytes
 Si `Mismos bytes: True`, selecciona una **segunda captura genuinamente distinta de la misma persona adulta**; es inválido usar la misma imagen dos veces. Si aparece `False` pero las dos ventanas muestran la misma escena, inspecciona por separado los dos archivos originales: el hash solo detecta duplicados exactos, no imágenes recomprimidas o capturas equivalentes. En ese caso tampoco se valida la prueba positiva hasta confirmar dos fotografías independientes.
 
 Después del control, repetir `--manual-crop-a --manual-crop-b` con la selección correcta. El objetivo es comparar dos tomas realmente diferentes, no demostrar que una imagen coincide consigo misma.
+
+## VI-04C.0/VI-04C.1 en ASUS: recorte manual opcional para registro y calibración
+
+Tras completar dos ensayos físicos de comparación con **recortes manuales** (misma persona, dos capturas diferentes: distancia 0.27631; personas diferentes: 1.00394), se habilitó el mismo recorte **opt-in** en los comandos de registro cifrado y calibración.
+
+**El registro sigue apagado por defecto.** Los comandos no se ejecutan al iniciar LUMIA. No se usa webcam ni se envían fotografías a GitHub. Solo adultos con consentimiento expreso; los controles no prueban identidad ni presencia real.
+
+Para una prueba de registro privado **voluntaria** en la ASUS:
+
+1. Preparar tres fotografías realmente distintas, tomadas en momentos/ángulos diferentes, de un mismo adulto que consiente. Mantenerlas **fuera del repositorio Git**. No incluir niños ni otras personas en esos recortes.
+2. Revisar si existe ya un perfil: 
+   `& $labPython ".\labs\vision-04b\adult_enrollment.py" status`
+3. Si no existe y el adulto consiente, usar:
+   `& $labPython ".\labs\vision-04b\adult_enrollment.py" enroll --label "Adulto piloto" --photos $f1 $f2 $f3 --manual-crop --detector-backend opencv`
+4. Confirmar interactiva y literalmente `ACEPTO REGISTRAR MI ROSTRO`. Recién entonces aparecerán las **tres** ventanas de selección manual. Cancelar aborta la operación sin guardar el registro.
+5. Si hay éxito, únicamente se almacenan 3 embeddings normalizados cifrados con DPAPI/current user en `%LOCALAPPDATA%\ORBI\LUMIA-FACE-LAB-VI04B\adult-vault.dpapi`. Los archivos originales no son copiados ni modificados. Se requiere permiso de adulto real, no solo una cadena escrita por otra persona.
+6. El registro nunca informa `identity_confirmed=true` ni habilita reconocimiento en vivo.
+7. Si el titular desea borrarlo: `& $labPython ".\labs\vision-04b\adult_enrollment.py" forget`, aceptar la frase exacta `ELIMINAR REGISTRO FACIAL`. El borrado lógico no garantiza borrado seguro de los bloques SSD.
+
+La extracción de SFace sigue requiriendo un rostro real, exactamente uno, aun después del recorte. `enforce_detection=True`, `max_faces=None`. El flag de recorte no implica detección automática.
+
+Para la **calibración experimental**, solo después del registro voluntario, preparar un conjunto distinto: carpeta `genuine` con al menos seis fotos nuevas del adulto registrado y carpeta `unknown` con al menos **tres subcarpetas de otros adultos distintos**, cada una con mínimo cuatro fotografías con consentimiento. Ninguna imagen debe coincidir con las tres usadas en el registro. Guardar todo fuera de Git:
+
+```powershell
+& $labPython ".\labs\vision-04b\calibrate_open_set.py" `
+   --genuine-dir $directorioConocido `
+   --unknown-dir $directorioDesconocidos `
+   --manual-crop --detector-backend opencv
+```
+
+Se pide una nueva frase de autorización: `ACEPTO CALIBRAR ROSTROS ADULTOS`. La interfaz recortará las fotos **una por una en RAM**; el proceso no genera copias nuevas ni un dataset dentro de Git. Solo salen métricas agregadas, un umbral candidato y el indicador experimental de separación. La cantidad mínima de fotografías **no prueba precisión poblacional**. Nada se activa automáticamente en LUMIA.
+
+**Puertas restantes:** validar el registro y calibración *real* en ASUS; calibrar detección automática sin recortes, evaluar condiciones de luz/movimiento, falsas aceptaciones/rechazos, anti-spoofing/liveness y CPU frente a la voz. Mantener PR en borrador y `main` intacta hasta superar esas pruebas.
