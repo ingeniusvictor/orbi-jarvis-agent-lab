@@ -19,7 +19,7 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 if (-not (Test-Path $clone)) {
     Write-Host 'Clonando DeepFace en laboratorio aislado (no modifica tu fork remoto)...'
-    git clone --no-checkout $repoUrl $clone
+    git clone $repoUrl $clone
     if ($LASTEXITCODE -ne 0) { throw 'Falló la descarga del fork.' }
 }
 if (-not (Test-Path (Join-Path $clone '.git'))) {
