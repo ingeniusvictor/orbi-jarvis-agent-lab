@@ -105,6 +105,41 @@ assert.equal(
 
 
 
+// QA 2026-11-09: *actual* Whisper Spanish transcripts, not invented success.
+const installedAsus = [
+  'qwen3.5:4b-vision4096',
+  'qwen3.5:4b-fast',
+  'qwen3.8:4b-gpu',
+  'qwen3.5:2b-q4_K_M',
+]
+assert.equal(resolveModelRequest('Qwen 2B',installedAsus),'qwen3.5:2b-q4_K_M')
+assert.equal(resolveModelRequest('Qwen 3.5, 2B',installedAsus),'qwen3.5:2b-q4_K_M')
+assert.equal(resolveModelRequest('Qwen 4B',installedAsus),'qwen3.5:4b-vision4096')
+for(const said of [
+  'Lumi, ¿puedes verificar cuántos tipos de IA local tienes para cambiar y actualizar?',
+  'Lumi, cuantas IA locales disponibles tienes para cambiar.',
+  'Lumi, cambiamos y entrenamos cuatro tipos de IA local para poder cambiar entre una y otra cuando la necesitemos. Quiero saber cuántas IA local tiene disponible.',
+]) {
+  assert.deepEqual(parseModelControl(said),{action:'count'},'Real ASUS inventory question: '+said)
+}
+assert.deepEqual(
+  parseModelControl('Lumia cambia a Qwen 2B.'),
+  {action:'switch',requested:'Qwen 2B'},
+)
+assert.deepEqual(
+  parseModelControl('Lumia cambia a Qwen 3.5, 2B.'),
+  {action:'switch',requested:'Qwen 3.5, 2B'},
+)
+for(const said of [
+  'Lumiar cambia a la versión de medio cuerpo.',
+  'Silumia, usa la vista de medio cuerpo.',
+  'Lumi cambia a la vista de solo rostro.',
+  'Lumia, preparamos para ti tres formas de visualizar la forma de solo rostro, la forma medio cuerpo y la forma de cuerpo completo. Puedes corroborar eso?',
+  'Lumi, no cambies al modelo 4B.',
+  'Cuántas inteligencias artificiales existen en el mundo?',
+  'Lumi, cambia a la vista de Qwen 4B.', // mixed domains: never switch implicitly
+]) assert.equal(parseModelControl(said),null,'Not a model switch: '+said)
+
 const before = getActiveModel()
 setActiveModel('qwen3:1.7b')
 
