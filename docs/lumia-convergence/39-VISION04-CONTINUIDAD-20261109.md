@@ -1,5 +1,8 @@
 # LUMIA — CONTINUIDAD CANÓNICA / HANDOFF VISION-04 (2026-11-09)
 
+> **ACTUALIZACIÓN CRÍTICA POSTERIOR — VQ-02 (09-11-2026):** Los últimos ensayos reales revelaron fallos de comprensión de órdenes de inventario Ollama («cuántas IA locales»), `Qwen 2B` y cambio de vistas del avatar («Lumiar», «Silumia», «medio cuerpo»), pese a la buena velocidad inicial de respuesta. Se corrigieron parsers y se añadieron regresiones CI, **pero falta la confirmación física en ASUS**. Las pausas Kokoro/WAV de 3–6 s siguen pendientes. **Leer obligatoriamente también [40-VQ02-COMPRENSION-COMANDOS-ASUS-20261109.md](40-VQ02-COMPRENSION-COMANDOS-ASUS-20261109.md) antes de seguir desarrollando.** No suponer que la sesión integrada anterior pasó sin problemas.
+
+
 > **Leer primero en un chat nuevo o antes de modificar LUMIA.** Este documento fija lo realmente implementado, probado y pendiente al cierre de la sesión del 9 de noviembre de 2026, hora de Chile. Se redactó con la evidencia aportada por el usuario en la ASUS, los scripts del repositorio y las ejecuciones de GitHub Actions. No contiene fotos, rutas privadas de fotos, embeddings, etiquetas personales ni secretos.
 >
 > **REGLA:** No confundir CI sintética, ejecución real de comparación de pares y QA del sistema completo. No afirmar identidad confirmada, reconocimiento en vivo ni calidad biométrica certificada.
