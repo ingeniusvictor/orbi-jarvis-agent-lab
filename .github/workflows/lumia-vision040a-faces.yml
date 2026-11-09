@@ -1,0 +1,33 @@
+name: LUMIA VISION-04A — Face Detection CPU
+on:
+  pull_request:
+    paths:
+      - 'src/lib/vision-faces-vi04.ts'
+      - 'src/lib/vision-face-worker-vi04.ts'
+      - 'src/ui/LumiaCameraViewfinder.tsx'
+      - 'src/App.tsx'
+      - 'src/index.css'
+      - 'scripts/certify-lumia-vision040a-faces.ts'
+      - 'scripts/install-lumia-face-model-vi04.mjs'
+      - 'INICIAR_LUMIA_ASUS_ROSTROS_VI040A.cmd'
+      - '.github/workflows/lumia-vision040a-faces.yml'
+  workflow_dispatch:
+jobs:
+  certify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
+      - run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
+      - run: npx tsx scripts/certify-lumia-vision032-sentinel-cpu.ts
+      - run: npx tsx scripts/certify-lumia-vision031-active-session.ts
+      - run: npm run build

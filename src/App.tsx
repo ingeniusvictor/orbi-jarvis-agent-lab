@@ -118,6 +118,9 @@ const VISION_ACTIVE_VI031_ENABLED = import.meta.env.VITE_LUMIA_VISION_ACTIVE_VI0
 const VISION_SENTINEL_VI032_ENABLED = VISION_ACTIVE_VI031_ENABLED &&
   import.meta.env.VITE_LUMIA_VISION_SENTINEL_VI032 === '1'
 const VISION_FRESH_VOICE_VI032B_ENABLED = import.meta.env.VITE_LUMIA_VISION_FRESH_VOICE_VI032B === '1'
+/** VI-04A: explicit facial presence detector; not a biometric identity recognizer. */
+const VISION_FACE_DETECTOR_VI04A_ENABLED = VISION_ACTIVE_VI031_ENABLED &&
+  import.meta.env.VITE_LUMIA_VISION_FACES_VI04A === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -1847,6 +1850,7 @@ export default function App() {
           onCaptured={analyzeCameraViewfinderFrame}
           visionActiveAvailable={VISION_ACTIVE_VI031_ENABLED}
           sentinelAvailable={VISION_SENTINEL_VI032_ENABLED}
+          faceDetectorAvailable={VISION_FACE_DETECTOR_VI04A_ENABLED}
           onActiveVisionChange={changeActiveVision}
           onActiveVisionFrame={receiveActiveVisionFrame}
           onRegisterActiveCapture={registerActiveVisionCapture}

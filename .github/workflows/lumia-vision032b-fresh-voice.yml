@@ -23,6 +23,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      # VI-04A stacked feature: enforce face-count regression on the proven voice pipeline.
+      - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
       - run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
       - run: npx tsx scripts/certify-lumia-vision032-sentinel-cpu.ts
       - run: npx tsx scripts/certify-lumia-vision031-active-session.ts

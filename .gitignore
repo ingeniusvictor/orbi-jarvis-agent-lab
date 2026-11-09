@@ -38,3 +38,7 @@ public/models/lumia-motion/*.vrm
 # Motion R8 private Mixamo clip assets (17 approved FBX), never publish.
 public/models/lumia-motion/clips/
 
+
+# VI-04A: locally downloaded Google BlazeFace weights (not committed)
+public/models/vision/*.tflite
+public/models/vision/*.partial-*

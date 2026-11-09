@@ -17,6 +17,7 @@ import type {VisionReplyMode} from '../lib/vision-context-vi023'
 import {chooseVisionResolution} from '../lib/vision-routing-amr024'
 import {ACTIVE_VISION_SAMPLE_MS,ACTIVE_VISION_MAX_SESSION_MS,type ActiveVisionFrame} from '../lib/vision-active-vi031'
 import {OpticalSentinel,SENTINEL_WIDTH,SENTINEL_HEIGHT,SENTINEL_INTERVAL_MS,toSentinelLuma,type SentinelZone} from '../lib/vision-sentinel-vi032'
+import {FaceCountGate,FACE_DETECTOR_INTERVAL_MS,FACE_DETECTOR_MAX_WIDTH,FACE_DETECTOR_MAX_HEIGHT,type FaceBox} from '../lib/vision-faces-vi04'
 
 type Props={
   live:boolean
@@ -26,6 +27,7 @@ type Props={
   onCaptured:(image:LocalVisualImage,resolution:VisionResolution)=>void
   visionActiveAvailable:boolean
   sentinelAvailable:boolean
+  faceDetectorAvailable:boolean
   onActiveVisionChange:(active:boolean)=>void
   onActiveVisionFrame:(image:LocalVisualImage,resolution:VisionResolution,at:number)=>void
   onRegisterActiveCapture:(fn:(()=>ActiveVisionFrame|null)|null)=>void
@@ -52,7 +54,7 @@ type Props={
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
-  visionActiveAvailable,sentinelAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,onRegisterActiveCapture,
+  visionActiveAvailable,sentinelAvailable,faceDetectorAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,onRegisterActiveCapture,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
   visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
   visualDetailOffer,visualDetailPurpose,visualDetailBusy,onRequestDetailedReanalysis,
@@ -85,6 +87,15 @@ export function LumiaCameraViewfinder({
   const [sentinelEvents,setSentinelEvents]=useState(0)
   const [visionActive,setVisionActive]=useState(false)
   const [visionSamples,setVisionSamples]=useState(0)
+  const faceGateRef=useRef(new FaceCountGate())
+  const faceLastLoggedRef=useRef<number|null>(null)
+  const [faceEnabled,setFaceEnabled]=useState(false)
+  const [faceStatus,setFaceStatus]=useState<'off'|'loading'|'ready'|'error'>('off')
+  const [faceError,setFaceError]=useState('')
+  const [faceBoxes,setFaceBoxes]=useState<FaceBox[]>([])
+  const [faceCount,setFaceCount]=useState<number|null>(null)
+  const [faceLatency,setFaceLatency]=useState<number|null>(null)
+  const [faceVideoSize,setFaceVideoSize]=useState({width:1280,height:720})
   const [ready,setReady]=useState(false)
   const [error,setError]=useState('')
   const [devices,setDevices]=useState<Array<{deviceId:string;label:string}>>([])
@@ -104,6 +115,10 @@ export function LumiaCameraViewfinder({
     if(sentinelTimerRef.current!==null){window.clearInterval(sentinelTimerRef.current);sentinelTimerRef.current=null}
     sentinelRef.current.reset()
     sentinelCanvasRef.current=null
+    setFaceEnabled(false)
+    faceGateRef.current.reset()
+    setFaceBoxes([])
+    setFaceCount(null)
     const wasActive=activeRef.current
     activeRef.current=false
     if(wasActive){onActiveRef.current(false);setVisionActive(false)}
@@ -181,6 +196,7 @@ export function LumiaCameraViewfinder({
       await video.play()
       if(cancelled){release();return}
       setActiveSource(camera.getCurrentCameraSource()?.label??'Cámara sin nombre')
+      setFaceVideoSize({width:video.videoWidth||1280,height:video.videoHeight||720})
       setReady(true)
       try{
         const detected=await camera.listCameraDevices()
@@ -218,6 +234,100 @@ export function LumiaCameraViewfinder({
       if(releaseRef.current===release)releaseRef.current=null
     }
   },[live,deviceChoice])
+
+  // VISION-04A: FaceDetector runs in a dedicated Web Worker on the CPU.
+  // It NEVER requests its own camera, performs recognition, or records faces.
+  useEffect(()=>{
+    if(!faceDetectorAvailable||!faceEnabled||!live||!visionActive||!ready)return
+    let cancelled=false
+    let workerReady=false
+    let busy=false
+    let sequence=0
+    let sampleTimer:number|null=null
+    let responseTimer:number|null=null
+    const worker=new Worker(new URL('../lib/vision-face-worker-vi04.ts',import.meta.url),{type:'module'})
+    faceGateRef.current.reset()
+    faceLastLoggedRef.current=null
+    setFaceCount(null)
+    setFaceBoxes([])
+    setFaceError('')
+    setFaceStatus('loading')
+
+    const fail=(reason:string)=>{
+      if(cancelled)return
+      workerReady=false
+      setFaceStatus('error')
+      setFaceError(reason.slice(0,160))
+      setFaceBoxes([])
+      setFaceCount(null)
+      if(sampleTimer!==null){window.clearInterval(sampleTimer);sampleTimer=null}
+      if(responseTimer!==null){window.clearTimeout(responseTimer);responseTimer=null}
+      worker.terminate()
+    }
+    const sample=async()=>{
+      if(cancelled||!workerReady||busy||document.visibilityState!=='visible')return
+      const video=videoRef.current
+      if(!video||video.readyState<2||video.videoWidth===0||video.videoHeight===0)return
+      busy=true
+      try{
+        const scale=Math.min(1,FACE_DETECTOR_MAX_WIDTH/video.videoWidth,
+          FACE_DETECTOR_MAX_HEIGHT/video.videoHeight)
+        const width=Math.max(1,Math.round(video.videoWidth*scale))
+        const height=Math.max(1,Math.round(video.videoHeight*scale))
+        const bitmap=await createImageBitmap(video,{
+          resizeWidth:width,resizeHeight:height,resizeQuality:'medium',
+        })
+        if(cancelled||!workerReady){bitmap.close();busy=false;return}
+        worker.postMessage({
+          type:'FRAME',bitmap,timestampMs:performance.now(),sequence:++sequence,
+        },[bitmap])
+        responseTimer=window.setTimeout(()=>fail('La detección facial tardó demasiado y fue detenida.'),6_000)
+      }catch(err){
+        busy=false
+        fail(err instanceof Error?err.message:'No pude preparar el video para el detector.')
+      }
+    }
+    worker.onmessage=(event:MessageEvent<{
+      type:string;sequence?:number;faces?:FaceBox[];elapsedMs?:number;message?:string
+    }>)=>{
+      if(cancelled)return
+      const msg=event.data
+      if(msg.type==='READY'){
+        workerReady=true
+        setFaceStatus('ready')
+        void sample()
+        sampleTimer=window.setInterval(()=>{void sample()},FACE_DETECTOR_INTERVAL_MS)
+      }else if(msg.type==='RESULT'){
+        if(responseTimer!==null){window.clearTimeout(responseTimer);responseTimer=null}
+        busy=false
+        if(msg.sequence!==sequence||!Array.isArray(msg.faces))return
+        setFaceBoxes(msg.faces)
+        const confirmed=faceGateRef.current.observe(msg.faces.length,Date.now())
+        setFaceCount(confirmed)
+        setFaceLatency(Number.isFinite(msg.elapsedMs)?Math.round(msg.elapsedMs!):null)
+        if(confirmed!==null && confirmed!==faceLastLoggedRef.current){
+          faceLastLoggedRef.current=confirmed
+          // Count and runtime only. No face images, landmarks or identity data.
+          console.info('[lumia:vision-vi04a]',JSON.stringify({
+            faceCount:confirmed,
+            inferenceMs:Number.isFinite(msg.elapsedMs)?Math.round(msg.elapsedMs!):null,
+            processor:'cpu',
+          }))
+        }
+      }else if(msg.type==='ERROR'){
+        fail(msg.message||'No se pudo ejecutar el detector facial.')
+      }
+    }
+    worker.onerror=()=>fail('Falló el proceso local de detección facial.')
+    worker.postMessage({type:'INIT'})
+    return ()=>{
+      cancelled=true
+      if(sampleTimer!==null)window.clearInterval(sampleTimer)
+      if(responseTimer!==null)window.clearTimeout(responseTimer)
+      worker.terminate()
+      faceGateRef.current.reset()
+    }
+  },[faceDetectorAvailable,faceEnabled,live,visionActive,ready])
 
   const close=()=>{
     endActive()
@@ -380,6 +490,35 @@ export function LumiaCameraViewfinder({
           <small>Detecta cambios ópticos, no personas. Cerebro 2B predeterminado, análisis solo al preguntar.</small>
         </div>
       )}
+      {live&&faceDetectorAvailable&&visionActive&&(
+        <div className="lumia-face-detector-panel" role="group" aria-label="Detección local de rostros">
+          <div className="lumia-face-detector-head">
+            <button type="button" aria-pressed={faceEnabled}
+              onClick={()=>{
+                if(faceEnabled){
+                  setFaceEnabled(false)
+                  setFaceStatus('off')
+                  setFaceBoxes([])
+                  setFaceCount(null)
+                  setFaceError('')
+                }else{
+                  setFaceEnabled(true)
+                }
+              }}>{faceEnabled?'Detener detector facial':'Detectar rostros · CPU'}</button>
+            <span role="status">
+              {!faceEnabled?'Apagado':faceStatus==='loading'?'Cargando modelo local…'
+                :faceStatus==='error'?'Error de detector'
+                :faceCount===null?'Confirmando rostros…'
+                :faceCount===1?'1 rostro detectado':faceCount+' rostros detectados'}
+            </span>
+          </div>
+          {faceEnabled&&faceStatus==='ready'&&faceLatency!==null&&(
+            <small>MediaPipe CPU · último análisis: {faceLatency} ms · sin identificación personal</small>
+          )}
+          {faceError&&<p role="alert" className="lumia-face-detector-error">{faceError}</p>}
+          <small>Solo detecta rostros presentes; todavía no reconoce nombres.</small>
+        </div>
+      )}
       <div className="lumia-camera-source">
         {live ? (
           <>
@@ -463,6 +602,25 @@ export function LumiaCameraViewfinder({
               <svg className="lumia-vision-sentinel-overlay" viewBox="0 0 100 100"
                 preserveAspectRatio="none" aria-hidden="true">
                 <polygon points="16,15 84,15 84,88 16,88"/>
+              </svg>
+            )}
+            {visionActive&&faceEnabled&&faceStatus==='ready'&&faceBoxes.length>0&&(
+              <svg className="lumia-face-detector-overlay"
+                viewBox={`0 0 ${faceVideoSize.width} ${faceVideoSize.height}`}
+                preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                {faceBoxes.map((face,i)=>(
+                  <g key={i}>
+                    <rect x={face.x*faceVideoSize.width}
+                      y={face.y*faceVideoSize.height}
+                      width={face.width*faceVideoSize.width}
+                      height={face.height*faceVideoSize.height}/>
+                    <text x={face.x*faceVideoSize.width}
+                      y={Math.max(20,face.y*faceVideoSize.height-5)}
+                      fontSize={Math.max(13,faceVideoSize.width/60)}>
+                      Rostro {i+1}
+                    </text>
+                  </g>
+                ))}
               </svg>
             )}
           </>
