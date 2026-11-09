@@ -3115,6 +3115,32 @@ kbd {
   font-family: 'Chakra Petch', system-ui, sans-serif;
   pointer-events: auto;
 }
+/* VI-03.1: the owner control stays above the preview, no scrolling required. */
+.lumia-vision-active-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 7px;
+  border: 1px solid rgba(99, 217, 232, .32);
+  border-radius: 9px;
+  background: rgba(11, 64, 80, .45);
+}
+.lumia-vision-active-bar button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(139, 237, 247, .7);
+  border-radius: 6px;
+  background: rgba(48, 170, 191, .25);
+  color: #c9f9ff;
+  padding: 6px 8px;
+  cursor: pointer;
+  font: 700 10px/1.2 system-ui,sans-serif;
+}
+.lumia-vision-active-bar button:disabled { opacity: .45; cursor: not-allowed; }
+.lumia-vision-active-bar span {
+  color: #a8eaf5;
+  font: 10px/1.35 system-ui,sans-serif;
+}
 .lumia-camera-viewfinder-head {
   display: flex;
   align-items: center;
