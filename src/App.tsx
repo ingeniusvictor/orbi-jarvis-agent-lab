@@ -413,7 +413,9 @@ export default function App() {
         shouldOfferGroupDetail(visualQuestion,frameSource.resolution,
           VISION_ADAPTIVE_AMR027_ENABLED && visionAutoEnabled))
       let contextualReply:string|null=activeFrameMissing
-        ? 'La visión activa aún no tiene un fotograma reciente disponible. Comprueba que la cámara funciona o vuelve a activar la sesión.'
+        ? activeVisionAuthorized.current
+          ? 'La visión activa está encendida, pero no pude capturar una imagen actual. Revisa la webcam; no voy a describir una foto antigua como si fuera nueva.'
+          : 'La visión activa está apagada o terminó su sesión. Abre LUMIA VISION y pulsa Activar visión para que pueda mirar nuevamente. No puedo comprobar qué hay frente a la cámara ahora.'
         : activeVisionQuestion && asksActiveVisionChange(said)
         ? 'Tengo una captura reciente, pero no una comparación verificada entre dos instantes. Por eso no puedo asegurar qué cambió o si el objeto sigue igual. Puedo describir lo que se ve ahora.'
         : null
@@ -556,9 +558,11 @@ export default function App() {
             (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')+
             (visionTracingEnabled()?visualPrecisionInstruction(visualQuestion):'')
           : visualImage
-          ? (cameraIntent || cameraRequested || fromCameraPreview || liveFrame
+          ? (liveFrame && VISION_FRESH_VOICE_VI032B_ENABLED
+              ? cameraVisionPrompt(freshCameraScenePrompt(said,voiceIntent==='visual-correction'))
+              : cameraIntent || cameraRequested || fromCameraPreview || liveFrame
               ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
-              (liveFrame ? ' Este es solo el fotograma más reciente de la sesión autorizada, no vídeo ni percepción continua. No atribuyas movimiento, cambios o persistencia de personas u objetos respecto de momentos anteriores sin comparar dos imágenes. ' : '') +
+              (liveFrame ? ' Es un único fotograma actual, no vídeo. No atribuyas movimiento ni cambios entre instantes sin comparar dos imágenes. ' : '') +
               visualReliabilityInstruction(cameraIntent?.question ?? said) +
               visualModeInstruction(visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
               (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')+
