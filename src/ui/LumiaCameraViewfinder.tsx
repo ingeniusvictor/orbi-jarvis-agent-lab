@@ -478,6 +478,35 @@ export function LumiaCameraViewfinder({
           <small>Detecta cambios ópticos, no personas. Cerebro 2B predeterminado, análisis solo al preguntar.</small>
         </div>
       )}
+      {live&&faceDetectorAvailable&&visionActive&&(
+        <div className="lumia-face-detector-panel" role="group" aria-label="Detección local de rostros">
+          <div className="lumia-face-detector-head">
+            <button type="button" aria-pressed={faceEnabled}
+              onClick={()=>{
+                if(faceEnabled){
+                  setFaceEnabled(false)
+                  setFaceStatus('off')
+                  setFaceBoxes([])
+                  setFaceCount(null)
+                  setFaceError('')
+                }else{
+                  setFaceEnabled(true)
+                }
+              }}>{faceEnabled?'Detener detector facial':'Detectar rostros · CPU'}</button>
+            <span role="status">
+              {!faceEnabled?'Apagado':faceStatus==='loading'?'Cargando modelo local…'
+                :faceStatus==='error'?'Error de detector'
+                :faceCount===null?'Confirmando rostros…'
+                :faceCount===1?'1 rostro detectado':faceCount+' rostros detectados'}
+            </span>
+          </div>
+          {faceEnabled&&faceStatus==='ready'&&faceLatency!==null&&(
+            <small>MediaPipe CPU · último análisis: {faceLatency} ms · sin identificación personal</small>
+          )}
+          {faceError&&<p role="alert" className="lumia-face-detector-error">{faceError}</p>}
+          <small>Solo detecta rostros presentes; todavía no reconoce nombres.</small>
+        </div>
+      )}
       <div className="lumia-camera-source">
         {live ? (
           <>
@@ -561,6 +590,25 @@ export function LumiaCameraViewfinder({
               <svg className="lumia-vision-sentinel-overlay" viewBox="0 0 100 100"
                 preserveAspectRatio="none" aria-hidden="true">
                 <polygon points="16,15 84,15 84,88 16,88"/>
+              </svg>
+            )}
+            {visionActive&&faceEnabled&&faceStatus==='ready'&&faceBoxes.length>0&&(
+              <svg className="lumia-face-detector-overlay"
+                viewBox={`0 0 ${faceVideoSize.width} ${faceVideoSize.height}`}
+                preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                {faceBoxes.map((face,i)=>(
+                  <g key={i}>
+                    <rect x={face.x*faceVideoSize.width}
+                      y={face.y*faceVideoSize.height}
+                      width={face.width*faceVideoSize.width}
+                      height={face.height*faceVideoSize.height}/>
+                    <text x={face.x*faceVideoSize.width}
+                      y={Math.max(20,face.y*faceVideoSize.height-5)}
+                      fontSize={Math.max(13,faceVideoSize.width/60)}>
+                      Rostro {i+1}
+                    </text>
+                  </g>
+                ))}
               </svg>
             )}
           </>
