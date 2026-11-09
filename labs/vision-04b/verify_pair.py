@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -21,7 +22,39 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 class LabError(Exception):
-    pass
+    """Only safe structured failure categories, never raw private image paths."""
+
+    def __init__(self, message: str, *, code: str = "LAB_VALIDATION_ERROR", photo: str | None = None):
+        super().__init__(message)
+        self.code = code
+        self.photo = photo if photo in ("A", "B") else None
+
+
+def safe_failure(err: Exception) -> dict[str, Any]:
+    """Output strictly allowlisted keys; DeepFace exception messages can contain paths."""
+    if isinstance(err, LabError):
+        code, photo = err.code, err.photo
+    else:
+        code, photo = "LIBRARY_OR_MODEL_ERROR", None
+    tips = {
+        "PHOTO_NOT_FOUND": "Selecciona una fotografía existente en la ASUS.",
+        "PHOTO_UNSUPPORTED": "Solo se admite JPG, JPEG, PNG o WebP.",
+        "PHOTO_SIZE_INVALID": "Usa una foto entre 1 byte y 12 MB.",
+        "SAME_IMAGE": "Elige dos fotografías diferentes.",
+        "NO_FACE_DETECTED": "El detector no encontró rostro frontal; prueba otra foto o --detector-backend yunet.",
+        "MULTIPLE_FACES": "Hay más de un rostro visible; usa una foto con una sola persona.",
+        "BAD_EMBEDDING": "SFace no devolvió exactamente 128 valores numéricos finitos.",
+        "MODEL_RUNTIME_ERROR": "Falló el detector o SFace; verifica pesos y dependencias locales.",
+        "VERIFY_RUNTIME_ERROR": "Falló la comparación de embeddings; revisa el entorno local.",
+    }
+    return {
+        "lab": "VISION-04B",
+        "ok": False,
+        "error_code": code,
+        "photo": photo,
+        "hint": tips.get(code, "Revisa la instalación y el diagnóstico local."),
+        "privacy": "Sin rutas, nombres, fotos ni embeddings en el diagnóstico.",
+    }
 
 
 def configure_cpu_environment() -> Path:
@@ -36,60 +69,91 @@ def configure_cpu_environment() -> Path:
     return root
 
 
-def validate_photo(raw: str) -> str:
+def validate_photo(raw: str, photo_label: str | None = None) -> str:
     """Never copy, delete or modify the source photo."""
     photo = Path(raw).expanduser().resolve()
     if not photo.is_file():
-        raise LabError("No existe el archivo de fotografía solicitado.")
+        raise LabError("No existe el archivo.", code="PHOTO_NOT_FOUND", photo=photo_label)
     if photo.suffix.lower() not in ALLOWED_EXTENSIONS:
-        raise LabError("Formato no permitido (usa JPG, PNG o WebP).")
+        raise LabError("Formato no permitido.", code="PHOTO_UNSUPPORTED", photo=photo_label)
     if not (1 <= photo.stat().st_size <= MAX_FILE_BYTES):
-        raise LabError("La fotografía supera el límite de 12 MB o está vacía.")
+        raise LabError("Tamaño inválido.", code="PHOTO_SIZE_INVALID", photo=photo_label)
     return str(photo)
 
 
-def extract_single_embedding(deepface: Any, photo: str) -> list[float]:
-    """Abort if the source contains zero or multiple faces; never pick one."""
-    result = deepface.represent(
-        img_path=photo,
-        model_name=MODEL_NAME,
-        detector_backend="opencv",
-        enforce_detection=True,
-        align=True,
-        anti_spoofing=False,
-        max_faces=None,
-        return_face=False,
-    )
-    if len(result) != 1:
-        raise LabError("Se necesita exactamente un rostro en cada imagen.")
+def extract_single_embedding(
+    deepface: Any,
+    photo: str,
+    detector_backend: str = "opencv",
+    photo_label: str | None = None,
+) -> list[float]:
+    """Require exactly one genuine detection, never silently use a whole image."""
+    if detector_backend not in ("opencv", "yunet"):
+        raise LabError("Detector no autorizado.", code="MODEL_RUNTIME_ERROR", photo=photo_label)
+    try:
+        result = deepface.represent(
+            img_path=photo,
+            model_name=MODEL_NAME,
+            detector_backend=detector_backend,
+            enforce_detection=True,  # NEVER switch to False: it fabricates a whole-image face
+            align=True,
+            anti_spoofing=False,
+            max_faces=None,          # NEVER truncate multiple faces to one
+            return_face=False,
+        )
+    except Exception as err:
+        # DeepFace FaceNotDetected includes an absolute photo path in its message.
+        # Classify only by the typed exception name; never echo str(err).
+        category = type(err).__name__
+        if category == "FaceNotDetected":
+            raise LabError("No hubo detección facial.", code="NO_FACE_DETECTED", photo=photo_label) from None
+        raise LabError("Fallo de modelo o imagen.", code="MODEL_RUNTIME_ERROR", photo=photo_label) from None
+
+    if not isinstance(result, list) or len(result) != 1:
+        code = "NO_FACE_DETECTED" if isinstance(result, list) and len(result) == 0 else "MULTIPLE_FACES"
+        raise LabError("Se requiere exactamente un rostro.", code=code, photo=photo_label)
+    if not isinstance(result[0], dict):
+        raise LabError("Salida SFace inválida.", code="BAD_EMBEDDING", photo=photo_label)
     vector = result[0].get("embedding")
-    if vector is None:
-        raise LabError("DeepFace no devolvió representación facial.")
-    # Explicitly convert in memory. Do not serialize facial templates to files.
-    dims = [float(n) for n in vector]
-    if len(dims) != 128:
-        raise LabError("Dimensión de SFace inesperada; no comparar.")
+    try:
+        dims = [float(n) for n in vector]
+    except (TypeError, ValueError, OverflowError):
+        raise LabError("Vector inválido.", code="BAD_EMBEDDING", photo=photo_label) from None
+    if len(dims) != 128 or any(not math.isfinite(n) for n in dims):
+        raise LabError("Vector no válido.", code="BAD_EMBEDDING", photo=photo_label)
     return dims
 
 
-def evaluate_pair(deepface: Any, image_a: str, image_b: str) -> dict[str, Any]:
+def evaluate_pair(
+    deepface: Any,
+    image_a: str,
+    image_b: str,
+    detector_backend: str = "opencv",
+) -> dict[str, Any]:
     start = time.perf_counter()
-    a = extract_single_embedding(deepface, image_a)
-    b = extract_single_embedding(deepface, image_b)
-    result = deepface.verify(
-        img1_path=a,
-        img2_path=b,
-        model_name=MODEL_NAME,
-        distance_metric="cosine",
-        threshold=None,  # DeepFace model-specific threshold; calibration is pending.
-        silent=True,
-    )
-    distance = float(result["distance"])
-    threshold = float(result["threshold"])
+    a = extract_single_embedding(deepface, image_a, detector_backend, "A")
+    b = extract_single_embedding(deepface, image_b, detector_backend, "B")
+    try:
+        result = deepface.verify(
+            img1_path=a,
+            img2_path=b,
+            model_name=MODEL_NAME,
+            distance_metric="cosine",
+            threshold=None,  # Model default: NOT calibrated for ASUS
+            silent=True,
+        )
+        distance = float(result["distance"])
+        threshold = float(result["threshold"])
+        matched = bool(result["verified"])
+        if not math.isfinite(distance) or not math.isfinite(threshold):
+            raise ValueError("Non-finite verification result.")
+    except Exception:
+        raise LabError("No se pudo comparar.", code="VERIFY_RUNTIME_ERROR") from None
     return {
         "mode": "offline-cpu-pair-lab",
         "model": MODEL_NAME,
-        "match_candidate": bool(result["verified"]),
+        "detector": detector_backend,
+        "match_candidate": matched,
         "distance": round(distance, 5),
         "threshold": round(threshold, 5),
         "faces_per_image": 1,
@@ -105,6 +169,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--doctor", action="store_true", help="Comprueba el entorno sin cargar fotos")
     parser.add_argument("--image-a", help="Fotografía autorizada de un adulto (primera)")
     parser.add_argument("--image-b", help="Fotografía autorizada de un adulto (segunda)")
+    parser.add_argument(
+        "--detector-backend", choices=("opencv", "yunet"), default="opencv",
+        help="opencv=Haar inicial; yunet=alternativa OpenCV ONNX para rostros difíciles",
+    )
     args = parser.parse_args(argv)
     if not args.doctor and (not args.image_a or not args.image_b):
         parser.error("Indica --image-a y --image-b, o solamente --doctor")
@@ -122,22 +190,18 @@ def main(argv: list[str] | None = None) -> int:
             }, ensure_ascii=False))
             return 0 if ready else 2
         # Validate both before importing a heavy ML runtime or downloading any weights.
-        photo_a = validate_photo(args.image_a)
-        photo_b = validate_photo(args.image_b)
+        photo_a = validate_photo(args.image_a, "A")
+        photo_b = validate_photo(args.image_b, "B")
         if photo_a == photo_b:
-            raise LabError("Selecciona dos fotografías distintas para la prueba.")
+            raise LabError("Selecciona dos fotografías distintas.", code="SAME_IMAGE")
         from deepface import DeepFace
         # All image bytes and embeddings remain within this process.
-        result = evaluate_pair(DeepFace, photo_a, photo_b)
+        result = evaluate_pair(DeepFace, photo_a, photo_b, args.detector_backend)
         print(json.dumps(result, ensure_ascii=False))
         return 0
     except Exception as err:
         # Do not print file paths, traceback, embeddings or raw image content.
-        print(json.dumps({
-            "lab": "VISION-04B", "ok": False,
-            "error": type(err).__name__,
-            "hint": "Comprueba el entorno, las imágenes (un solo rostro) y el modelo local.",
-        }, ensure_ascii=False), file=sys.stderr)
+        print(json.dumps(safe_failure(err), ensure_ascii=False), file=sys.stderr)
         return 1
 
 
