@@ -278,6 +278,17 @@ export function LumiaCameraViewfinder({
           className={fileMode || (!live && stillSource==='file')?'is-selected':''}
           onClick={onSelectFileMode}>Cargar imagen</button>
       </div>
+      {live&&visionActiveAvailable&&(
+        <div className="lumia-vision-active-bar" role="group" aria-label="Sesión de visión activa">
+          <button type="button" disabled={!ready&&!visionActive}
+            onClick={visionActive?close:beginActive}>
+            {visionActive?'Detener visión':'Activar visión'}
+          </button>
+          <span role="status">{visionActive
+            ? `${visionSamples} capturas · cada 12 s · máximo 3 min`
+            : 'Foto periódica en memoria · análisis solo al preguntar'}</span>
+        </div>
+      )}
       <div className="lumia-camera-source">
         {live ? (
           <>
@@ -394,18 +405,6 @@ export function LumiaCameraViewfinder({
             }}/>
           <p>JPG, PNG o WEBP · máximo 12 MB · se convierte a JPEG localmente.</p>
           {fileError&&<p className="lumia-vision-file-error" role="alert">{fileError}</p>}
-        </section>
-      )}
-      {live&&visionActiveAvailable&&(
-        <section className="lumia-camera-followup" aria-label="Visión activa de LUMIA">
-          <p className="lumia-camera-followup-status" role="status">
-            {visionActive
-              ? `VISIÓN ACTIVA · ${visionSamples} fotograma(s) · nueva imagen cada 12 s · cierre automático en 3 minutos`
-              : 'Visión activa opcional: captura un fotograma cada 12 s en memoria. Solo se analiza cuando preguntes o pulses Analizar ahora.'}
-          </p>
-          {!visionActive&&<button type="button" className="lumia-camera-viewfinder-primary"
-            disabled={!ready} onClick={beginActive}>Activar visión</button>}
-          {visionActive&&<p className="lumia-camera-followup-privacy">Cámara visible · una imagen reciente · sin grabación ni análisis automático · cerrar detiene todo.</p>}
         </section>
       )}
       {signalWarning&&live&&(
