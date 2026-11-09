@@ -326,6 +326,7 @@ export function LumiaCameraViewfinder({
             <button type="button" aria-pressed={visionAutoEnabled}
               className={visionAutoEnabled?'is-selected':''}
               title="Automático conservador: 768 escenas, 1024 para lectura, 512 solo objetos simples"
+              disabled={visionActive}
               onClick={()=>{
                 if(visionAutoEnabled)return
                 onVisionAutoEnabledChange(true)
@@ -337,6 +338,7 @@ export function LumiaCameraViewfinder({
             <button key={edge} type="button" aria-pressed={!visionAutoEnabled && visionResolution===edge}
               className={!visionAutoEnabled && visionResolution===edge?'is-selected':''}
               title={edge===512?'Rápida · objetos grandes':edge===768?'Equilibrada · escenas':'Detallada · textos pequeños'}
+              disabled={visionActive}
               onClick={()=>{
                 if(visionResolution===edge && !visionAutoEnabled)return
                 onVisionAutoEnabledChange(false)
