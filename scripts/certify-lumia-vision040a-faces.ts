@@ -13,16 +13,17 @@ const detections=[
   {boundingBox:{originX:64,originY:36,width:128,height:90},categories:[{score:.92}]},
   {boundingBox:{originX:320,originY:108,width:160,height:144},categories:[{score:.84}]},
 ]
+const near=(a:number,b:number)=>assert.ok(Math.abs(a-b)<1e-9,`Expected ${a} ≈ ${b}`)
 const faces=normalizeDetectedFaces(detections,640,360)
 assert.equal(faces.length,2)
-assert.equal(faces[0].x,.1)
-assert.equal(faces[0].y,.1)
-assert.equal(faces[0].width,.2)
-assert.equal(faces[0].height,.25)
-assert.equal(faces[1].x,.5)
-assert.equal(faces[1].y,.3)
-assert.equal(faces[1].width,.25)
-assert.equal(faces[1].height,.4)
+near(faces[0].x,.1)
+near(faces[0].y,.1)
+near(faces[0].width,.2)
+near(faces[0].height,.25)
+near(faces[1].x,.5)
+near(faces[1].y,.3)
+near(faces[1].width,.25)
+near(faces[1].height,.4)
 assert.equal(normalizeDetectedFaces(detections,0,360).length,0)
 assert.equal(normalizeDetectedFaces(detections,640,0).length,0)
 assert.equal(normalizeDetectedFaces([
