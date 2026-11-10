@@ -46,7 +46,11 @@ def read_pcm16_mono(path: str) -> tuple[bytes, float]:
 
 
 def diarize(pcm16: bytes, segmentation: str, embeddings: str,
-            num_speakers: int = -1, backend=None, numpy_module=None):
+            num_speakers: int = -1, backend=None, numpy_module=None,
+            *, cluster_threshold: float = 0.5):
+    if (not math.isfinite(cluster_threshold) or
+            not 0.0 < cluster_threshold < 1.0):
+        raise LabError("INVALID_CLUSTER_THRESHOLD")
     if backend is None:
         try:
             import sherpa_onnx as backend
@@ -65,7 +69,7 @@ def diarize(pcm16: bytes, segmentation: str, embeddings: str,
         ),
         embedding=backend.SpeakerEmbeddingExtractorConfig(model=embeddings),
         clustering=backend.FastClusteringConfig(
-            num_clusters=num_speakers, threshold=0.5,
+            num_clusters=num_speakers, threshold=cluster_threshold,
         ),
         min_duration_on=0.3,
         min_duration_off=0.5,
@@ -103,6 +107,8 @@ def main(argv=None):
     p.add_argument("--segmentation-model")
     p.add_argument("--embedding-model")
     p.add_argument("--num-speakers", type=int, default=-1)
+    p.add_argument("--cluster-threshold", type=float, default=0.5,
+                   help="Auto-clustering similarity threshold: higher tends to merge more speakers; default 0.5")
     p.add_argument("--consent", action="store_true")
     args = p.parse_args(argv)
     if args.doctor:
@@ -120,6 +126,9 @@ def main(argv=None):
             raise LabError("MISSING_INPUT")
         if args.num_speakers not in (-1, 1, 2, 3, 4):
             raise LabError("INVALID_SPEAKER_COUNT")
+        if (not math.isfinite(args.cluster_threshold) or
+                not 0.0 < args.cluster_threshold < 1.0):
+            raise LabError("INVALID_CLUSTER_THRESHOLD")
         if not (Path(args.segmentation_model).is_file() and
                 Path(args.embedding_model).is_file()):
             raise LabError("MODELS_NOT_FOUND")
@@ -129,10 +138,13 @@ def main(argv=None):
         turns, count = diarize(
             samples, args.segmentation_model,
             args.embedding_model, args.num_speakers,
+            cluster_threshold=args.cluster_threshold,
         )
         print(json.dumps({
             "lab": "VOICE-01", "ok": True, "mode": "offline-cpu-file",
             "duration_s": round(duration, 3),
+            "num_speakers_requested": args.num_speakers,
+            "cluster_threshold": args.cluster_threshold,
             "speaker_count": count,
             "segment_count": len(turns),
             "segments": turns,
