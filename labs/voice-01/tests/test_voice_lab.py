@@ -79,6 +79,26 @@ class VoiceLabTests(unittest.TestCase):
         self.assertEqual(out["reference_overlap_frames_skipped"], 50)
         self.assertEqual(out["error_fraction"], 0)
 
+    def test_empty_prediction_means_missed_speech(self):
+        gold = metrics.parse_rttm(rttm(0, 1, "a"))
+        empty = metrics.parse_rttm("", allow_empty=True)
+        out = metrics.assess(gold, empty)
+        self.assertEqual(out["predicted_speaker_count"], 0)
+        self.assertEqual(out["error_fraction"], 1)
+        self.assertEqual(out["false_alarm_frames"], 0)
+        self.assertGreater(out["miss_frames"], 0)
+
+    def test_long_four_speaker_dataset_permuted(self):
+        # Four distinct IDs swapped; the frame-based score must be zero
+        # without rescanning every audio frame for each permutation.
+        gold = metrics.parse_rttm("\n".join(
+            rttm(i * 15, 15, f"person_{i}") for i in range(4)))
+        pred = metrics.parse_rttm("\n".join(
+            rttm(i * 15, 15, f"anon_{3-i}") for i in range(4)))
+        out = metrics.assess(gold, pred)
+        self.assertEqual(out["error_fraction"], 0)
+        self.assertEqual(out["reference_speaker_count"], 4)
+
     def test_nonfinite_rttm_and_more_than_four_speakers_rejected(self):
         for start in ["-1", "nan", "inf", "1000"]:
             with self.assertRaises(metrics.MetricError):
