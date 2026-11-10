@@ -4,6 +4,8 @@
 
 **QA física:** [VOICE-01B: primer motor y hashes](QA-ASUS-VOICE01B-20261109.md) · [VOICE-01C: conteo automático y próximos gates](QA-ASUS-VOICE01C-20261109.md).
 
+> **ATENCIÓN — VOICE-01D (09-11-2026):** La prueba física ASUS con la muestra pública **de cuatro hablantes** y `--num-speakers -1` estimó **7 voces en lugar de 4** (`segment_count=10`, `elapsed_ms=16451`, archivo 56.861 s). La inferencia terminó con exit 0, pero **la calidad del conteo automático FALLÓ**. Ver [informe de QA y parámetros de agrupamiento](QA-ASUS-VOICE01D-20261109.md). El valor predeterminado `cluster_threshold=0.5` no cambia; el nuevo parámetro experimental `--cluster-threshold` requiere uso explícito. **No dar por certificada la generalización multihablante ni integrar en vivo.**
+
 Seguimiento y continuidad: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78
 
 ## Repositorios elegidos para fork
