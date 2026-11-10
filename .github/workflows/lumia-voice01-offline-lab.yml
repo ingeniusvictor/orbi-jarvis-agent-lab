@@ -65,6 +65,21 @@ jobs:
           & python -c 'import sherpa_onnx; import numpy'
           if ($LASTEXITCODE -ne 0) { throw 'Native Python import expression failed under Windows PowerShell 5.1.' }
           Write-Host 'Windows PowerShell 5.1 Python import quoting PASS (stub modules only).'
+      - name: Windows PowerShell syntax for CAM++ A/B (no downloads)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'labs/voice-01/compare-embeddings-asus.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Out-String | Write-Error
+            exit 1
+          }
+          Write-Host 'VOICE-01G CAM++ A/B script syntax OK; no models or audio accessed.'
       - name: Reject private voice and model files in lab
         shell: bash
         run: |
