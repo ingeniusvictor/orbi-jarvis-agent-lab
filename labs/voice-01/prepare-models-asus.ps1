@@ -116,8 +116,11 @@ if ($Bootstrap) {
 if (-not (Test-Path -LiteralPath $python)) {
     throw 'VOICE-01 Python is missing: run with -Bootstrap.'
 }
-& $python -c 'import sherpa_onnx; import numpy; print("SHERPA ONNX IMPORT OK")'
+# Windows PowerShell 5.1 can strip nested quotes in python -c arguments.
+# Keep the Python expression quote-free; display success from PowerShell.
+& $python -c 'import sherpa_onnx; import numpy'
 RequireSuccess 'verify sherpa'
+Write-Host 'SHERPA ONNX IMPORT OK'
 & $python -B (Join-Path $PSScriptRoot 'offline_diarization.py') --doctor
 RequireSuccess 'offline doctor'
 
