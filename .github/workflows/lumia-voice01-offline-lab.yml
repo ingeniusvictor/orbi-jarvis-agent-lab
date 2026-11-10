@@ -35,6 +35,21 @@ jobs:
         run: python -m unittest discover -s labs/voice-01/tests -p "test_*.py" -v
       - name: Offline doctor without any models installed
         run: python labs/voice-01/offline_diarization.py --doctor
+      - name: ASUS PowerShell script syntax without installation or downloads
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'labs/voice-01/prepare-models-asus.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Out-String | Write-Error
+            exit 1
+          }
+          Write-Host 'VOICE-01 ASUS bootstrap syntax OK; no downloads run.'
       - name: Reject private voice and model files in lab
         shell: bash
         run: |
