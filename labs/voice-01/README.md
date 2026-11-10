@@ -1,8 +1,8 @@
 # LUMIA VOICE-00 / VOICE-01 — Laboratorio multihablante aislado
 
-**Estado (9 nov 2026, actualizado tras prueba ASUS):** laboratorio offline experimental **instalado y probado físicamente en ASUS** con una grabación pública de 16 s y dos hablantes configurados: 4 segmentos y 3.013 s de procesamiento (PASS). **No** está integrado con el micrófono ni con LUMIA en vivo; no se ha validado el descubrimiento automático del número de hablantes ni la precisión mediante anotaciones humanas. No cambia los lanzadores, Whisper.cpp, Kokoro, Qwen3.5 2B, avatar ni permisos de la app. No activa identificación vocal ni facial.
+**Estado (9 nov 2026, VOICE-01C):** laboratorio offline experimental **instalado y probado físicamente en ASUS** con la misma grabación pública de 16 s en dos modalidades: 2 hablantes **fijados** (VOICE-01B: 4 segmentos en 3.013 s) y **estimación automática con `--num-speakers -1`** (VOICE-01C: 2 hablantes, mismos 4 segmentos, 2.352 s). **No** está integrado al micrófono ni a LUMIA en vivo; falta generalización sobre más grabaciones, evaluación contra anotaciones humanas, español, solapamientos y política de destinatario. No cambia los lanzadores, Whisper.cpp, Kokoro, Qwen3.5 2B, avatar ni permisos. No activa identificación vocal ni facial.
 
-**QA real y próximo paso:** [VOICE-01B ASUS, resultados, SHA256 y prueba de conteo automático](QA-ASUS-VOICE01B-20261109.md).
+**QA física:** [VOICE-01B: primer motor y hashes](QA-ASUS-VOICE01B-20261109.md) · [VOICE-01C: conteo automático y próximos gates](QA-ASUS-VOICE01C-20261109.md).
 
 Seguimiento y continuidad: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78
 
@@ -122,4 +122,4 @@ Activos verificados contra GitHub Releases (tamaño publicado, no hash externo):
 
 **Limitación de integridad:** estas versiones antiguas no exponen SHA256 publicado mediante GitHub API. Se verifican tamaños, estructura del archivo tar, formato del modelo y se imprimen hashes SHA256 locales para una auditoría posterior, pero esto NO constituye comparación con un checksum publicado. Los pesos tienen términos separados de la licencia del código; no redistribuirlos sin revisar el origen.
 
-**Completado:** primera ejecución real de una muestra pública en ASUS con `--num-speakers 2`. **Pendiente:** conteo automático `--num-speakers -1`, más grabaciones, anotaciones independientes, medidas RAM/CPU, español y política de destinatario antes de integrar en vivo. No confundir PASS de tests sintéticos con diarización real.
+**Completado:** primera ejecución real de una muestra pública en ASUS con `--num-speakers 2`. **Completado:** conteo automático `--num-speakers -1` en **una muestra pública** con dos hablantes, con segmentos idénticos al ensayo de conteo fijado. **Pendiente:** generalizar a grabaciones diferentes (1/2/4 hablantes), anotaciones independientes, medidas RAM/CPU, español y política de destinatario antes de integrar en vivo. No confundir PASS de tests sintéticos con diarización real.
