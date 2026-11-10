@@ -106,7 +106,15 @@ class VoiceLabTests(unittest.TestCase):
         with self.assertRaises(metrics.MetricError):
             metrics.parse_rttm("\n".join(rttm(0, 1, str(i)) for i in range(5)))
 
+    def test_invalid_cluster_threshold_rejected_before_model_import(self):
+        for invalid in (0.0, -0.1, 1.0, 2.0, float("nan"), float("inf")):
+            with self.subTest(threshold=invalid):
+                with self.assertRaises(voice.LabError) as bad:
+                    voice.diarize(b"\\x00\\x00", "s", "e", cluster_threshold=invalid)
+                self.assertEqual(str(bad.exception), "INVALID_CLUSTER_THRESHOLD")
+
     def test_sherpa_backend_contract_without_models(self):
+        clustering_args = []
         class FakeArray:
             def astype(self, _type):
                 return self
@@ -135,7 +143,8 @@ class VoiceLabTests(unittest.TestCase):
             def SpeakerEmbeddingExtractorConfig(**_):
                 return object()
             @staticmethod
-            def FastClusteringConfig(**_):
+            def FastClusteringConfig(**options):
+                clustering_args.append(options)
                 return object()
             @staticmethod
             def OfflineSpeakerDiarization(_config):
@@ -155,11 +164,13 @@ class VoiceLabTests(unittest.TestCase):
         turns, speakers = voice.diarize(
             make_wav(), "dummy-seg", "dummy-emb",
             backend=FakeSherpa, numpy_module=FakeNumpy,
+            cluster_threshold=0.65,
         )
         self.assertEqual(speakers, 2)
         self.assertEqual([t["speaker"] for t in turns],
                          ["speaker_0", "speaker_1", "speaker_0"])
         self.assertNotIn("9", str(turns))
+        self.assertEqual(clustering_args, [{"num_clusters": -1, "threshold": 0.65}])
 
 
 if __name__ == "__main__":
