@@ -50,33 +50,21 @@ jobs:
             exit 1
           }
           Write-Host 'VOICE-01 ASUS bootstrap syntax OK; no downloads run.'
-      - name: Windows PowerShell 5.1 native Python import check (no model files)
+      - name: Windows PowerShell 5.1 native import quoting regression
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          $source = Get-Content -LiteralPath 'labs/voice-01/prepare-models-asus.ps1' -Raw
-          # Verify the actual import check used by the ASUS installer.
-          $pattern = '^\s*& \$python -c ''([^'']+)''\s*        shell: bash
-        run: |
-          if git ls-files labs/voice-01 | grep -Ei '\.(wav|mp3|flac|ogg|opus|onnx|pt|pth|ckpt|bin|rttm)$'; then
-            echo 'ERROR: private audio or model assets tracked'
-            exit 1
-          fi
-
-          $m = [regex]::Match($source, $pattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
-          if (-not $m.Success) { throw 'The ASUS importer is missing or changed.' }
-          $snippet = $m.Groups[1].Value
-          if ($snippet.Contains('"') -or $snippet.Contains("'")) {
-            throw 'Nested Python literal quotes are unsafe in Windows PowerShell 5.1.'
-          }
+          $needle = '& $python -c ''import sherpa_onnx; import numpy'''
+          $matching = @(Get-Content -LiteralPath 'labs/voice-01/prepare-models-asus.ps1' | Where-Object { $_.Trim() -eq $needle })
+          if ($matching.Count -ne 1) { throw 'Safe Python import expression was modified or missing.' }
           $stub = Join-Path $env:RUNNER_TEMP 'voice01-python-import-stubs'
           New-Item -ItemType Directory -Force -Path $stub | Out-Null
-          Set-Content -LiteralPath (Join-Path $stub 'sherpa_onnx.py') -Value '# CI import stub' -Encoding ASCII
-          Set-Content -LiteralPath (Join-Path $stub 'numpy.py') -Value '# CI import stub' -Encoding ASCII
+          Set-Content -LiteralPath (Join-Path $stub 'sherpa_onnx.py') -Value '# CI test stub' -Encoding ASCII
+          Set-Content -LiteralPath (Join-Path $stub 'numpy.py') -Value '# CI test stub' -Encoding ASCII
           $env:PYTHONPATH = $stub
-          & python -c $snippet
-          if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell Python import call failed.' }
-          Write-Host 'Native Python -c command works in Windows PowerShell 5.1 (stub modules; no weights).'
+          & python -c 'import sherpa_onnx; import numpy'
+          if ($LASTEXITCODE -ne 0) { throw 'Native Python import expression failed under Windows PowerShell 5.1.' }
+          Write-Host 'Windows PowerShell 5.1 Python import quoting PASS (stub modules only).'
       - name: Reject private voice and model files in lab
         shell: bash
         run: |
