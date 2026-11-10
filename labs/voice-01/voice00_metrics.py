@@ -21,7 +21,7 @@ class MetricError(Exception):
     pass
 
 
-def parse_rttm(text: str):
+def parse_rttm(text: str, *, allow_empty: bool = False):
     segments = []
     for line in text.splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
@@ -37,7 +37,7 @@ def parse_rttm(text: str):
                 start < 0 or duration <= 0 or start + duration > MAX_SECONDS):
             raise MetricError("INVALID_RTTM")
         segments.append((start, start + duration, fields[7]))
-    if not segments:
+    if not segments and not allow_empty:
         raise MetricError("EMPTY_RTTM")
     if len({sp for _, _, sp in segments}) > 4:
         raise MetricError("TOO_MANY_SPEAKERS")
@@ -56,36 +56,48 @@ def labels_per_frame(segments, count: int):
 
 
 def assess(reference, prediction):
+    """Score fixed 10-ms frames once, then optimize speaker-ID permutation.
+
+    Avoid factorial * frame-count loops on 10-minute CPU recordings.
+    """
     duration = max(end for _, end, _ in reference + prediction)
     n = math.ceil(duration / FRAME)
     expected = labels_per_frame(reference, n)
     observed = labels_per_frame(prediction, n)
     real_ids = sorted({s for _, _, s in reference})
     predicted_ids = sorted({s for _, _, s in prediction})
-    # Find best global permutation (speaker IDs have no intrinsic meaning).
+    pair_counts = {}
+    miss = false_alarm = multi_pred = scored = overlap_skipped = single_pairs = 0
+    for gold, hyp in zip(expected, observed):
+        if len(gold) > 1:
+            overlap_skipped += 1
+            continue
+        if not gold and not hyp:
+            continue
+        scored += 1
+        if not gold:
+            false_alarm += 1
+        elif not hyp:
+            miss += 1
+        elif len(hyp) > 1:
+            multi_pred += 1
+        else:
+            key = (next(iter(gold)), next(iter(hyp)))
+            pair_counts[key] = pair_counts.get(key, 0) + 1
+            single_pairs += 1
+
     candidates = real_ids + ["__unmapped_" + str(i) for i in range(len(predicted_ids))]
-    best = None
+    best_confusion = single_pairs
+    # The number of distinct speakers is hard-capped at four by parse_rttm.
     for perm in itertools.permutations(candidates, len(predicted_ids)):
         mapping = dict(zip(predicted_ids, perm))
-        miss = false_alarm = confusion = scored = overlap_skipped = 0
-        for gold, hyp in zip(expected, observed):
-            if len(gold) > 1:
-                overlap_skipped += 1
-                continue
-            if not gold and not hyp:
-                continue
-            if not gold:
-                false_alarm += 1
-            elif not hyp:
-                miss += 1
-            elif len(hyp) > 1 or mapping[next(iter(hyp))] not in gold:
-                confusion += 1
-            scored += 1
-        ranked = (miss + false_alarm + confusion,
-                  confusion, false_alarm, miss, scored, overlap_skipped)
-        if best is None or ranked < best:
-            best = ranked
-    errors, confusion, false_alarm, miss, scored, overlap_skipped = best
+        correct = sum(
+            count for (actual, predicted), count in pair_counts.items()
+            if mapping[predicted] == actual
+        )
+        best_confusion = min(best_confusion, single_pairs - correct)
+    confusion = multi_pred + best_confusion
+    errors = miss + false_alarm + confusion
     return {
         "metric": "frame_error_proxy_nonoverlap_not_standard_DER",
         "frame_ms": 10,
@@ -107,7 +119,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     try:
         ref = parse_rttm(Path(args.reference).read_text(encoding="utf-8"))
-        pred = parse_rttm(Path(args.predicted).read_text(encoding="utf-8"))
+        pred = parse_rttm(Path(args.predicted).read_text(encoding="utf-8"), allow_empty=True)
         print(json.dumps({"lab": "VOICE-00", "ok": True, **assess(ref, pred)}))
         return 0
     except (OSError, UnicodeError, ValueError, MetricError):
