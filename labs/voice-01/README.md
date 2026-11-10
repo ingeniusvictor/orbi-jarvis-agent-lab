@@ -8,6 +8,10 @@
 
 > **VOICE-01E (10-11-2026) — calibración inicial NO RESUELTA:** en ASUS se probaron `--cluster-threshold 0.50, 0.55, 0.60, 0.65` sobre muestras públicas de 2 y 4 hablantes, ocho ejecuciones reales. El conteo fue **2/2** en la muestra corta y **7/4** en la de cuatro hablantes en todos los valores. La API C++ sí utiliza el umbral como distancia de corte en agrupamiento jerárquico (enlace completo), pero el rango probado no cambió los conteos. **No cambiar el umbral predeterminado ni integrar en vivo.** [Ver tabla real, análisis upstream y VOICE-01F diagnóstico](QA-ASUS-VOICE01E-20261110.md).
 
+> **VOICE-01F ASUS (10-11-2026):** al fijar 4 grupos, el motor devolvió 4 **por instrucción**; en automático devolvió 5 grupos para el archivo de 4 voces con umbrales 0.75 y 0.85. En el audio de 2 voces, 0.85 las **fusionó erróneamente en 1 grupo**. No hay un umbral seguro entre los valores ensayados. [QA VOICE-01F](QA-ASUS-VOICE01F-20261110.md).
+
+> **VOICE-01G propuesto:** comparación aislada de un segundo extractor de voz, CAM++, dejando intacta la segmentación y el runtime de LUMIA. El nuevo [script opcional ASUS](compare-embeddings-asus.ps1) utiliza solamente WAV públicos y requiere activación explícita; todavía **no está probado físicamente**. El modelo Reverb v1 no es candidato comercial por licencia de no producción.
+
 Seguimiento y continuidad: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78
 
 ## Repositorios elegidos para fork
