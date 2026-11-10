@@ -38,7 +38,7 @@ Pruebas sin modelos ni archivos personales:
 
 ~~~powershell
 cd C:\Users\ingvm\LUMIA-ASUS
-py -3.11 -m unittest discover -s .\labs\voice-01\tests -p "test_*.py" -v
+& "$env:LOCALAPPDATA\ORBI\LUMIA-FACE-LAB-VI04B\.venv\Scripts\python.exe" -B -m unittest discover -s .\labs\voice-01\tests -p "test_*.py" -v
 py -3.11 .\labs\voice-01\voice00_metrics.py --reference $rttmReal --predicted $rttmPredicho
 ~~~
 
@@ -51,17 +51,15 @@ El script offline_diarization.py no utiliza micrófono, cámara ni internet; req
 Primero ejecutar:
 
 ~~~powershell
-py -3.11 .\labs\voice-01\offline_diarization.py --doctor
+& "$env:LOCALAPPDATA\ORBI\LUMIA-VOICE-LAB\.venv\Scripts\python.exe" -B .\labs\voice-01\offline_diarization.py --doctor
 ~~~
 
 Solo cuando se autorice una instalación de laboratorio aislada:
 
 ~~~powershell
-$dir = Join-Path $env:LOCALAPPDATA "ORBI\LUMIA-VOICE-LAB"
-py -3.11 -m venv "$dir\.venv"
-$voicePy = "$dir\.venv\Scripts\python.exe"
-& $voicePy -m pip install -r ".\labs\voice-01\requirements-optional.txt"
-& $voicePy ".\labs\voice-01\offline_diarization.py" --doctor
+# Método vigente en ASUS, sin depender de py -3.11:
+.\labs\voice-01\prepare-models-asus.ps1 -Bootstrap
+$voicePy = "$env:LOCALAPPDATA\ORBI\LUMIA-VOICE-LAB\.venv\Scripts\python.exe"
 ~~~
 
 Los modelos ONNX se obtienen voluntariamente de la fuente oficial, se valida su SHA y licencia: https://k2-fsa.github.io/sherpa/onnx/speaker-diarization/index.html. El wrapper sigue el ejemplo oficial https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-speaker-diarization.py, con segmentación Pyannote 3.0 y embeddings 3D-Speaker 16 kHz. No se ha realizado esa descarga.
@@ -84,3 +82,42 @@ Este comando es para una **prueba futura**, no se ejecuta durante CI. Produce se
 6. VOICE-04: política de destinatario, eco y barge-in real. VOICE-05: reuniones con permiso y exportación voluntaria.
 
 **No fusionar a main, no alterar el launcher ASUS y no proclamar diarización física a partir de CI sintética.**
+
+
+## VOICE-01B — Instalación aislada de modelos oficiales (9 nov 2026)
+
+Se añadió [prepare-models-asus.ps1](prepare-models-asus.ps1): prepara voluntariamente el motor, los dos modelos ONNX y una prueba pública de dos hablantes, sin modificar LUMIA. NO está demostrado todavía que se haya ejecutado físicamente en la ASUS.
+
+Comandos desde el worktree separado, para evitar modificar la instalación principal:
+
+~~~powershell
+cd "$env:USERPROFILE\LUMIA-VOICE-LAB"
+if (git status --porcelain) { throw "Existen cambios locales; revisar antes de actualizar." }
+git fetch origin feature/lumia-voice01-offline-diarization-lab-20261109
+if ($LASTEXITCODE -ne 0) { throw "Falló fetch." }
+git merge --ff-only FETCH_HEAD
+if ($LASTEXITCODE -ne 0) { throw "Falló merge." }
+
+.\labs\voice-01\prepare-models-asus.ps1 -Bootstrap -DownloadModels -DownloadSample -RunDemo
+~~~
+
+Si el sistema bloquea scripts PowerShell, únicamente tras revisar este archivo, puede utilizarse PowerShell -NoProfile con -ExecutionPolicy Bypass **solo para ese proceso**; nunca modificar la política global.
+
+El script encuentra el ejecutable Python base mediante el venv anterior de FACE-LAB: no requiere el comando py -3.11 que falló en la ASUS. Crea un venv nuevo en %LOCALAPPDATA%\ORBI\LUMIA-VOICE-LAB, instala sherpa-onnx 2.0.1 allí y guarda los pesos y la grabación pública fuera de Git.
+
+- -Bootstrap: crea/prepara venv privado sin alterar Whisper/Kokoro/DeepFace
+- -DownloadModels: descarga segmentación + extractor de embeddings de los releases oficiales
+- -DownloadSample: baja la demostración pública de dos hablantes (en inglés)
+- -RunDemo: ejecuta el análisis offline sobre esa demostración, sin micrófono
+
+Activos verificados contra GitHub Releases (tamaño publicado, no hash externo):
+
+| Archivo | Release | Tamaño |
+| --- | --- | ---: |
+| sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 | speaker-segmentation-models | 6 958 444 bytes |
+| 3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx | speaker-recongition-models (tag escrito así upstream) | 39 593 761 bytes |
+| 1-two-speakers-en.wav | speaker-segmentation-models | 512 044 bytes |
+
+**Limitación de integridad:** estas versiones antiguas no exponen SHA256 publicado mediante GitHub API. Se verifican tamaños, estructura del archivo tar, formato del modelo y se imprimen hashes SHA256 locales para una auditoría posterior, pero esto NO constituye comparación con un checksum publicado. Los pesos tienen términos separados de la licencia del código; no redistribuirlos sin revisar el origen.
+
+**Pendiente:** validar el resultado real de la demostración en ASUS; después usar grabaciones propias de adultos consentidos, anotar turnos de referencia y medir calidad y rendimiento CPU antes de plantear una integración en vivo. No confundir PASS de tests sintéticos con diarización real.
