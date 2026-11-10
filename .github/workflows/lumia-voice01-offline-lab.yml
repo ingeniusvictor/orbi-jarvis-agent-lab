@@ -1,0 +1,44 @@
+name: LUMIA VOICE-00/01 offline CPU lab
+
+on:
+  push:
+    branches:
+      - feature/lumia-voice01-offline-diarization-lab-20261109
+  pull_request:
+    branches:
+      - feature/lumia-vi04c1-open-set-calibration-cpu-20261109
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-voice-lab:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile isolated scripts
+        run: python -m compileall -q labs/voice-01
+      - name: Synthetic PCM and speaker RTTM regressions
+        run: python -m unittest discover -s labs/voice-01/tests -p "test_*.py" -v
+      - name: Offline doctor without any models installed
+        run: python labs/voice-01/offline_diarization.py --doctor
+      - name: Reject private voice and model files in lab
+        shell: bash
+        run: |
+          if git ls-files labs/voice-01 | grep -Ei '\.(wav|mp3|flac|ogg|opus|onnx|pt|pth|ckpt|bin|rttm)$'; then
+            echo 'ERROR: private audio or model assets tracked'
+            exit 1
+          fi
