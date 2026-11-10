@@ -60,8 +60,8 @@ $sample2 = Join-Path $data "samples\1-two-speakers-en.wav"
 $sample4 = Join-Path $data "samples\0-four-speakers-zh.wav"
 
 foreach ($target in @($sample2, $sample4)) {
-  foreach ($threshold in @(0.50, 0.55, 0.60, 0.65)) {
-    Write-Host ("=== THRESHOLD {0:F2} ===" -f $threshold)
+  foreach ($threshold in @("0.50", "0.55", "0.60", "0.65")) {
+    Write-Host ("=== THRESHOLD {0} ===" -f $threshold)
     & $python -B $script --wav $target --segmentation-model $seg --embedding-model $emb --num-speakers -1 --cluster-threshold $threshold --consent
     if ($LASTEXITCODE -ne 0) { throw "VOICE-01E experimental run failed." }
   }
