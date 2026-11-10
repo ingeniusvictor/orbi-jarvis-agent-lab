@@ -6,6 +6,8 @@
 
 > **ATENCIÓN — VOICE-01D (09-11-2026):** La prueba física ASUS con la muestra pública **de cuatro hablantes** y `--num-speakers -1` estimó **7 voces en lugar de 4** (`segment_count=10`, `elapsed_ms=16451`, archivo 56.861 s). La inferencia terminó con exit 0, pero **la calidad del conteo automático FALLÓ**. Ver [informe de QA y parámetros de agrupamiento](QA-ASUS-VOICE01D-20261109.md). El valor predeterminado `cluster_threshold=0.5` no cambia; el nuevo parámetro experimental `--cluster-threshold` requiere uso explícito. **No dar por certificada la generalización multihablante ni integrar en vivo.**
 
+> **VOICE-01E (10-11-2026) — calibración inicial NO RESUELTA:** en ASUS se probaron `--cluster-threshold 0.50, 0.55, 0.60, 0.65` sobre muestras públicas de 2 y 4 hablantes, ocho ejecuciones reales. El conteo fue **2/2** en la muestra corta y **7/4** en la de cuatro hablantes en todos los valores. La API C++ sí utiliza el umbral como distancia de corte en agrupamiento jerárquico (enlace completo), pero el rango probado no cambió los conteos. **No cambiar el umbral predeterminado ni integrar en vivo.** [Ver tabla real, análisis upstream y VOICE-01F diagnóstico](QA-ASUS-VOICE01E-20261110.md).
+
 Seguimiento y continuidad: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78
 
 ## Repositorios elegidos para fork
