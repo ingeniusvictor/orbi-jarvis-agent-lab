@@ -1,6 +1,8 @@
 # LUMIA VOICE-00 / VOICE-01 — Laboratorio multihablante aislado
 
-**Estado (9 nov 2026):** código experimental, NO instalado ni probado físicamente en ASUS. No cambia los lanzadores, el micrófono, Whisper.cpp, Kokoro, Qwen3.5 2B, avatar ni configuración de seguridad. No activa reconocimiento vocal ni facial.
+**Estado (9 nov 2026, actualizado tras prueba ASUS):** laboratorio offline experimental **instalado y probado físicamente en ASUS** con una grabación pública de 16 s y dos hablantes configurados: 4 segmentos y 3.013 s de procesamiento (PASS). **No** está integrado con el micrófono ni con LUMIA en vivo; no se ha validado el descubrimiento automático del número de hablantes ni la precisión mediante anotaciones humanas. No cambia los lanzadores, Whisper.cpp, Kokoro, Qwen3.5 2B, avatar ni permisos de la app. No activa identificación vocal ni facial.
+
+**QA real y próximo paso:** [VOICE-01B ASUS, resultados, SHA256 y prueba de conteo automático](QA-ASUS-VOICE01B-20261109.md).
 
 Seguimiento y continuidad: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78
 
@@ -62,7 +64,7 @@ Solo cuando se autorice una instalación de laboratorio aislada:
 $voicePy = "$env:LOCALAPPDATA\ORBI\LUMIA-VOICE-LAB\.venv\Scripts\python.exe"
 ~~~
 
-Los modelos ONNX se obtienen voluntariamente de la fuente oficial, se valida su SHA y licencia: https://k2-fsa.github.io/sherpa/onnx/speaker-diarization/index.html. El wrapper sigue el ejemplo oficial https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-speaker-diarization.py, con segmentación Pyannote 3.0 y embeddings 3D-Speaker 16 kHz. No se ha realizado esa descarga.
+Los modelos ONNX se obtienen voluntariamente de la fuente oficial, se valida su SHA y licencia: https://k2-fsa.github.io/sherpa/onnx/speaker-diarization/index.html. El wrapper sigue el ejemplo oficial https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-speaker-diarization.py, con segmentación Pyannote 3.0 y embeddings 3D-Speaker 16 kHz. Los dos modelos oficiales y la muestra pública **ya fueron descargados y procesados correctamente en ASUS**, como acredita la [QA real](QA-ASUS-VOICE01B-20261109.md); estos comandos permanecen opcionales y aislados.
 
 Después de preparar audio privado con consentimiento y los modelos oficiales:
 
@@ -120,4 +122,4 @@ Activos verificados contra GitHub Releases (tamaño publicado, no hash externo):
 
 **Limitación de integridad:** estas versiones antiguas no exponen SHA256 publicado mediante GitHub API. Se verifican tamaños, estructura del archivo tar, formato del modelo y se imprimen hashes SHA256 locales para una auditoría posterior, pero esto NO constituye comparación con un checksum publicado. Los pesos tienen términos separados de la licencia del código; no redistribuirlos sin revisar el origen.
 
-**Pendiente:** validar el resultado real de la demostración en ASUS; después usar grabaciones propias de adultos consentidos, anotar turnos de referencia y medir calidad y rendimiento CPU antes de plantear una integración en vivo. No confundir PASS de tests sintéticos con diarización real.
+**Completado:** primera ejecución real de una muestra pública en ASUS con `--num-speakers 2`. **Pendiente:** conteo automático `--num-speakers -1`, más grabaciones, anotaciones independientes, medidas RAM/CPU, español y política de destinatario antes de integrar en vivo. No confundir PASS de tests sintéticos con diarización real.
