@@ -14,6 +14,10 @@
 
 > **VOICE-01G actualizado (11-11-2026):** el script [compare-embeddings-asus.ps1](compare-embeddings-asus.ps1) hace ahora A/B **en la misma sesión**, con los modelos ERes2Net original y CAM++ alternativo sobre ambos WAV públicos y tres umbrales (0.50 / 0.75 / 0.85). Ejecuta 12 inferencias, muestra los segmentos del caso de cuatro voces en 0.50 para **ambos** motores, y emite una tabla con CountMatch **solo para el número estimado**, no para identidad, calidad ni DER. El nuevo peso CAM++ es opcional (~28.3 MB) y su SHA-256 coincide con la copia publicada por el mantenedor upstream [csukuangfj](https://huggingface.co/csukuangfj/speaker-embedding-models/blob/main/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx). **CAM++ no se ha probado todavía en la ASUS; quedan pendientes los resultados físicos.** Mantener PR #79 en borrador, sin mover nada a LUMIA en vivo.
 
+> **VOICE-01G ASUS (11-11-2026): A/B FÍSICO COMPLETADO** — CAM++ acertó el **conteo** de grupos en 5/6 combinaciones (2 archivos públicos × 3 umbrales) vs ERes2Net en 2/6. Sobre la muestra oficial de cuatro participantes, CAM++ devolvió 4 grupos a 0.50 y 0.75, ERes2Net devolvió 7 y 5 respectivamente; al subir a 0.85, CAM++ fusionó cuatro en 3. A 0.50 el procesamiento fue 7034 ms CAM++ vs 14123 ms ERes2Net. Este resultado es prometedor, pero **NO evalúa diarización contra etiquetas humanas ni prueba un producto en vivo**. [Registro de las 12 ejecuciones y turnos](QA-ASUS-VOICE01G-20261111.md).
+
+> **VOICE-01H pendiente:** comparar ambos embeddings sobre **dos archivos WAV públicos nuevos**, que no se usaron para elegir umbrales, con el script [validate-embeddings-holdout-asus.ps1](validate-embeddings-holdout-asus.ps1) (descarga explícita opcional, no se ejecuta en CI). Conservar el embedding anterior y el default 0.50; CAM++ es candidato preferido **solo en el laboratorio**. Son dos muestras nuevas de 2 voces; para validar 3–4 voces hará falta un conjunto independiente con turnos anotados.
+
 Seguimiento y continuidad: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78
 
 ## Repositorios elegidos para fork
