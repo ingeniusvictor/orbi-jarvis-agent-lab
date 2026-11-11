@@ -80,6 +80,21 @@ jobs:
             exit 1
           }
           Write-Host 'VOICE-01G CAM++ A/B script syntax OK; no models or audio accessed.'
+      - name: Windows PowerShell syntax for VOICE-01H holdout (no downloads)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'labs/voice-01/validate-embeddings-holdout-asus.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Out-String | Write-Error
+            exit 1
+          }
+          Write-Host 'VOICE-01H holdout script syntax OK; no model or WAV downloads.'
       - name: Reject private voice and model files in lab
         shell: bash
         run: |
