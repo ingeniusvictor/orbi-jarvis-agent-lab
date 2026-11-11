@@ -12,6 +12,8 @@
 
 > **VOICE-01G propuesto:** comparación aislada de un segundo extractor de voz, CAM++, dejando intacta la segmentación y el runtime de LUMIA. El nuevo [script opcional ASUS](compare-embeddings-asus.ps1) utiliza solamente WAV públicos y requiere activación explícita; todavía **no está probado físicamente**. El modelo Reverb v1 no es candidato comercial por licencia de no producción.
 
+> **VOICE-01G actualizado (11-11-2026):** el script [compare-embeddings-asus.ps1](compare-embeddings-asus.ps1) hace ahora A/B **en la misma sesión**, con los modelos ERes2Net original y CAM++ alternativo sobre ambos WAV públicos y tres umbrales (0.50 / 0.75 / 0.85). Ejecuta 12 inferencias, muestra los segmentos del caso de cuatro voces en 0.50 para **ambos** motores, y emite una tabla con CountMatch **solo para el número estimado**, no para identidad, calidad ni DER. El nuevo peso CAM++ es opcional (~28.3 MB) y su SHA-256 coincide con la copia publicada por el mantenedor upstream [csukuangfj](https://huggingface.co/csukuangfj/speaker-embedding-models/blob/main/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx). **CAM++ no se ha probado todavía en la ASUS; quedan pendientes los resultados físicos.** Mantener PR #79 en borrador, sin mover nada a LUMIA en vivo.
+
 Seguimiento y continuidad: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78
 
 ## Repositorios elegidos para fork
