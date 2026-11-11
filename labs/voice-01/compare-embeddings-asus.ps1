@@ -16,7 +16,8 @@ $two = Join-Path $homeDir 'samples\1-two-speakers-en.wav'
 $four = Join-Path $homeDir 'samples\0-four-speakers-zh.wav'
 
 # Asset length checked via upstream GitHub release metadata (28,281,164 bytes).
-# SHA256 copied from an independent mirror; official release API has no digest.
+# SHA256 corroborated by upstream maintainer csukuangfj on Hugging Face; GitHub release API has no asset digest.
+# See https://huggingface.co/csukuangfj/speaker-embedding-models/blob/main/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx
 $expectedSize = 28281164
 $expectedSha = 'AA3CFC16963A10586A9393F5035D6D6B57E98D358B347F80C2A30BF4F00CEBA2'
 $source = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx'
@@ -83,46 +84,55 @@ $tests = @(
     @{ Sample = '2-speaker EN'; Wave = $two; Expected = 2 },
     @{ Sample = '4-speaker ZH'; Wave = $four; Expected = 4 }
 )
+# Real controlled A/B: run BOTH embeddings in the SAME local session.
+# Changing the model is the only variable within each pair.
+$models = @(
+    @{ Name = 'ERes2Net'; Path = $existingEmbedding },
+    @{ Name = 'CAM++'; Path = $candidate }
+)
 $thresholds = @('0.50', '0.75', '0.85')
 $rows = @()
 
 foreach ($test in $tests) {
     foreach ($threshold in $thresholds) {
-        Write-Host ("=== CAM++ {0} threshold={1} ===" -f $test.Sample, $threshold)
-        $pythonArgs = @(
-            '-B', $diarizer,
-            '--wav', $test.Wave,
-            '--segmentation-model', $segmenter,
-            '--embedding-model', $candidate,
-            '--num-speakers', '-1',
-            '--cluster-threshold', $threshold,
-            '--consent'
-        )
-        $output = & $python @pythonArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw 'CAM++ inference failed. Do not treat partial results as successful.'
-        }
-        $r = $output | ConvertFrom-Json
-        if (-not $r.ok -or $r.num_speakers_requested -ne -1) {
-            throw 'Unexpected JSON or non-automatic clustering.'
-        }
-        $rows += [PSCustomObject]@{
-            Model = 'CAM++'
-            Sample = $test.Sample
-            Expected = $test.Expected
-            Threshold = $threshold
-            Detected = $r.speaker_count
-            Segments = $r.segment_count
-            Milliseconds = $r.elapsed_ms
-        }
-        if ($test.Expected -eq 4 -and $threshold -eq '0.50') {
-            Write-Host '=== CAM++ 4-speaker segment assignments, 0.50 ==='
-            $r.segments | Format-Table -AutoSize
+        foreach ($model in $models) {
+            Write-Host ("=== {0} | {1} | threshold {2} ===" -f $model.Name, $test.Sample, $threshold)
+            $pythonArgs = @(
+                '-B', $diarizer,
+                '--wav', $test.Wave,
+                '--segmentation-model', $segmenter,
+                '--embedding-model', $model.Path,
+                '--num-speakers', '-1',
+                '--cluster-threshold', $threshold,
+                '--consent'
+            )
+            $output = & $python @pythonArgs
+            if ($LASTEXITCODE -ne 0) {
+                throw ("Offline inference failed for {0}. Do not trust partial results." -f $model.Name)
+            }
+            $r = $output | ConvertFrom-Json
+            if (-not $r.ok -or $r.num_speakers_requested -ne -1) {
+                throw 'Invalid lab output or number of speakers was forced.'
+            }
+            $rows += [PSCustomObject]@{
+                Model = $model.Name
+                Sample = $test.Sample
+                Expected = $test.Expected
+                Threshold = $threshold
+                Detected = $r.speaker_count
+                CountMatch = ($r.speaker_count -eq $test.Expected)
+                Segments = $r.segment_count
+                Milliseconds = $r.elapsed_ms
+            }
+            if ($test.Expected -eq 4 -and $threshold -eq '0.50') {
+                Write-Host ("=== Detailed segments {0}: 4-voice sample, t=0.50 ===" -f $model.Name)
+                $r.segments | Format-Table -AutoSize
+            }
         }
     }
 }
-Write-Host '=== RESULTADOS VOICE-01G CAM++ ==='
+Write-Host '=== RESULTADOS VOICE-01G / CONTROL A-B ==='
 $rows | Format-Table -AutoSize
-Write-Host 'ERes2Net baseline 2-speaker: 2 at 0.50/0.75, 1 at 0.85.'
-Write-Host 'ERes2Net baseline 4-speaker: 7 at 0.50, 5 at 0.75/0.85.'
-Write-Host 'No microphone, identity verification, LUMIA live-runtime changes or saved transcripts.'
+Write-Host 'CountMatch means expected COUNT only; it does NOT validate speaker assignments, overlaps or DER.'
+Write-Host 'No automatic model has been selected for live LUMIA.'
+Write-Host 'No microphone, identity verification, production changes or saved transcripts.'
