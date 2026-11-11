@@ -18,6 +18,10 @@
 
 > **VOICE-01H pendiente:** comparar ambos embeddings sobre **dos archivos WAV públicos nuevos**, que no se usaron para elegir umbrales, con el script [validate-embeddings-holdout-asus.ps1](validate-embeddings-holdout-asus.ps1) (descarga explícita opcional, no se ejecuta en CI). Conservar el embedding anterior y el default 0.50; CAM++ es candidato preferido **solo en el laboratorio**. Son dos muestras nuevas de 2 voces; para validar 3–4 voces hará falta un conjunto independiente con turnos anotados.
 
+> **VOICE-01H ASUS (11-11-2026) — FALLO EN GRABACIONES NUEVAS:** en dos WAV públicos nuevos descritos como de 2 hablantes, CAM++ estimó 3 grupos a umbral 0.50 para ambos. Con 0.75 estimó 2 en uno y 3 en el otro: **solo 1/4 conteos**; ERes2Net estimó 4 en las cuatro ejecuciones (**0/4**). CAM++ procesó los archivos aproximadamente 53–56% más rápido, pero no está validado para producción. En un archivo apareció solapamiento de 0.253 s y un grupo extra al final. [Resultados completos y límites](QA-ASUS-VOICE01H-20261111.md).
+
+> **VOICE-01I preparado, pendiente en ASUS:** el [reproductor de fragmentos voice01_listen.py](voice01_listen.py) permitirá comparar por oído, **en memoria y sin grabar**, los segmentos a los que CAM++ asignó un tercer grupo. Es una revisión manual orientativa, no DER ni RTTM independiente. No mover CAM++ ni otros cambios a LUMIA en vivo.
+
 Seguimiento y continuidad: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78
 
 ## Repositorios elegidos para fork
