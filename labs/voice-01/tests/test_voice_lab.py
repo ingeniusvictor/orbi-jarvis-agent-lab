@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import offline_diarization as voice
 import voice00_metrics as metrics
+import voice01_listen as audition
 
 
 def make_wav(seconds=1.0, rate=16000, channels=1):
@@ -112,6 +113,46 @@ class VoiceLabTests(unittest.TestCase):
                 with self.assertRaises(voice.LabError) as bad:
                     voice.diarize(b"\\x00\\x00", "s", "e", cluster_threshold=invalid)
                 self.assertEqual(str(bad.exception), "INVALID_CLUSTER_THRESHOLD")
+
+    def test_manual_review_clip_validation(self):
+        self.assertEqual(audition.parse_clip("1.25:3.0", 4), (1.25, 3))
+        for bad in ("2:2", "-1:2", "5:6", "0:26", "nan:2", "1:inf", "0", "3:1"):
+            with self.subTest(spec=bad):
+                with self.assertRaises(audition.ReviewError):
+                    audition.parse_clip(bad, 4)
+
+    def test_manual_review_memory_wav_no_files_written(self):
+        from contextlib import redirect_stdout
+        pcm = bytes(range(256)) * 125
+        self.assertEqual(len(pcm), 32000)
+        wav_memory = audition.build_excerpt(pcm, 0.1, 0.35)
+        with wave.open(io.BytesIO(wav_memory), "rb") as rendered:
+            self.assertEqual(rendered.getnchannels(), 1)
+            self.assertEqual(rendered.getframerate(), 16000)
+            self.assertEqual(rendered.getnframes(), 4000)
+
+        with TemporaryDirectory() as directory:
+            p = Path(directory) / "public.wav"
+            p.write_bytes(make_wav(seconds=2))
+            before = sorted(str(x) for x in Path(directory).iterdir())
+            played = []
+            with redirect_stdout(io.StringIO()):
+                exit_code = audition.main(
+                    ["--wav", str(p), "--clip", "0.2:0.6",
+                     "--clip", "1:1.4", "--consent"],
+                    audio_player=played.append,
+                )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(len(played), 2)
+            self.assertEqual(before, sorted(str(x) for x in Path(directory).iterdir()))
+
+    def test_manual_review_doctor_without_audio(self):
+        from contextlib import redirect_stdout
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(audition.main(["--doctor"]), 0)
+        self.assertIn('"microphone_enabled": false', out.getvalue())
+        self.assertIn('"files_written": 0', out.getvalue())
 
     def test_sherpa_backend_contract_without_models(self):
         clustering_args = []
