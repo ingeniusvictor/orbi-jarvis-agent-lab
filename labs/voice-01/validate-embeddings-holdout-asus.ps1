@@ -19,7 +19,7 @@ $camSha = 'AA3CFC16963A10586A9393F5035D6D6B57E98D358B347F80C2A30BF4F00CEBA2'
 
 function RequireFile([string]$file, [string]$label) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
-        throw "Missing $label: use only the isolated VOICE lab."
+        throw "Missing ${label}: use only the isolated VOICE lab."
     }
 }
 function GetPublicWav([string]$filename, [long]$expectedBytes) {
