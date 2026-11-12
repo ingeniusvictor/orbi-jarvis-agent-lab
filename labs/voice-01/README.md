@@ -1,5 +1,7 @@
 # LUMIA VOICE-00 / VOICE-01 — Laboratorio multihablante aislado
 
+**Estado actual (11-11-2026, VOICE-01J):** tras VOICE-01H, CAM++ es más rápido que ERes2Net pero NO generalizó el conteo de hablantes en dos WAV nuevos. VOICE-01I completó reproducción real en ASUS de 7 clips públicos. Se implementó [VOICE-01J: GUI privada de revisión auditiva A/B/C](VOICE-01J-GUI-REVIEW-20261111.md), con radio-opciones, reproducción en memoria y guardado JSON **solo por decisión del usuario**. **Todavía no hay QA de apertura real de la interfaz en ASUS ni verificación de identidades vocales por oído.** La herramienta permanece aislada; LUMIA en vivo, el micrófono, Whisper/Kokoro/Qwen y main no se modifican. [Archivo del revisor](voice01_review_gui.py).
+
 **Estado (9 nov 2026, VOICE-01C):** laboratorio offline experimental **instalado y probado físicamente en ASUS** con la misma grabación pública de 16 s en dos modalidades: 2 hablantes **fijados** (VOICE-01B: 4 segmentos en 3.013 s) y **estimación automática con `--num-speakers -1`** (VOICE-01C: 2 hablantes, mismos 4 segmentos, 2.352 s). **No** está integrado al micrófono ni a LUMIA en vivo; falta generalización sobre más grabaciones, evaluación contra anotaciones humanas, español, solapamientos y política de destinatario. No cambia los lanzadores, Whisper.cpp, Kokoro, Qwen3.5 2B, avatar ni permisos. No activa identificación vocal ni facial.
 
 **QA física:** [VOICE-01B: primer motor y hashes](QA-ASUS-VOICE01B-20261109.md) · [VOICE-01C: conteo automático y próximos gates](QA-ASUS-VOICE01C-20261109.md).
