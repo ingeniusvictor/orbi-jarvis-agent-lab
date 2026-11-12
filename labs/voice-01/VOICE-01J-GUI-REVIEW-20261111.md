@@ -95,6 +95,25 @@ finally {
 
 **Validación pendiente:** ejecutar el nuevo modo en la ASUS y comprobar que se muestran solo cuatro clips y dos preguntas, y que copiar devuelve los dos campos. Los tests sintéticos pueden verificar el contenido y los argumentos sin simular el oído humano. No declarar físico PASS por un commit en GitHub.
 
+## VOICE-01J — Audio 3 revisado en ASUS, cierre perceptual (11-11-2026)
+
+El propietario ejecutó el **modo exclusivo `--audio3-only`** y compartió el resumen que genera esa ruta:
+- **Audio 3 C = A**, escucha subjetiva de C (27–30 s) semejante a A (1–6 s).
+- **Audio 3 D = A**, escucha subjetiva de D (48–53 s) semejante a A (1–6 s).
+- El resumen **solo contenía las dos preguntas de Audio 3**, por lo que se confirma el funcionamiento físico del modo dirigido en ASUS hasta la selección y el portapapeles. No se acredita que cada botón de reproducción dentro de esa GUI se probara ni que se haya guardado JSON.
+
+**Cruce con la predicción CAM++ a threshold 0.50 de VOICE-01H:**
+- A (1–6 s) cae dentro del cluster `speaker_0` (0.470–8.384 s).
+- B (14–20 s) cae en `speaker_1` (12.620–25.664 s).
+- C (27–30 s) cae en `speaker_2` (26.693–30.743 s).
+- D (48–53 s) cae en `speaker_2` (47.534–53.930 s).
+
+**Hipótesis principal:** posible **sobrefragmentación de una voz**: el oyente juzga C y D semejantes a A, mientras CAM++ separa A de C/D. Es un indicio que merece investigar **similitud entre embeddings** y contenido acústico, no una etiqueta de verdad terreno. No se deduce que las tres intervenciones pertenezcan inequívocamente a la misma persona. No hay RTTM/DER de referencia ni verificación de cantidad exacta de personas. Tampoco es suficiente para afirmar que el algoritmo de agrupamiento es la causa única (puede haber segmentación, calidad de audio o diferencias prosódicas).
+
+**Siguiente gate VOICE-01K:** hacer un diagnóstico de similitud acústica **entre los fragmentos A/B/C/D** usando el extractor CAM++ **en una prueba nueva y aislada**; reportar solo cosenos por pares, no embeddings crudos, identidades ni audio. Ver si A–C y A–D son más parecidos que A–B, conservando B como comparación de control. *Las similitudes de fragmentos recortados no equivalen a los embeddings internos exactos del diarizador*, por lo que sus resultados deben compararse cualitativamente sin ajustar aún el threshold.
+
+El Audio 2 conserva sus cuatro revisiones cronológicas previas (C = incierto/otra/otra/otra; simultaneidad = sí/incierto/no/sí). El resultado de Audio 3 **no resuelve** esa inconsistencia. PR #79 permanece en borrador, `main` y LUMIA en vivo intactos.
+
 ## Limitaciones explícitas
 
 1. La observación del oyente es **subjetiva y parcial**: escuchar unos fragmentos no equivale a etiquetar todos los turnos del WAV ni a medir DER.
