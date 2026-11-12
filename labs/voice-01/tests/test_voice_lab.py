@@ -340,6 +340,46 @@ class VoiceLabTests(unittest.TestCase):
         with self.assertRaises(benchmark.BenchmarkError):
             benchmark.score_intervals([], [], duration=2.0)
 
+    def test_voice01m_prepare_public_fixture_offline_and_checksum(self):
+        import json
+        from unittest.mock import patch
+        full = make_wav(seconds=162)
+        raw = "\n".join([
+            "SPEAKER ES2002a 1 60 2 <NA> <NA> a <NA> <NA>",
+            "SPEAKER ES2002a 1 66 2 <NA> <NA> b <NA> <NA>",
+            "SPEAKER ES2002a 1 70 2 <NA> <NA> c <NA> <NA>",
+            "SPEAKER ES2002a 1 80 2 <NA> <NA> d <NA> <NA>",
+        ]).encode("utf-8")
+        def mock_download(url, _limit):
+            return full if url == benchmark.AUDIO_URL else raw
+        with TemporaryDirectory() as folder:
+            base = Path(folder)
+            with patch.object(benchmark, "download_fixed", side_effect=mock_download) as downloader:
+                stats = benchmark.prepare(base)
+            self.assertEqual(downloader.call_count, 2)
+            self.assertTrue(stats["ok"])
+            self.assertFalse(stats["full_meeting_audio_saved"])
+            self.assertFalse(stats["inference_executed"])
+            wav, rttm, manifest = benchmark.locations(base)
+            self.assertTrue(wav.is_file())
+            self.assertTrue(rttm.is_file())
+            self.assertTrue(manifest.is_file())
+            self.assertEqual(wav.stat().st_size, 3_200_044)
+            metadata = json.loads(manifest.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["reference_speakers"], 4)
+            self.assertFalse(metadata["source_original_audio_persisted"])
+            self.assertNotIn("SPEAKER ES2002a", rttm.read_text(encoding="utf-8"))
+            pcm, turns = benchmark.load_prepared(base)
+            self.assertEqual(len(pcm), 3_200_000)
+            self.assertEqual(len(turns), 4)
+            self.assertEqual(len(list(base.rglob("*.wav"))), 1)
+            with self.assertRaisesRegex(benchmark.BenchmarkError, "ALREADY_EXISTS"):
+                benchmark.prepare(base)
+            with rttm.open("a", encoding="utf-8") as stream:
+                stream.write("unapproved change\n")
+            with self.assertRaisesRegex(benchmark.BenchmarkError, "REFERENCE_MODIFIED"):
+                benchmark.load_prepared(base)
+
     def test_voice01m_consent_no_network_and_doctor(self):
         import json
         from contextlib import redirect_stdout, redirect_stderr
