@@ -117,14 +117,56 @@ finally {
 Si ES2003a ya esta preparado, omitir --prepare: no sobrescribe datos.
 Compartir solo salidas JSON de PowerShell. El clip no altera ES2002a.
 
+## QA físico ASUS — ES2003a (12-11-2026)
+
+Se recibió salida directa de PowerShell tras fast-forward `7091e77..f385d27`.
+
+- **Doctor PASS**: `prepared_files_present=false` antes de la preparación, `meeting=ES2003a`, sin inferencia, escritura ni red en doctor.
+- **Preparación PASS** (`--prepare --consent`): `ok=true`, audio público AMI 10.0–110.0 s (100 s), **cuatro voces manuales y 20 turnos anotados**, solo WAV recortado, RTTM anonimizado y manifiesto local; audio original completo no persistido.
+- **Inferencia real PASS** (`--run --compare --consent`): `ok=true`, CPU offline, conteo automático con `threshold=0.50`, cero descargas/escrituras durante inferencia, sin micrófono ni identificación personal.
+
+### Comparación con la primera reunión ES2002a
+
+| Reunión y medida | CAM++ | ERes2Net |
+| --- | ---: | ---: |
+| ES2002a — grupos (referencia: 4) | 8 | 8 |
+| ES2002a — error tipo DER experimental | 13.726 % | 16.733 % |
+| ES2003a — grupos (referencia: 4) | **4** | **5** |
+| ES2003a — turnos predichos | 10 | 10 |
+| ES2003a — error tipo DER experimental | **29.118 %** | **33.213 %** |
+| ES2003a — CPU tiempo total (ms) | **14 160** | **33 920** |
+| ES2003a — MISS speaker-s | 2.202 | 2.220 |
+| ES2003a — FA speaker-s | 2.626 | 2.626 |
+| ES2003a — confusión speaker-s | **17.794** | **20.957** |
+| ES2003a — referencia speaker-s | 77.69 | 77.69 |
+| ES2003a — overlap wall-clock s | 2.43 | 2.43 |
+| ES2003a — coincidencia no ambigua s | 71.354 | 71.404 |
+
+El incremento frente a ES2002a es de **15.392 pp CAM++** y **16.480 pp ERes2Net**. Para ES2003a la mayor contribución al error proviene de la **confusión** (17.794 de 22.622 speaker-s de error CAM++; 20.957 de 25.803 para ERes2Net). **Los cuatro grupos de CAM++ no implican cuatro identidades correctamente agrupadas**.
+
+### Matriz anonima resumida de ES2003a
+
+| Referencia | CAM++ grupos con soporte >=1 segundo (no ambigüedad) | ERes2Net grupos >=1 segundo | Grupo dominante |
+| --- | --- | --- | --- |
+| p0 | speaker_3: **43.542 s**; speaker_0: **11.180 s**; speaker_2: **5.526 s** | speaker_4: **42.262 s**; speaker_0: **10.454 s**; speaker_1: **6.318 s**; speaker_3: **1.280 s** | 72.19% CAM++ / 70.01% ERes2Net |
+| p1 | speaker_1: **1.915 s**; speaker_2: **1.020 s** | speaker_2: **1.915 s**; speaker_1: **1.020 s** | 65.25% ambos |
+| p2 | speaker_2: **1.390 s** | speaker_1: **1.390 s** | 100% ambos |
+| p3 | speaker_0: **6.713 s** | speaker_0: **6.713 s** | 100% ambos |
+
+La referencia `p0` concentra **60.316 s** de soporte no ambiguo CAM++, distribuido materialmente entre **tres grupos**. Con ERes2Net concentra **60.366 s** entre **cuatro grupos**. Además, los grupos compartidos muestran **mezcla entre referencias**: por ejemplo, `speaker_0` CAM++ coincide con `p0` 11.180 s y con `p3` 6.713 s, mientras `speaker_2` coincide con `p0` 5.526 s, `p1` 1.020 s y `p2` 1.390 s. Hay evidencia de **fragmentación y combinación de voces distintas** en esta segunda grabación; no se pueden inferir identidades reales por estos IDs anónimos.
+
+**Límites:** ES2002a/ES2003a son solo dos reuniones del corpus AMI; las puntuaciones no son DER oficial (sin collar/UEM del protocolo) ni validación para español, hogar o audio real de LUMIA. Ninguna señal acústica ni turno individual se exportó. Es necesario aislar efectos de segmentos, clustering y solapamiento antes de modificar umbrales o fusionar grupos.
+
+**Propuesta VOICE-01P:** diagnóstico controlado, en ambos archivos ya preparados, que separe **fragmentación por referencia** y **mezclas por predicción** y confronte detección de solapamiento / discrepancias temporales; conservar los modelos, ventanas, umbral 0.50 y conteo automático como línea base. La alternativa de conteo forzado podrá examinarse solo como ablación explícitamente etiquetada, no como solución ni cambio de producción.
+
 ## Gates
 
 - [x] Audio ES2003a presente en indice oficial y RTTM externo manual con 4 voces distintas.
 - [x] Script aislado con permisos y almacenamiento separado.
 - [x] Pruebas unitarias sin red con validacion de SHA, anonimato y evaluacion dual.
 - [x] CI Windows/Linux: **45/45 PASS en ambos SO**, run https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43154141986, commit e07aa825 (solo tests sinteticos; NO inferencia AMI ES2003a fisica).
-- [ ] Descarga/preparacion fisica en ASUS.
-- [ ] Evaluacion CAM++/ERes2Net en ASUS y comparacion con ES2002a.
+- [x] Descarga y preparación física ASUS: PASS, 100 s, cuatro voces de referencia, 20 turnos, hashes locales y audio recortado.
+- [x] Evaluación real ASUS de CAM++/ERes2Net: PASS; grupos 4 y 5, error experimental 29.118% y 33.213%, con fragmentación y mezcla de referencias.
 - [ ] Tercera muestra / DER oficial / validacion de otras condiciones.
 
 No fusionar PR, no ajustar umbrales ni modificar LUMIA live.
