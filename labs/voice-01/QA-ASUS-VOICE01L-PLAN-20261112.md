@@ -40,20 +40,36 @@ $branch = "feature/lumia-voice01-offline-diarization-lab-20261109"
 
 Push-Location $lab
 try {
-    if (git status --porcelain) {
-        throw "El laboratorio contiene cambios locales; revisar antes de actualizar."
+    $top = git rev-parse --show-toplevel
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($top)) {
+        throw "La carpeta no es un repositorio Git valido."
     }
-    git fetch origin "refs/heads/${branch}:refs/remotes/origin/${branch}"
-    if ($LASTEXITCODE -ne 0) { throw "Git fetch falló" }
-    git merge --ff-only "refs/remotes/origin/$branch"
-    if ($LASTEXITCODE -ne 0) { throw "Git fast-forward falló" }
+    $expected = (Resolve-Path -LiteralPath $lab).Path
+    $actual = (Resolve-Path -LiteralPath $top).Path
+    if ($actual -ine $expected) {
+        throw "La raiz Git no coincide con el laboratorio aislado."
+    }
+    $changes = @(git status --porcelain)
+    if ($LASTEXITCODE -ne 0 -or $changes.Count -gt 0) {
+        throw "Hay cambios locales o fallo de Git: revisar antes de actualizar."
+    }
+
+    # Compatible con worktrees en detached HEAD: no fuerza cambio de rama.
+    git fetch origin "refs/heads/$branch"
+    if ($LASTEXITCODE -ne 0) { throw "Git fetch fallo" }
+    git merge-base --is-ancestor HEAD FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) {
+        throw "El HEAD actual no es antecesor de la rama remota; no se actualizo."
+    }
+    git merge --ff-only FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) { throw "Git fast-forward fallo" }
 
     $py = Join-Path $data ".venv\Scripts\python.exe"
     $script = Join-Path $lab "labs\voice-01\voice01l_stability.py"
     & $py -B $script --doctor
-    if ($LASTEXITCODE -ne 0) { throw "VOICE-01L doctor falló" }
+    if ($LASTEXITCODE -ne 0) { throw "VOICE-01L doctor fallo" }
     & $py -B $script --consent
-    if ($LASTEXITCODE -ne 0) { throw "VOICE-01L inferencia falló" }
+    if ($LASTEXITCODE -ne 0) { throw "VOICE-01L inferencia fallo" }
 }
 finally {
     Pop-Location
@@ -61,6 +77,8 @@ finally {
 ~~~
 
 Compartir **solo** las dos salidas JSON de PowerShell, no WAV, logs con voces ni embeddings. El resultado tiene `within`, `between`, `comparisons`, `windows` y `elapsed_ms`.
+
+**Nota de compatibilidad Git:** la ASUS devolvió un error PowerShell cuando el comando de una respuesta previa intentó llamar a `.Trim()` sobre la salida vacía de `git branch --show-current`. En worktrees con `HEAD` desacoplado la salida vacía es válida; no usar esa comprobación ni obligar a `git switch`. El comando actualizado verifica la raíz del repositorio, exige el árbol limpio, descarga el commit remoto a `FETCH_HEAD`, comprueba ascendencia y hace solo `git merge --ff-only`. No se conoció aún el estado exacto del HEAD local; si no es un avance lineal, el procedimiento se detiene sin cambiar el repositorio.
 
 ## Interpretación y gates de QA
 
