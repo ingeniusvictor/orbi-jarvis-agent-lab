@@ -50,6 +50,21 @@ El propietario copió un **nuevo resumen** desde VOICE-01J, con dos respuestas m
 
 **Pendiente:** dos campos del Audio 3; escuchar los clips de 1–6, 14–20, 27–30 y 48–53 s, y comparar C/D con los ejemplos. Si no son distinguibles, registrar «incierto» en vez de completar por conjetura. No convertir este revisor en reconocimiento de identidad real; no modificar CAM++ ni el umbral global basándose en estas respuestas.
 
+## Tercera revisión auditiva parcial comunicada (11-11-2026)
+
+El propietario compartió otra salida de la GUI VOICE-01J. Se registra como **tercera evaluación subjetiva distinta**, no como sustitución ni corrección retroactiva de las anteriores:
+
+| Campo | Primera | Segunda | Tercera |
+| --- | --- | --- | --- |
+| Audio 2: C suena como | incierto | otra | **otra** |
+| Audio 2: hay dos voces simultáneas | sí | incierto | **no** |
+| Audio 3: C suena como | pendiente | pendiente | **pendiente** |
+| Audio 3: D suena como | pendiente | pendiente | **pendiente** |
+
+**Lectura cautelosa:** la categoría «otra» para el Audio 2 C se repite en las revisiones 2 y 3, pero **no verifica que exista un tercer hablante distinto**. La percepción de simultaneidad pasó de «sí» a «incierto» y finalmente «no»; por tanto, **no hay confirmación humana estable del solapamiento**. El algoritmo conserva su resultado: intervalos 17.817–18.627 s y 18.374–21.142 s se superponen matemáticamente 0.253 s; eso no demuestra que ambas señales vocales sean audibles de forma simultánea ni que la anotación automática sea correcta.
+
+**Estado VOICE-01J:** evaluación de Audio 2 reiterada tres veces; Audio 3 C/D siguen sin evaluarse. No calcular DER, no concluir cantidad real de personas, no modificar el threshold ni pasar CAM++ a LUMIA en vivo. Próximo paso: **abrir la segunda pestaña «Audio 3» de la GUI**, escuchar los botones A (1–6 s), B (14–20 s), C (27–30 s) y D (48–53 s) y completar solo esos dos selectores; «incierto» es un resultado legítimo.
+
 ## Limitaciones explícitas
 
 1. La observación del oyente es **subjetiva y parcial**: escuchar unos fragmentos no equivale a etiquetar todos los turnos del WAV ni a medir DER.
