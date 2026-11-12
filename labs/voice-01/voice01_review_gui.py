@@ -80,7 +80,7 @@ def review_keys(audio3_only: bool = False) -> tuple[str, ...]:
 def summary_text(answers: dict[str, str], audio3_only: bool = False) -> str:
     checked = validate_answers(answers)
     lines = [
-        ("LUMIA VOICE-01J - Audio 3 - revision auditiva dirigida de WAV publicos"
+        ("LUMIA VOICE-01J - SOLO AUDIO 3 - revision auditiva dirigida de WAV publicos"
          if audio3_only else
          "LUMIA VOICE-01J - revision auditiva local de WAV publicos"),
         "Evaluacion subjetiva; no verifica precision DER ni identidad personal.",
