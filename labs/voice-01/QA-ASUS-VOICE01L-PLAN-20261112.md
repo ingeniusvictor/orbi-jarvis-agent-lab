@@ -141,6 +141,13 @@ El JSON confirmó: `exploratory_only=true`, `equivalent_to_diarizer_internal=fal
 
 **Próximo gate propuesto:** confirmar mediante escucha local que las ocho ventanas contienen voz limpia y trabajar con al menos una grabación **independiente con referencia temporal anotada**, sin ajustar threshold ni cambiar LUMIA en vivo.
 
+## VOICE-01L — reproducción física de las ocho ventanas (12-11-2026)
+
+El propietario ejecutó en la ASUS `voice01_listen.py` (VOICE-01I) sobre el WAV público `3-two-speakers-en.wav` con ocho recortes `--clip` en el orden A1/A2/B1/B2/C1/C2/D1/D2:
+`1:2.5`, `4:5.5`, `14:15.5`, `18.5:20`, `27:28.5`, `28.5:30`, `48:49.5`, `51:52.5`.
+
+La salida fue **`ok=true`, `clips_played=8`, `files_written=0`, `microphone_enabled=false`, `identity_confirmed=false`**. Esto confirma ejecución del reproductor local sobre ocho recortes, pero **no certifica que cada uno contenga voz clara** ni aporta una evaluación perceptual de A1–D2. La escucha humana individual continúa sin documentarse: solicitar del operador para cada ventana `voz clara` / `ruido-pausa` / `incierto`. No tratar el éxito de `PlaySound` como una anotación VAD humana, ni declarar DER o identidad verificada. No subir WAV ni audio personal a GitHub.
+
 ## Estado
 
 - [x] VOICE-01J revisión perceptual C≈A/D≈A.
@@ -148,7 +155,8 @@ El JSON confirmó: `exploratory_only=true`, `equivalent_to_diarizer_internal=fal
 - [x] VOICE-01L script y regresiones sintéticas preparados en rama de laboratorio.
 - [x] VOICE-01L CI Windows/Linux: **PASS** del commit `89bc60b1` en run [43146852682](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43146852682), pruebas sintéticas sin inferencia ONNX real.
 - [x] VOICE-01L inferencia real ASUS: **PASS de ejecución**, 764 ms, 28 cosenos y márgenes positivos documentados; no implica DER.
-- [ ] Escucha individual de las ocho ventanas para comprobar voz limpia: pendiente.
+- [x] Reproducción física de los ocho recortes con VOICE-01I: `ok=true` y 8/8 ejecutados.
+- [ ] Clasificación perceptual individual (voz clara / ruido-pausa / incierto) de las ocho ventanas: pendiente.
 - [ ] Corpus humano anotado (incluidos solapamientos) y DER independiente: pendiente.
 
 **Protecciones:** no cambiar clustering, no fusionar `speaker_0`/`speaker_2` automáticamente, no establecer umbrales por intuición. PR #79 en borrador; `main`, modelos personales y LUMIA en vivo intactos.
