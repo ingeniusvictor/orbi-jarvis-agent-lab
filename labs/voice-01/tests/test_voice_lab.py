@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import offline_diarization as voice
 import voice00_metrics as metrics
 import voice01_listen as audition
+import voice01_review_gui as gui
 
 
 def make_wav(seconds=1.0, rate=16000, channels=1):
@@ -145,6 +146,82 @@ class VoiceLabTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(len(played), 2)
             self.assertEqual(before, sorted(str(x) for x in Path(directory).iterdir()))
+
+    def test_voice01j_review_label_contract(self):
+        answers = gui.empty_answers()
+        self.assertEqual(set(answers), set(gui.CHOICES))
+        self.assertEqual(answers["audio2_c"], "pendiente")
+        answers["audio2_c"] = "A"
+        answers["audio3_c"] = "B"
+        answers["audio3_d"] = "C"
+        answers["audio2_overlap"] = "incierto"
+        data = gui.review_payload(answers)
+        self.assertEqual(data["lab"], "VOICE-01J")
+        self.assertEqual(data["answers"], answers)
+        self.assertFalse(data["audio_written"])
+        self.assertFalse(data["microphone_enabled"])
+        self.assertEqual(data["files_uploaded"], 0)
+        text = gui.summary_text(answers)
+        self.assertIn("Audio 3: D suena como: C", text)
+        for wrong in (
+                {"audio2_c": "A"},
+                dict(answers, audio2_c="NombreReal"),
+                dict(answers, audio2_overlap="yes"),
+                ):
+            with self.subTest(invalid=wrong):
+                with self.assertRaises(ValueError):
+                    gui.validate_answers(wrong)
+
+    def test_voice01j_opt_in_json_save_only(self):
+        with TemporaryDirectory() as directory:
+            target = Path(directory) / "reviews" / "test-review.json"
+            with self.assertRaisesRegex(ValueError, "NOTHING_REVIEWED"):
+                gui.save_review(gui.empty_answers(), target)
+            self.assertFalse(target.exists())
+            edited = gui.empty_answers()
+            edited["audio2_c"] = "incierto"
+            gui.save_review(edited, target)
+            payload = __import__("json").loads(target.read_text(encoding="utf-8"))
+            self.assertEqual(payload["answers"]["audio2_c"], "incierto")
+            self.assertFalse(payload["audio_written"])
+            self.assertEqual([p.name for p in target.parent.iterdir()],
+                             ["test-review.json"])
+            before = target.read_bytes()
+            with self.assertRaises(FileExistsError):
+                gui.save_review(dict(edited, audio2_c="A"), target)
+            self.assertEqual(target.read_bytes(), before)
+
+    def test_voice01j_rejects_unverified_wav(self):
+        import hashlib
+        from unittest.mock import patch
+        audio = make_wav(seconds=1.0)
+        digest = hashlib.sha256(audio).hexdigest().upper()
+        manifest = {
+            "public.wav": {
+                "bytes": len(audio), "sha256": digest,
+                "clips": [("A", 0.1, 0.5)],
+            }
+        }
+        with TemporaryDirectory() as directory:
+            file = Path(directory) / "public.wav"
+            file.write_bytes(audio)
+            with patch.dict(gui.EXPECTED, manifest, clear=True):
+                pcm = gui.checked_public_audio(Path(directory))
+                self.assertEqual(len(pcm["public.wav"]), 32000)
+                file.write_bytes(audio[:-4] + b"\x00\x01\x02\x03")
+                with self.assertRaisesRegex(ValueError, "SHA256"):
+                    gui.checked_public_audio(Path(directory))
+
+    def test_voice01j_doctor_never_starts_gui(self):
+        from contextlib import redirect_stdout
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = gui.main(["--doctor"])
+        self.assertEqual(code, 0)
+        payload = __import__("json").loads(out.getvalue())
+        self.assertTrue(payload["user_save_required"])
+        self.assertFalse(payload["microphone_enabled"])
+        self.assertFalse(payload["network_enabled"])
 
     def test_manual_review_uses_native_winsound_memory_flag(self):
         # Regression: SND_SYNC does not exist in winsound. Synchronous
