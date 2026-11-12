@@ -22,6 +22,8 @@
 
 > **VOICE-01I preparado, pendiente en ASUS:** el [reproductor de fragmentos voice01_listen.py](voice01_listen.py) permitirá comparar por oído, **en memoria y sin grabar**, los segmentos a los que CAM++ asignó un tercer grupo. Es una revisión manual orientativa, no DER ni RTTM independiente. No mover CAM++ ni otros cambios a LUMIA en vivo.
 
+> **VOICE-01I ASUS (11-11-2026) — REPRODUCCIÓN REAL PASS:** tras corregir la bandera inexistente `winsound.SND_SYNC`, Windows reprodujo los **3 fragmentos del Audio 2** y los **4 del Audio 3**, ambos `ok:true`, `files_written:0`, `microphone_enabled:false`. **No hay todavía evaluación perceptual de si A/B/C son las mismas voces**. [QA VOICE-01I y preguntas de comparación](QA-ASUS-VOICE01I-20261111.md). No declarar diarización ni identificación validadas por haber podido reproducir clips.
+
 Seguimiento y continuidad: https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78
 
 ## Repositorios elegidos para fork
