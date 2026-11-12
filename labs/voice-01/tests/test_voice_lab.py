@@ -12,6 +12,7 @@ import offline_diarization as voice
 import voice00_metrics as metrics
 import voice01_listen as audition
 import voice01_review_gui as gui
+import voice01k_similarity as similarity
 
 
 def make_wav(seconds=1.0, rate=16000, channels=1):
@@ -208,6 +209,35 @@ class VoiceLabTests(unittest.TestCase):
             self.assertEqual(gui.main(["--doctor", "--audio3-only"]), 0)
         doctor = __import__("json").loads(output.getvalue())
         self.assertFalse(doctor["microphone_enabled"])
+
+    def test_voice01k_cosine_pairs_are_anonymous_and_symmetric(self):
+        vectors = {"A": [1.0, 0.0], "B": [0.0, 1.0],
+                   "C": [0.8, 0.6], "D": [0.9, 0.435889894]}
+        scores = similarity.pair_scores(vectors)
+        self.assertEqual(len(scores), 6)
+        self.assertEqual([item["pair"] for item in scores],
+                         ["A-B", "A-C", "A-D", "B-C", "B-D", "C-D"])
+        self.assertEqual(scores[0]["cosine"], 0.0)
+        self.assertAlmostEqual(similarity.cosine(vectors["A"], vectors["C"]),
+                               similarity.cosine(vectors["C"], vectors["A"]))
+        self.assertGreater(scores[2]["cosine"], scores[1]["cosine"])
+        with self.assertRaises(similarity.SimilarityError):
+            similarity.cosine([0.0, 0.0], [1.0, 0.0])
+        with self.assertRaises(similarity.SimilarityError):
+            similarity.cosine([float("nan")], [1.0])
+        with self.assertRaises(similarity.SimilarityError):
+            similarity.pair_scores({"A": [1.0], "B": [0.0]})
+
+    def test_voice01k_doctor_and_consent_are_safe(self):
+        from contextlib import redirect_stdout, redirect_stderr
+        with redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(similarity.main(["--doctor"]), 0)
+        doctor = __import__("json").loads(output.getvalue())
+        self.assertFalse(doctor["microphone_enabled"])
+        self.assertEqual(doctor["files_written"], 0)
+        with redirect_stderr(io.StringIO()) as errors:
+            self.assertEqual(similarity.main([]), 1)
+        self.assertIn("CONSENT_REQUIRED", errors.getvalue())
 
     def test_voice01j_opt_in_json_save_only(self):
         with TemporaryDirectory() as directory:
