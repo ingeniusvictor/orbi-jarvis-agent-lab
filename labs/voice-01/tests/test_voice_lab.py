@@ -172,6 +172,23 @@ class VoiceLabTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     gui.validate_answers(wrong)
 
+    def test_voice01j_pending_fields_and_partial_clipboard_summary(self):
+        answers = gui.empty_answers()
+        answers["audio2_c"] = "incierto"
+        answers["audio2_overlap"] = "si"
+        self.assertEqual(gui.pending_questions(answers),
+                         ["Audio 3: C suena como", "Audio 3: D suena como"])
+        text = gui.summary_text(answers)
+        self.assertIn("Audio 2: C suena como: incierto", text)
+        self.assertIn("Audio 2: hay dos voces simultaneas: si", text)
+        self.assertIn("Audio 3: C suena como: pendiente", text)
+        self.assertIn("Audio 3: D suena como: pendiente", text)
+        answers["audio3_c"] = "A"
+        answers["audio3_d"] = "C"
+        self.assertEqual(gui.pending_questions(answers), [])
+        with self.assertRaises(ValueError):
+            gui.pending_questions(dict(answers, audio3_c="named_person"))
+
     def test_voice01j_opt_in_json_save_only(self):
         with TemporaryDirectory() as directory:
             target = Path(directory) / "reviews" / "test-review.json"
