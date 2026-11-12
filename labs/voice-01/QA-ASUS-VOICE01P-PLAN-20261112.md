@@ -94,7 +94,7 @@ Si necesitas aislar una reunión por diagnóstico, las opciones son `--meeting E
 - [x] Lógica de diagnóstico segmentada por actividad de referencia (silencio, 1 voz, superposición).
 - [x] Matriz de splits/mixes con soporte mínimo descriptivo y consistencia con el scorer anterior.
 - [x] Tests sintéticos de correspondencia, dos reuniones, dos modelos, autorización y sin escritura.
-- [ ] CI Windows/Linux en el commit final.
+- [x] CI Windows y Ubuntu: **53/53 PASS en cada SO** para el commit fe9a854 (8 pruebas nuevas de VOICE-01P), run https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43155567047. Son pruebas sintéticas; no se ha ejecutado físicamente VOICE-01P en la ASUS.
 - [ ] QA física ASUS de cuatro inferencias, con resultados reales y desglose.
 - [ ] Instrumentación de etapas internas o ablación controlada separada para diferenciar causas.
 - [ ] Validación adicional multirreunión / en otros idiomas y DER oficial.
