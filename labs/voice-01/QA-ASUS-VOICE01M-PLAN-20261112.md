@@ -134,6 +134,36 @@ The doctor should report prepared_files_present=true. **Do NOT run --prepare aga
 
 **Status:** public sample preparation physically PASS; physical AMI scoring remains pending a successful ASUS rerun. No DER-like measurement from the failed first run. No changes to LUMIA live, model count, threshold, weights or main.
 
+## VOICE-01M — real ASUS inference PASS (12-11-2026)
+
+**User-provided physical Windows/ASUS logs** after fast-forward `fbf457a..4e53240`:
+
+- `--doctor`: `prepared_files_present=true`, no microphone, network, writing or inference.
+- `--run --compare --consent`: `ok=true`; independently prepared AMI ES2002a clip from 60–160 s (100 s), externally manually annotated `only_words` reference with **4 speakers / 18 reference turns**.
+- Both diarization models were called at **fixed `cluster_threshold=0.50` and automatic speaker count**. **Both returned 8 anonymous speaker groups** rather than the 4 reference labels. This is observed speaker-count overfragmentation on this sample, but the error cannot yet be attributed uniquely to clustering, segmentation or annotation/recording mismatch.
+- No prediction files, vectors, microphone or network access during inference, per tool output; no identity verified.
+
+| Indicator | CAM++ | ERes2Net |
+| --- | ---: | ---: |
+| Automatic clusters | 8 | 8 |
+| Diarizer segments | 18 | 15 |
+| CPU inference + scoring time | 15,607 ms | 38,401 ms |
+| Manual reference speakers | 4 | 4 |
+| Reference speaker-seconds | 96.56 | 96.56 |
+| Reference simultaneous-speech wall-clock | 4.73 s | 4.73 s |
+| Missed speaker-seconds | 5.220 | 5.511 |
+| False-alarm speaker-seconds | 1.389 | 1.528 |
+| Confusion speaker-seconds | 6.645 | 9.118 |
+| DER-like error (experimental) | **13.726%** | **16.733%** |
+| Overlap counted | yes | yes |
+| Collar | 0 s | 0 s |
+
+**Observations:** CAM++ yields **3.007 percentage points** lower experimental error than ERes2Net and is **2.46x faster** by the observed CPU elapsed milliseconds. This is a single public 100-second recording, not a statistical benchmark. The measured 13.726%/16.733% are explicitly **NOT official DER** and must not be interpreted as deployment performance, identity confidence or a comparison to published AMI DER scores.
+
+**Key diagnostic distinction:** 8 automatic speaker IDs versus 4 reference IDs establishes a cardinality mismatch on this example, but it is not yet shown which predicted IDs split which manual speakers or whether some predictions represent noise. Need next-stage **VOICE-01N** aggregate, anonymized speaker-to-reference support matrix (speaker-seconds per anonymous pairing), plus a confusion/split summary (no audio export, names or raw vectors); inspect whether extra IDs carry meaningful durations. Follow with independent meetings and appropriate official scorer before changing any threshold.
+
+**Gate:** real external-reference offline inference **PASS** for two models. PR #79 remains draft, LUMIA live and main unchanged.
+
 ## Gates
 
 - [x] External manual AMI reference source independently published.
@@ -141,7 +171,7 @@ The doctor should report prepared_files_present=true. **Do NOT run --prepare aga
 - [x] Time-integrated, overlap-aware DER-like evaluation code and synthetic tests.
 - [x] CI Windows and Linux: **PASS** del commit 2b9fc2c, run https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43150234154 (31 pruebas sintéticas y contrato de preparación sin red; no es inferencia AMI real).
 - [x] Real ASUS preparation of AMI audio and reference: PASS, 100 seconds, 4 reference speakers, 18 annotated turns.
-- [ ] Real ASUS comparison of CAM++ and ERes2Net: first run blocked by scorer cap; patched, rerun pending.
+- [x] Real ASUS comparison of CAM++ and ERes2Net: PASS after scorer fix, both eight clusters against four labels; error and timing measured and documented.
 - [ ] Later: additional meetings, Spanish, home audio, independent labeled ground truth and official DER scorer.
 
 PR #79 stays draft, main and LUMIA live unchanged.
