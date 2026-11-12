@@ -122,7 +122,7 @@ Compartir solo salidas JSON de PowerShell. El clip no altera ES2002a.
 - [x] Audio ES2003a presente en indice oficial y RTTM externo manual con 4 voces distintas.
 - [x] Script aislado con permisos y almacenamiento separado.
 - [x] Pruebas unitarias sin red con validacion de SHA, anonimato y evaluacion dual.
-- [ ] CI Windows/Linux del ultimo commit.
+- [x] CI Windows/Linux: **45/45 PASS en ambos SO**, run https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43154141986, commit e07aa825 (solo tests sinteticos; NO inferencia AMI ES2003a fisica).
 - [ ] Descarga/preparacion fisica en ASUS.
 - [ ] Evaluacion CAM++/ERes2Net en ASUS y comparacion con ES2002a.
 - [ ] Tercera muestra / DER oficial / validacion de otras condiciones.
