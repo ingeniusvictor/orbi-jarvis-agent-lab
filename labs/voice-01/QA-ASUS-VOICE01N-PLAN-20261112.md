@@ -84,7 +84,7 @@ finally {
 
 - [x] Matriz temporal anónima, con discriminación de solapamiento / no solapamiento, programada en la rama de laboratorio.
 - [x] Tests sintéticos de matriz, superposición, no referencia, 6+ grupos, consentimiento y contrato de modelos.
-- [ ] CI Windows/Linux sobre el commit final.
+- [x] CI Windows/Linux de VOICE-01N: **PASS**, 40 tests en cada SO, run [43153038195](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43153038195), commit `75c8d287` (tests sintéticos, no inferencia AMI real).
 - [ ] QA físico ASUS con CAM++ y ERes2Net (mismos pesos/umbral).
 - [ ] Evaluación de hipótesis con otra reunión independiente.
 - [ ] DER oficial o validación humana de confusiones reales (sin datos sensibles).
