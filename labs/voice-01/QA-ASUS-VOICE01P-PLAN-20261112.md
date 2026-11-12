@@ -89,13 +89,51 @@ finally {
 
 Si necesitas aislar una reunión por diagnóstico, las opciones son `--meeting ES2002a` y `--meeting ES2003a`; por defecto se evalúan ambas. Comparte solo los resultados JSON por PowerShell, no WAV ni RTTM.
 
+## QA física ASUS — VOICE-01P (12-11-2026)
+
+**Salida real aportada por el usuario desde ASUS:** worktree actualizado por fast-forward `f385d27..5dff559`; `--doctor` verificó `ES2002a=true` y `ES2003a=true` sin red ni escritura. `--run --compare --meeting both --consent` devolvió `ok=true`, cuatro inferencias y `scorer_consistency_verified=true` en cada comparación. Umbral original `0.5`, número de hablantes automático/no forzado; cero nuevas descargas, escritura, micrófono, red, exportación de audio, turnos o embeddings.
+
+### Resultados reproducidos y anatomía por región
+
+| Reunión / modelo | Clusters frente a 4 referencias | Segmentos | CPU (ms) | Error tipo DER no oficial | MISS s-h | FA s-h | CONF s-h |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ES2002a CAM++ | 8 | 18 | 15765 | 13.726% | 5.220 | 1.389 | 6.645 |
+| ES2002a ERes2Net | 8 | 15 | 37149 | 16.733% | 5.511 | 1.528 | 9.118 |
+| ES2003a CAM++ | **4** | 10 | 15958 | **29.118%** | 2.202 | 2.626 | 17.794 |
+| ES2003a ERes2Net | 5 | 10 | 35819 | 33.213% | 2.220 | 2.626 | 20.957 |
+
+Referencia ES2002a: 96.56 speaker-s, **4.73 s** de solapamiento y 9.14 s de silencio según RTTM `only_words`. Referencia ES2003a: 77.69 speaker-s, **2.43 s** de solapamiento y 24.74 s de silencio RTTM. Valores de `silence` son ausencia de anotación, **no prueba de silencio acústico real**.
+
+| Contexto y métrica | ES2002a CAM++ | ES2002a ERes2Net | ES2003a CAM++ | ES2003a ERes2Net |
+| --- | ---: | ---: | ---: | ---: |
+| Silencio ref.: FA speaker-s | 0.625 | 0.682 | **2.613** | **2.613** |
+| Voz única ref.: MISS speaker-s | 2.604 | 2.543 | 1.463 | 1.413 |
+| Voz única ref.: FA speaker-s | 0.750 | 0.846 | 0.013 | 0.013 |
+| Voz única ref.: **confusión speaker-s** | **4.841** | 5.275 | **17.794** | **19.137** |
+| Overlap ref.: MISS speaker-s | 2.616 | 2.968 | 0.739 | 0.807 |
+| Overlap ref.: FA speaker-s | 0.014 | 0 | 0 | 0 |
+| Overlap ref.: confusión speaker-s | 1.804 | 3.843 | **0** | 1.820 |
+| Overlap ref.: solo 1 grupo predicho (wallclock s) | 2.189 | 1.998 | 0.739 | 0.807 |
+| Overlap ref.: >=2 grupos predichos (wallclock s) | 2.541 | 2.732 | 1.691 | 1.623 |
+
+**Conclusiones acotadas:**
+
+- ES2003a CAM++ presenta **17.794 / 22.622 = 78.66%** del error total en **confusión durante voz única**, no en actividad simultánea. ERes2Net tiene **19.137 / 25.803 = 74.17%** en la misma categoría. La prioridad para esta reunión es comprender el intercambio/mezcla de grupos en condiciones sin solapamiento.
+- ES2002a presenta una debilidad adicional durante **overlap**: CAM++ tiene 2.616 speaker-s de MISS sobrelapados y deja un único grupo predicho durante 2.189 de los 4.73 s de simultaneidad; ERes2Net 2.968 speaker-s de MISS y un único grupo durante 1.998 s. No diagnostica directamente el mecanismo del segmentador.
+- **Splits descriptivos >=1 s no ambiguos:** ES2002a `p1`: 2 grupos CAM++ (`speaker_1` 4.383 s, `speaker_6` 4.544 s), 3 ERes2Net (`speaker_1` 3.212, `speaker_5` 3.989, `speaker_6` 1.570). ES2003a `p0`: 3 CAM++ (43.542, 11.180, 5.526 s), 4 ERes2Net (42.262, 10.454, 6.318, 1.280 s); `p1` dividida en 2 grupos de >=1 s para ambos modelos.
+- **Mezclas descriptivas >=1 s por referencia:** ES2002a sin clusters que superen dicho criterio; ES2003a CAM++ `speaker_0` tiene soporte `p0=11.180` y `p3=6.713` segundos; `speaker_2` tiene `p0=5.526`, `p1=1.020`, `p2=1.390`. ERes2Net exhibe dos mezclas análogas. Tener **4 de 4 grupos** no indica atribución correcta.
+- ES2002a `speaker_7` sigue sin coincidencia **no ambigua** (1.165 s CAM++; 2.532 s ERes2Net de duración total), pero la presencia ocurre en contexto anotado; no asignar identidad ni clasificar automáticamente como ruido.
+- La consistencia `scorer_consistency_verified=true` verifica la aritmética agregada frente al **mismo scorer experimental**; no constituye una validación de DER oficial o de corrección de los anotadores.
+
+**Siguiente gate experimental sugerido: VOICE-01Q**, instrumentar la frontera entre segmentación y embeddings/clustering de manera **solo diagnóstica**: documentar segmentos candidatos antes del clustering, duración/cobertura y detección de overlap, sin guardar audio privado ni vectores de voz. Diseñar después ablaciones separadas y predefinidas; no adaptar el umbral 0.50 en vivo ni fusionar grupos. Los resultados finales de estos 2 clips **no prueban causalidad de una etapa interna** y no generalizan a conversaciones domésticas.
+
 ## Gates
 
 - [x] Lógica de diagnóstico segmentada por actividad de referencia (silencio, 1 voz, superposición).
 - [x] Matriz de splits/mixes con soporte mínimo descriptivo y consistencia con el scorer anterior.
 - [x] Tests sintéticos de correspondencia, dos reuniones, dos modelos, autorización y sin escritura.
 - [x] CI Windows y Ubuntu: **53/53 PASS en cada SO** para el commit fe9a854 (8 pruebas nuevas de VOICE-01P), run https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43155567047. Son pruebas sintéticas; no se ha ejecutado físicamente VOICE-01P en la ASUS.
-- [ ] QA física ASUS de cuatro inferencias, con resultados reales y desglose.
+- [x] QA física ASUS **PASS**: cuatro inferencias sobre ambos corpus, scorer consistente, desglose por contexto y riesgos de split/mix documentados.
 - [ ] Instrumentación de etapas internas o ablación controlada separada para diferenciar causas.
 - [ ] Validación adicional multirreunión / en otros idiomas y DER oficial.
 
