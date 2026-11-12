@@ -148,6 +148,14 @@ El propietario ejecutó en la ASUS `voice01_listen.py` (VOICE-01I) sobre el WAV 
 
 La salida fue **`ok=true`, `clips_played=8`, `files_written=0`, `microphone_enabled=false`, `identity_confirmed=false`**. Esto confirma ejecución del reproductor local sobre ocho recortes, pero **no certifica que cada uno contenga voz clara** ni aporta una evaluación perceptual de A1–D2. La escucha humana individual continúa sin documentarse: solicitar del operador para cada ventana `voz clara` / `ruido-pausa` / `incierto`. No tratar el éxito de `PlaySound` como una anotación VAD humana, ni declarar DER o identidad verificada. No subir WAV ni audio personal a GitHub.
 
+## VOICE-01L — verificación perceptual de las ocho ventanas (12-11-2026)
+
+Tras reproducir físicamente los ocho extractos en el orden documentado, el propietario respondió expresamente: **«sí, todos se oyen bien»**, a la pregunta de si todos tenían voz humana clara o alguno presentaba silencio, ruido o voz poco distinguible. Esta confirmación aplica a las ocho ventanas **A1, A2, B1, B2, C1, C2, D1 y D2** sin reportar incidencias.
+
+**Gate de escucha: completado como evaluación humana subjetiva.** Los ocho recortes son utilizables para el ensayo perceptual indicado. Esta confirmación humana no fue recopilada automáticamente por el script; su JSON histórico conserva correctamente `windows_audibly_checked=false` porque en el momento de la ejecución todavía no se había realizado esta confirmación. No hay nueva ejecución de embeddings, ni RTTM independiente, ni validación de identidad o DER.
+
+**Cierre VOICE-01L:** QA físico del pipeline y reproducción PASS, escuchabilidad de los ocho extractos confirmada, relación de cosenos A-C/A-D sobre A-B consistente en el WAV examinado. La hipótesis de sobrefragmentación está apoyada cualitativamente, pero todavía no demostrada de forma generalizable. Próximo gate **VOICE-01M**: evaluación con audios nuevos y anotaciones independientes por turnos (incluidos silencios, transiciones y solapamientos), antes de experimentar con cambios en clustering o valores de umbral.
+
 ## Estado
 
 - [x] VOICE-01J revisión perceptual C≈A/D≈A.
@@ -156,7 +164,7 @@ La salida fue **`ok=true`, `clips_played=8`, `files_written=0`, `microphone_enab
 - [x] VOICE-01L CI Windows/Linux: **PASS** del commit `89bc60b1` en run [43146852682](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43146852682), pruebas sintéticas sin inferencia ONNX real.
 - [x] VOICE-01L inferencia real ASUS: **PASS de ejecución**, 764 ms, 28 cosenos y márgenes positivos documentados; no implica DER.
 - [x] Reproducción física de los ocho recortes con VOICE-01I: `ok=true` y 8/8 ejecutados.
-- [ ] Clasificación perceptual individual (voz clara / ruido-pausa / incierto) de las ocho ventanas: pendiente.
+- [x] Confirmación auditiva humana de las ocho ventanas: «sí, todos se oyen bien»; evaluación subjetiva sin incidentes reportados.
 - [ ] Corpus humano anotado (incluidos solapamientos) y DER independiente: pendiente.
 
 **Protecciones:** no cambiar clustering, no fusionar `speaker_0`/`speaker_2` automáticamente, no establecer umbrales por intuición. PR #79 en borrador; `main`, modelos personales y LUMIA en vivo intactos.
