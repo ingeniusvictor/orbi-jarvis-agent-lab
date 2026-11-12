@@ -108,8 +108,9 @@ def main(argv=None, *, audio_player=None):
             import winsound
 
             def audio_player(data):
-                winsound.PlaySound(
-                    data, winsound.SND_MEMORY | winsound.SND_SYNC)
+                # PlaySound is synchronous by default; SND_SYNC does not
+                # exist in the Windows winsound Python module.
+                winsound.PlaySound(data, winsound.SND_MEMORY)
 
         for i, (start, end) in enumerate(clips, 1):
             data = build_excerpt(pcm, start, end)
