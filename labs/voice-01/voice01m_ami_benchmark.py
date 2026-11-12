@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import io
-import itertools
 import json
 import math
 import os
@@ -45,6 +44,7 @@ SEG_MODEL = "sherpa-onnx-pyannote-segmentation-3-0/model.onnx"
 ERES_MODEL = "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx"
 MAX_AUDIO_BYTES = 65_000_000
 MAX_RTTM_BYTES = 2_000_000
+MAX_AUTOMATIC_CLUSTERS = 64  # Fail safely above this; do not force a count in sherpa.
 
 
 class BenchmarkError(ValueError):
@@ -107,14 +107,18 @@ def cut_audio(source: bytes) -> bytes:
     return out.getvalue()
 
 
-def validate_segments(segments: list[tuple], *, max_duration: float = SECONDS):
+def validate_segments(segments: list[tuple], *, max_duration: float = SECONDS,
+                      max_speakers: int = 4):
     for start, end, name in segments:
         if (not math.isfinite(start) or not math.isfinite(end) or
                 start < 0 or end <= start or end > max_duration + 1e-6 or
                 not isinstance(name, str) or not name):
             raise BenchmarkError("INVALID_SEGMENTS")
-    if len({name for _, _, name in segments}) > 4:
-        raise BenchmarkError("MORE_THAN_FOUR_SPEAKERS")
+    if len({name for _, _, name in segments}) > max_speakers:
+        raise BenchmarkError(
+            "TOO_MANY_AUTOMATIC_CLUSTERS" if max_speakers > 4
+            else "MORE_THAN_FOUR_SPEAKERS"
+        )
 
 
 def crop_manual_rttm(source: str) -> tuple[str, list[tuple]]:
@@ -251,7 +255,11 @@ def score_intervals(reference: list[tuple], predicted: list[tuple],
     voices counted. It is NOT the published official DER protocol (UEM/collar).
     """
     validate_segments(reference, max_duration=duration)
-    validate_segments(predicted, max_duration=duration)
+    # The manual reference has four speakers. Automatic diarizers may return
+    # substantially MORE groups due to overfragmentation; scoring must count
+    # and penalize those groups, not truncate or force num_speakers=4.
+    validate_segments(predicted, max_duration=duration,
+                      max_speakers=MAX_AUTOMATIC_CLUSTERS)
     if not reference:
         raise BenchmarkError("EMPTY_REFERENCE")
     event: dict[float, list] = defaultdict(list)
@@ -286,12 +294,25 @@ def score_intervals(reference: list[tuple], predicted: list[tuple],
         raise BenchmarkError("EMPTY_REFERENCE")
     rids = sorted({sp for _, _, sp in reference})
     pids = sorted({sp for _, _, sp in predicted})
-    targets = rids + ["__unmapped_" + str(i) for i in range(len(pids))]
-    correct = 0.0
-    for permutation in itertools.permutations(targets, len(pids)):
-        score = sum(cooccur.get((gold, predicted_sp), 0.0)
-                    for predicted_sp, gold in zip(pids, permutation))
-        correct = max(correct, score)
+    # Exact maximum-weight one-to-one assignment. Unmatched automatic groups
+    # remain unmatched and contribute to confusion; they are NOT merged.
+    # Mask represents assigned manual reference speakers (at most four), so
+    # O(predicted_groups * 2**reference_groups * reference_groups) replaces the
+    # factorial permutation enumeration that cannot scale above four groups.
+    states = {0: 0.0}
+    for predicted_sp in pids:
+        next_states = dict(states)  # Skip this predicted group (unmapped).
+        for mask, cumulative in states.items():
+            for idx, gold in enumerate(rids):
+                bit = 1 << idx
+                if mask & bit:
+                    continue
+                new_mask = mask | bit
+                candidate = cumulative + cooccur.get((gold, predicted_sp), 0.0)
+                if candidate > next_states.get(new_mask, float("-inf")):
+                    next_states[new_mask] = candidate
+        states = next_states
+    correct = max(states.values(), default=0.0)
     confusion = max(0.0, baseline_confusion - correct)
     error = (missed + false_alarm + confusion) / total_ref
     return {
