@@ -1,6 +1,6 @@
 # LUMIA VOICE-01J — Revisor GUI offline de clips (2026-11-11)
 
-**Alcance:** nueva interfaz gráfica de Windows en el laboratorio aislado, tras la reproducción física PASS de siete fragmentos (VOICE-01I). La interfaz **todavía no se ha ejecutado físicamente en ASUS**. No se activa en LUMIA en vivo, no modifica Whisper, Kokoro, Qwen ni micrófono, y no produce RTTM ni identifica personas.
+**Alcance:** nueva interfaz gráfica de Windows en el laboratorio aislado, tras la reproducción física PASS de siete fragmentos (VOICE-01I). La interfaz **ya se abrió y utilizó en la ASUS para seleccionar opciones y copiar un resumen**; falta evaluar los botones de reproducción dentro de esta GUI y cerrar las dos respuestas pendientes del Audio 3. No se activa en LUMIA en vivo, no modifica Whisper, Kokoro, Qwen ni micrófono, y no produce RTTM ni identifica personas.
 
 ## Por qué existe
 
@@ -41,7 +41,7 @@ El hecho de haber copiado este resumen desde la interfaz es evidencia de ejecuci
 2. Las etiquetas A/B/C/D son temporales **por grabación**, no nombres ni perfiles biométricos.
 3. El archivo JSON local solo representa respuestas voluntarias; un valor "otra" no demuestra por sí solo un tercer hablante real en la grabación completa.
 4. Las pausas, ruidos, voces simultáneas y segmentos omitidos no quedan totalmente anotados; para evaluar diarización rigurosamente se requiere un RTTM completo con límites y verificación independiente.
-5. Tkinter GUI en Windows será probado físicamente en ASUS antes de marcar VOICE-01J PASS; CI solo comprueba importación Tk y lógica sin ventana/altavoces reales.
+5. El uso real de la GUI en ASUS está **parcialmente validado** por un resumen copiado: apertura, controles de selección y portapapeles. CI comprueba además importación Tk y lógica sin altavoces; falta confirmar los botones de escucha dentro de la GUI antes de marcar la fase completa PASS.
 
 ## Comando de ejecución, solo Windows
 
@@ -61,7 +61,7 @@ Si la ASUS no tiene Tkinter en el Python base, la UI fallará con error de impor
 ## Gate de cierre
 
 - CI Windows/Linux: pruebas sintéticas para valores de radio, validación del SHA del audio, guardado solo por acción explícita, ausencia de sobreescritura, y modo --doctor. Windows valida importación de Tkinter, **no** la reproducción con altavoces en ASUS.
-- QA física pendiente: la ventana abre, reproducen los 8 botones, las selecciones se conservan entre pestañas, el resumen se copia correctamente y no hay archivo local antes de pulsar Guardar.
+- QA física parcial: ventana, interacción y copia de resumen confirmadas en ASUS. Queda pendiente confirmar todos los botones de reproducción de la GUI, la persistencia de selección entre pestañas y que no se guarde JSON hasta pulsar Guardar; **el guardado es totalmente opcional**.
 - Recolección perceptual opcional: el usuario decide si C corresponde a A/B/otra/incierto, y si las dos intervenciones alrededor del segundo 18 se solapan. Las opiniones se registran como opiniones, no como verdad terreno.
 
 **Protecciones:** archivos del repositorio no guardan WAV/ONNX ni biometría, PR #79 sigue en borrador, sin cambios a main ni al programa cotidiano de LUMIA.
