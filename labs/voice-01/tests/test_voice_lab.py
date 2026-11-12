@@ -189,6 +189,26 @@ class VoiceLabTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             gui.pending_questions(dict(answers, audio3_c="named_person"))
 
+    def test_voice01j_audio3_only_summary_is_scoped(self):
+        answers = gui.empty_answers()
+        answers["audio3_c"] = "A"
+        answers["audio3_d"] = "incierto"
+        self.assertEqual(gui.review_keys(audio3_only=True),
+                         ("audio3_c", "audio3_d"))
+        text = gui.summary_text(answers, audio3_only=True)
+        self.assertIn("SOLO AUDIO 3", text.upper())
+        self.assertIn("Audio 3: C suena como: A", text)
+        self.assertIn("Audio 3: D suena como: incierto", text)
+        self.assertNotIn("Audio 2:", text)
+        # The original comprehensive review stays backward-compatible.
+        self.assertIn("Audio 2: C suena como: pendiente",
+                      gui.summary_text(answers))
+        from contextlib import redirect_stdout
+        with redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(gui.main(["--doctor", "--audio3-only"]), 0)
+        doctor = __import__("json").loads(output.getvalue())
+        self.assertFalse(doctor["microphone_enabled"])
+
     def test_voice01j_opt_in_json_save_only(self):
         with TemporaryDirectory() as directory:
             target = Path(directory) / "reviews" / "test-review.json"
