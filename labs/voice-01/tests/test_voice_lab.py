@@ -340,6 +340,61 @@ class VoiceLabTests(unittest.TestCase):
         with self.assertRaises(benchmark.BenchmarkError):
             benchmark.score_intervals([], [], duration=2.0)
 
+    def test_voice01m_scores_six_automatic_groups_without_forcing_four(self):
+        # A reference with two people can legitimately be overfragmented into
+        # six automatic labels. The extra groups must add confusion, not error.
+        gold = [(0.0, 3.0, "p0"), (3.0, 6.0, "p1")]
+        pred = [(float(i), float(i + 1), "speaker_" + str(i))
+                for i in range(6)]
+        score = benchmark.score_intervals(gold, pred, duration=6.0)
+        self.assertEqual(score["reference_speakers"], 2)
+        self.assertEqual(score["predicted_speakers"], 6)
+        self.assertEqual(score["miss_seconds"], 0)
+        self.assertEqual(score["false_alarm_seconds"], 0)
+        self.assertAlmostEqual(score["confusion_seconds"], 4.0)
+        self.assertEqual(score["error_fraction"], 0.666667)
+
+    def test_voice01m_twenty_auto_clusters_bounded_exact_assignment(self):
+        gold = [(0.0, 10.0, "p0"), (10.0, 20.0, "p1")]
+        pred = [(float(i), float(i + 1), f"speaker_{i}")
+                for i in range(20)]
+        score = benchmark.score_intervals(gold, pred, duration=20.0)
+        self.assertEqual(score["predicted_speakers"], 20)
+        self.assertEqual(score["confusion_seconds"], 18.0)
+        self.assertEqual(score["error_fraction"], 0.9)
+        excessive = [(0.0, 1.0, f"speaker_{i}")
+                     for i in range(benchmark.MAX_AUTOMATIC_CLUSTERS + 1)]
+        with self.assertRaisesRegex(
+            benchmark.BenchmarkError, "TOO_MANY_AUTOMATIC_CLUSTERS"
+        ):
+            benchmark.score_intervals([(0, 1, "p0")], excessive, duration=1.0)
+
+    def test_voice01m_run_preserves_automatic_count_over_four(self):
+        from unittest.mock import patch
+        with TemporaryDirectory() as folder:
+            base = Path(folder)
+            seg = base / "models" / benchmark.SEG_MODEL
+            emb = base / "models" / benchmark.MODEL_NAME
+            for path in (seg, emb):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"synthetic placeholder only")
+            reference = [(0.0, 3.0, "p0"), (3.0, 6.0, "p1")]
+            turns = [{"start": float(i), "end": float(i + 1),
+                      "speaker": "speaker_" + str(i)} for i in range(6)]
+            with patch.object(benchmark, "load_prepared",
+                              return_value=(b"synthetic_pcm", reference)), \\
+                 patch.object(benchmark, "sha_matches", return_value=True), \\
+                 patch.object(benchmark.voice, "diarize",
+                              return_value=(turns, 6)) as diarize:
+                result = benchmark.run(base, "campp")
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["models"][0]["auto_speaker_count"], 6)
+            self.assertEqual(result["models"][0]["reference_speakers"], 2)
+            self.assertEqual(result["models"][0]["predicted_speakers"], 6)
+            self.assertEqual(result["models"][0]["error_fraction"], 0.666667)
+            self.assertEqual(diarize.call_args.kwargs["cluster_threshold"], 0.5)
+            self.assertEqual(diarize.call_args.args[3], -1)
+
     def test_voice01m_prepare_public_fixture_offline_and_checksum(self):
         import json
         from unittest.mock import patch
