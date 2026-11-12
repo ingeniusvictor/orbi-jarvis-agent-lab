@@ -80,12 +80,38 @@ finally {
 
 **No ejecutar `--prepare`**: el corpus y su referencia ya existen en ASUS. Publicar en este hilo exclusivamente el JSON de salida (sin audios ni archivos de referencia).
 
+## QA real ASUS — matriz VOICE-01N (12-11-2026)
+
+Se recibió log local de Windows/ASUS de la ejecución **`--run --compare --consent`** después del fast-forward `4e53240..7091e77`:
+
+- `--doctor`: `prepared_files_present=true`, CAM++/ERes2Net, sin micrófono/red/escrituras.
+- `--run`: **`ok=true`** para los dos modelos; `source_audio_reused=true`, `new_downloads=0`, `files_written=0`, `raw_predictions_exported=false`, `embedding_vectors_exported=false`.
+- Ambas inferencias: **8 grupos automáticos frente a 4 voces manuales**, umbral `0.50`. CAM++: 18 segmentos, `cpu_elapsed_ms=18778`, error experimental `13.726%`. ERes2Net: 15 segmentos, `cpu_elapsed_ms=46201`, error experimental `16.733%`. No se trata de DER oficial ni de evaluación multicorpus.
+- Referencia: **4.73 s de solapamiento wallclock**; coincidencia sin ambigüedad de 1 manual + 1 predicción: **82.776 s CAM++**, **82.741 s ERes2Net**. Estas cantidades no deben confundirse con los **96.56 segundos-hablante** de la referencia.
+
+### Correspondencias no ambiguas por hablante (segundos)
+
+| Manual | CAM++ — grupos con al menos 1 s | ERes2Net — grupos con al menos 1 s | % del grupo dominante CAM++ / ERes2Net |
+| --- | --- | --- | --- |
+| p0 | speaker_0: **69.483** | speaker_0: **69.561** | 99.44 / 99.44 |
+| p1 | speaker_6: **4.544**; speaker_1: **4.383** | speaker_5: **3.989**; speaker_1: **3.212**; speaker_6: **1.570** | **50.77 / 45.36** |
+| p2 | speaker_5: **1.528** | speaker_4: **1.536** | 97.14 / 95.05 |
+| p3 | speaker_3: **2.380** | speaker_3: **2.380** | 100 / 100 |
+
+Contribuciones inferiores a 1 s: CAM++ p0←speaker_2 0.390, p1←speaker_2 0.023, p2←speaker_4 0.045; ERes2Net p0←speaker_2 0.390, p1←speaker_2 0.023, p2←speaker_3 0.080. El umbral de 1 s es solo un criterio de presentación fijado antes del resultado, **no una regla para fusionar**.
+
+**Análisis acotado:** el foco principal de posible sobrefragmentación es **p1**: en CAM++ dos grupos explican **8.927/8.950 s** de coincidencia no ambigua, mientras ERes2Net reparte **8.771/8.794 s** en tres grupos. Se apoya la existencia de una división de etiquetas para p1 según RTTM AMI; todavía puede existir influencia del contenido, solapamientos, segmentación y anotaciones `only_words`.
+
+El grupo `speaker_7` tiene **0.000 s de soporte en la matriz sin ambigüedad** en ambos modelos, pero duración predicha total de **1.165 s CAM++** y **2.532 s ERes2Net**, con 0 s fuera de referencia. Su presencia en actividad de referencia sin coincidencia 1:1 requiere estudiar voces superpuestas o predicciones simultáneas; **no se le puede asignar arbitrariamente a otra persona ni considerarlo ruido automáticamente**.
+
+**Siguiente gate técnico:** inspección de regiones anonimizadas con mayor soporte de p1 frente a sus grupos asociados y una reunión AMI adicional elegida antes de ver sus resultados. No modificar `cluster_threshold`, no fusionar IDs, no afirmar precisión general ni incorporar el código a LUMIA live.
+
 ## Gates
 
 - [x] Matriz temporal anónima, con discriminación de solapamiento / no solapamiento, programada en la rama de laboratorio.
 - [x] Tests sintéticos de matriz, superposición, no referencia, 6+ grupos, consentimiento y contrato de modelos.
 - [x] CI Windows/Linux de VOICE-01N: **PASS**, 40 tests en cada SO, run [43153038195](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43153038195), commit `75c8d287` (tests sintéticos, no inferencia AMI real).
-- [ ] QA físico ASUS con CAM++ y ERes2Net (mismos pesos/umbral).
+- [x] QA físico ASUS: `ok=true` en CAM++ y ERes2Net, matrices completas y resumen de fragmentación de p1 documentados.
 - [ ] Evaluación de hipótesis con otra reunión independiente.
 - [ ] DER oficial o validación humana de confusiones reales (sin datos sensibles).
 
