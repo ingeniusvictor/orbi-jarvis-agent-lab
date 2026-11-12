@@ -80,7 +80,7 @@ If already prepared, --prepare deliberately errors with LOCAL_BENCHMARK_ALREADY_
 - [x] External manual AMI reference source independently published.
 - [x] Local opt-in downloader/clipper, consent gate and checksum manifest.
 - [x] Time-integrated, overlap-aware DER-like evaluation code and synthetic tests.
-- [ ] CI Windows and Linux: verify on latest commit.
+- [x] CI Windows and Linux: **PASS** del commit 2b9fc2c, run https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43150234154 (31 pruebas sintéticas y contrato de preparación sin red; no es inferencia AMI real).
 - [ ] Real ASUS preparation of AMI audio and reference.
 - [ ] Real ASUS comparison of CAM++ and ERes2Net.
 - [ ] Later: additional meetings, Spanish, home audio, independent labeled ground truth and official DER scorer.
