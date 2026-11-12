@@ -381,11 +381,13 @@ class VoiceLabTests(unittest.TestCase):
             reference = [(0.0, 3.0, "p0"), (3.0, 6.0, "p1")]
             turns = [{"start": float(i), "end": float(i + 1),
                       "speaker": "speaker_" + str(i)} for i in range(6)]
-            with patch.object(benchmark, "load_prepared",
-                              return_value=(b"synthetic_pcm", reference)), \\
-                 patch.object(benchmark, "sha_matches", return_value=True), \\
-                 patch.object(benchmark.voice, "diarize",
-                              return_value=(turns, 6)) as diarize:
+            with (
+                patch.object(benchmark, "load_prepared",
+                             return_value=(b"synthetic_pcm", reference)),
+                patch.object(benchmark, "sha_matches", return_value=True),
+                patch.object(benchmark.voice, "diarize",
+                             return_value=(turns, 6)) as diarize,
+            ):
                 result = benchmark.run(base, "campp")
             self.assertTrue(result["ok"])
             self.assertEqual(result["models"][0]["auto_speaker_count"], 6)
