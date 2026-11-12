@@ -48,12 +48,31 @@ finally {
 - Un coseno de clip completo **no coincide necesariamente con el embedding exacto usado por el pipeline de diarización** (segmentación, ventanas, normalización y agregación pueden diferir). No usar este experimento para calcular DER, calibrar automáticamente threshold ni fusionar clusters; cada resultado será evidencia exploratoria.
 - La semejanza acústica no autentica personas reales, ni sustituye verificar el destinatario de los comandos de LUMIA.
 
+## QA físico ASUS — VOICE-01K completado (12-11-2026, hora local Chile)
+
+El propietario compartió la salida literal de PowerShell del entorno **ASUS/LUMIA-VOICE-LAB** después de actualizar en fast-forward `6ba6208..e4dae8a`. El modo `--doctor` informó `sherpa_installed=true`, `microphone_enabled=false`, `network_enabled=false`, `files_written=0`. La inferencia `--consent` respondió `ok=true`, muestra `3-two-speakers-en.wav`, extractor `CAM++`, prueba `four_fixed_clip_embeddings`, duración de procesamiento `elapsed_ms=1108`.
+
+| Par | Coseno |
+| --- | ---: |
+| A–B | 0.39515 |
+| A–C | 0.73412 |
+| A–D | 0.81847 |
+| B–C | 0.34419 |
+| B–D | 0.34815 |
+| C–D | 0.75023 |
+
+**Interpretación:** C y D exhiben mayor similitud de embeddings con A que la referencia B (A-C vs A-B = +0.33897; A-D vs A-B = +0.42332). A-D (0.81847) incluso supera C-D (0.75023), aunque el diarizador asignó A a `speaker_0` y C/D a `speaker_2`. Los resultados **son compatibles** con un exceso de fragmentación de clusters, tal como sugirió la escucha humana C≈A, D≈A. No hay prueba de que las tres intervenciones pertenezcan a la misma persona, ni exactitud/DER ni estimación de probabilidad biométrica. Los cosenos no equivalen a los umbrales de distancia de clustering de los embeddings internos del diarizador. Tampoco se valida el tiempo de respuesta de LUMIA en vivo.
+
+La propia salida afirma `clip_level_only=true`, `equivalent_to_diarizer_internal=false`, `speaker_identity_verified=false`, `der_validated=false`, `embedding_vectors_exported=false`, `files_written=0`, `microphone_enabled=false`, `network_enabled=false`. **No se subió audio personal, ni pesos o embeddings a GitHub**; solo estos seis números.
+
+**Siguiente gate sugerido, VOICE-01L:** comprobar robustez del resultado con subfragmentos temporalmente independientes y duración equiparada dentro del mismo WAV público: al menos dos ventanas por cada grupo acústico, comparar cosenos intra/inter-grupo sin almacenar vectores; observar si A/C/D siguen próximos y B separado. No elegir un threshold o fusionar speaker_0 y speaker_2 a partir de esta única muestra. Para validar diarización final harán falta RTTM de referencia y grabaciones consentidas independientes, incluyendo solapes.
+
 ## Estado de gates
 
 - [x] VOICE-01J: Audio 3 C≈A y D≈A documentado, resultados subjetivos.
 - [x] Script VOICE-01K preparado en rama experimental, sin modificaciones al producto.
-- [ ] CI Windows/Linux en el commit final — comprobar antes de reportar PASS.
-- [ ] Ejecución física ASUS — **pendiente**; no inventar puntuaciones coseno.
+- [x] CI sintética Windows/Linux del commit `e4dae8ac` — PASS en run 43144753096; no infiere calidad física.
+- [x] Inferencia física ASUS de cuatro clips — `ok=true`, seis cosenos documentados, 1108 ms; no es validación DER.
 - [ ] Referencia independiente RTTM/DER y escenarios físicos multihablante — pendiente.
 
 **Restricciones:** PR #79 en borrador, `main` y `src/lib/voice.ts` intactos, nada de sonido privado ni embeddings en GitHub.
