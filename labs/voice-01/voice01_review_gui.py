@@ -66,6 +66,12 @@ def validate_answers(answers: dict[str, str]) -> dict[str, str]:
     return dict(answers)
 
 
+def pending_questions(answers: dict[str, str]) -> list[str]:
+    checked = validate_answers(answers)
+    return [DESCRIPTIONS[key] for key in CHOICES
+            if checked[key] == "pendiente"]
+
+
 def summary_text(answers: dict[str, str]) -> str:
     checked = validate_answers(answers)
     lines = [
@@ -138,6 +144,17 @@ def launch_gui(pcm: dict[str, bytes], out_dir: Path):
 
     status = tk.StringVar(value="Listo. Reproduce los clips. No se graba audio.")
     answers = {name: tk.StringVar(value="pendiente") for name in CHOICES}
+    progress = tk.StringVar(value="0 de 4 respuestas. Hay campos pendientes.")
+
+    def update_progress(*_args):
+        selected = {key: var.get() for key, var in answers.items()}
+        missing = pending_questions(selected)
+        progress.set(f"{len(CHOICES) - len(missing)} de 4 respuestas. "
+                     + ("Evaluacion completa." if not missing
+                        else f"{len(missing)} pendientes (puedes copiar una revision parcial)."))
+
+    for selection in answers.values():
+        selection.trace_add("write", update_progress)
 
     top = ttk.Frame(root, padding=12)
     top.pack(fill="both", expand=True)
@@ -199,8 +216,10 @@ def launch_gui(pcm: dict[str, bytes], out_dir: Path):
                  [("A", "A"), ("B", "B"), ("C", "C"), ("otra", "Otra"),
                   ("incierto", "Incierto")])
 
+    ttk.Label(top, textvariable=progress, wraplength=725,
+              foreground="#704800").pack(anchor="w", pady=(10, 3))
     ttk.Label(top, textvariable=status, wraplength=725).pack(
-        anchor="w", pady=(10, 7))
+        anchor="w", pady=(3, 7))
 
     def selected():
         return {key: var.get() for key, var in answers.items()}
@@ -211,7 +230,12 @@ def launch_gui(pcm: dict[str, bytes], out_dir: Path):
             root.clipboard_clear()
             root.clipboard_append(value)
             root.update_idletasks()
-            status.set("Resumen anonimizado copiado; pegalo en el chat cuando quieras.")
+            missing = pending_questions(selected())
+            if missing:
+                status.set(f"Resumen PARCIAL copiado: {len(missing)} respuestas pendientes. "
+                           "Puedes completar el Audio 3 y copiarlo otra vez.")
+            else:
+                status.set("Resumen completo copiado; pegalo en el chat cuando quieras.")
         except (ValueError, tk.TclError):
             messagebox.showerror("Error", "No se pudo copiar el resumen.")
 
