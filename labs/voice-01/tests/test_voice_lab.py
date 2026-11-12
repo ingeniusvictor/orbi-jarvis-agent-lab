@@ -15,6 +15,7 @@ import voice01_review_gui as gui
 import voice01k_similarity as similarity
 import voice01l_stability as stability
 import voice01m_ami_benchmark as benchmark
+import voice01n_reference_matrix as matrix
 
 
 def make_wav(seconds=1.0, rate=16000, channels=1):
@@ -449,6 +450,105 @@ class VoiceLabTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()) as errors:
             self.assertEqual(benchmark.main(["--run"]), 1)
         self.assertIn("CONSENT_REQUIRED", errors.getvalue())
+
+    def test_voice01n_matrix_detects_a_split_without_auto_merging(self):
+        reference = [(0.0, 4.0, "p0"), (4.0, 8.0, "p1")]
+        predicted = [(0.0, 2.0, "speaker_0"),
+                     (2.0, 4.0, "speaker_1"),
+                     (4.0, 8.0, "speaker_2")]
+        data = matrix.summarize_matrix(reference, predicted, duration=8.0)
+        self.assertEqual(data["reference_count"], 2)
+        self.assertEqual(data["prediction_count"], 3)
+        self.assertEqual(data["reference_labels"], ["p0", "p1"])
+        self.assertEqual(data["prediction_labels"],
+                         ["speaker_0", "speaker_1", "speaker_2"])
+        self.assertEqual(data["nonoverlap_matrix"][0]["seconds_by_predicted"],
+                         [2.0, 2.0, 0.0])
+        self.assertEqual(data["nonoverlap_matrix"][1]["seconds_by_predicted"],
+                         [0.0, 0.0, 4.0])
+        self.assertEqual(data["reference_split_diagnostics"][0]["contributing_groups"], 2)
+        self.assertEqual(data["reference_split_diagnostics"][0]["groups_with_at_least_1_second"], 2)
+        self.assertEqual(data["reference_split_diagnostics"][0]["top_group_share_pct"], 50.0)
+        self.assertFalse(data["split_diagnosis_confirmed"])
+        self.assertNotIn("audio", str(data))
+
+    def test_voice01n_overlap_remains_separate_from_unambiguous(self):
+        ref = [(0, 3, "p0"), (1, 2, "p1")]
+        pred = [(0, 3, "speaker_0")]
+        data = matrix.summarize_matrix(ref, pred, duration=3.0)
+        self.assertEqual(data["unambiguous_wallclock_seconds"], 2.0)
+        self.assertEqual(data["reference_overlap_wallclock_seconds"], 1.0)
+        self.assertEqual(data["nonoverlap_matrix"][0]["seconds_by_predicted"], [2.0])
+        self.assertEqual(data["nonoverlap_matrix"][1]["seconds_by_predicted"], [0.0])
+        self.assertEqual(data["coactive_matrix"][0]["seconds_by_predicted"], [3.0])
+        self.assertEqual(data["coactive_matrix"][1]["seconds_by_predicted"], [1.0])
+        self.assertEqual(data["reference_split_diagnostics"][1]["top_group"], None)
+
+    def test_voice01n_non_reference_prediction_is_not_misattributed(self):
+        ref = [(2, 4, "p0")]
+        pred = [(0, 2, "speaker_0"), (2, 4, "speaker_1")]
+        data = matrix.summarize_matrix(ref, pred, duration=4)
+        self.assertEqual(data["predicted_group_details"][0]["outside_manual_reference_seconds"], 2.0)
+        self.assertIsNone(data["predicted_group_details"][0]["dominant_reference"])
+        self.assertEqual(data["predicted_group_details"][1]["dominant_reference"], "p0")
+        self.assertEqual(data["reference_split_diagnostics"][0]["contributing_groups"], 1)
+
+    def test_voice01n_rejects_bad_segments_and_over_64_labels(self):
+        with self.assertRaisesRegex(benchmark.BenchmarkError, "EMPTY_REFERENCE"):
+            matrix.summarize_matrix([], [], duration=4)
+        with self.assertRaisesRegex(benchmark.BenchmarkError, "INVALID_SEGMENTS"):
+            matrix.summarize_matrix([(0, float("nan"), "p0")], [], duration=4)
+        groups = [(0, 1, f"speaker_{x}") for x in
+                  range(benchmark.MAX_AUTOMATIC_CLUSTERS + 1)]
+        with self.assertRaisesRegex(benchmark.BenchmarkError, "TOO_MANY_AUTOMATIC_CLUSTERS"):
+            matrix.summarize_matrix([(0, 1, "p0")], groups, duration=4)
+
+    def test_voice01n_doctor_and_no_consent(self):
+        from contextlib import redirect_stdout, redirect_stderr
+        import json
+        with redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(matrix.main(["--doctor", "--compare"]), 0)
+        payload = json.loads(out.getvalue())
+        self.assertFalse(payload["microphone_enabled"])
+        self.assertFalse(payload["network_enabled"])
+        self.assertEqual(payload["files_written"], 0)
+        self.assertEqual(payload["models"], ["CAM++", "ERes2Net"])
+        with redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(matrix.main(["--run", "--compare"]), 1)
+        self.assertIn("CONSENT_REQUIRED", err.getvalue())
+
+    def test_voice01n_mock_models_preserve_auto_threshold_and_no_files(self):
+        from unittest.mock import patch
+        with TemporaryDirectory() as folder:
+            base = Path(folder)
+            models = [base / "models" / benchmark.SEG_MODEL,
+                      base / "models" / benchmark.MODEL_NAME,
+                      base / "models" / benchmark.ERES_MODEL]
+            for model in models:
+                model.parent.mkdir(parents=True, exist_ok=True)
+                model.write_bytes(b"dummy")
+            reference = [(0, 1, "p0"), (1, 2, "p1")]
+            turns = [{"start": 0.0, "end": 1.0, "speaker": "speaker_0"},
+                     {"start": 1.0, "end": 2.0, "speaker": "speaker_1"}]
+            before = sorted(str(p) for p in base.rglob("*"))
+            with (
+                patch.object(benchmark, "load_prepared",
+                             return_value=(b"dummy_pcm", reference)),
+                patch.object(benchmark, "sha_matches", return_value=True),
+                patch.object(benchmark.voice, "diarize",
+                             return_value=(turns, 2)) as diarize,
+            ):
+                payload = matrix.run(base, both=True)
+            self.assertEqual(sorted(str(p) for p in base.rglob("*")), before)
+            self.assertEqual(len(payload["models"]), 2)
+            self.assertEqual(payload["models"][0]["der_like_error_percent"], 0.0)
+            self.assertEqual(payload["models"][1]["auto_speaker_count"], 2)
+            self.assertEqual(diarize.call_count, 2)
+            for call in diarize.call_args_list:
+                self.assertEqual(call.args[3], -1)
+                self.assertEqual(call.kwargs["cluster_threshold"], 0.5)
+            self.assertEqual(payload["new_downloads"], 0)
+            self.assertEqual(payload["files_written"], 0)
 
     def test_voice01j_opt_in_json_save_only(self):
         with TemporaryDirectory() as directory:
