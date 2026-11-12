@@ -17,6 +17,7 @@ import voice01l_stability as stability
 import voice01m_ami_benchmark as benchmark
 import voice01n_reference_matrix as matrix
 import voice01o_second_meeting as second
+import voice01p_error_attribution as anatomy
 
 
 def make_wav(seconds=1.0, rate=16000, channels=1):
@@ -671,6 +672,139 @@ class VoiceLabTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()) as out:
             self.assertEqual(second.main(["--run", "--compare"]), 1)
         self.assertIn("CONSENT_REQUIRED", out.getvalue())
+
+    def test_voice01p_perfect_overlap_and_relabeling(self):
+        reference = [(0.0, 3.0, "p0"), (1.0, 2.0, "p1")]
+        predicted = [(0.0, 3.0, "speaker_1"),
+                     (1.0, 2.0, "speaker_0")]
+        details = anatomy.describe(reference, predicted, duration=3.0)
+        self.assertEqual(details["der_like_error_percent"], 0.0)
+        self.assertEqual(details["total_confusion_speaker_seconds"], 0)
+        self.assertEqual(
+            details["error_by_reference_activity"]["overlap_reference"]
+            ["wallclock_seconds"], 1.0)
+        self.assertEqual(
+            details["overlap_reference_predicted_multiplicity"]
+            ["at_least_two_predicted_wallclock_seconds"], 1.0)
+        self.assertTrue(details["scorer_consistency_verified"])
+        self.assertFalse(details["internal_segmentation_causally_diagnosed"])
+
+    def test_voice01p_split_only_same_reference(self):
+        reference = [(0, 4, "p0")]
+        predicted = [(0, 2, "speaker_0"), (2, 4, "speaker_1")]
+        details = anatomy.describe(reference, predicted, duration=4)
+        self.assertEqual(details["total_confusion_speaker_seconds"], 2)
+        self.assertEqual(details["total_miss_speaker_seconds"], 0)
+        self.assertEqual(details["total_false_alarm_speaker_seconds"], 0)
+        self.assertEqual(details["split_candidates"][0]["reference"], "p0")
+        self.assertEqual(details["split_candidates"][0]
+                         ["distinct_groups_with_at_least_1s"], 2)
+        self.assertEqual(details["mixed_predicted_groups"], [])
+
+    def test_voice01p_mixed_cluster_no_overcount(self):
+        reference = [(0, 1, "p0"), (1, 2, "p1")]
+        predicted = [(0, 2, "speaker_0")]
+        details = anatomy.describe(reference, predicted, duration=2)
+        self.assertEqual(details["total_confusion_speaker_seconds"], 1)
+        self.assertEqual(details["total_miss_speaker_seconds"], 0)
+        self.assertEqual(details["total_false_alarm_speaker_seconds"], 0)
+        self.assertEqual(details["split_candidates"], [])
+        self.assertEqual(details["mixed_predicted_groups"][0]["group"],
+                         "speaker_0")
+        self.assertEqual(details["mixed_predicted_groups"][0]
+                         ["distinct_references_with_at_least_1s"], 2)
+
+    def test_voice01p_overlap_under_count_is_not_cluster_identity_proof(self):
+        reference = [(0, 3, "p0"), (1, 2, "p1")]
+        predicted = [(0, 3, "speaker_0")]
+        result = anatomy.describe(reference, predicted, duration=3)
+        self.assertEqual(result["total_miss_speaker_seconds"], 1)
+        self.assertEqual(result["total_confusion_speaker_seconds"], 0)
+        self.assertEqual(result["reference_overlap_wallclock_seconds"], 1)
+        self.assertEqual(
+            result["overlap_reference_predicted_multiplicity"]
+            ["only_one_predicted_wallclock_seconds"], 1)
+
+    def test_voice01p_silence_false_alarm_is_separate_region(self):
+        reference = [(1, 2, "p0")]
+        predicted = [(0, 2, "speaker_0")]
+        result = anatomy.describe(reference, predicted, duration=3)
+        self.assertEqual(result["total_false_alarm_speaker_seconds"], 1)
+        self.assertEqual(
+            result["error_by_reference_activity"]["reference_silence"]
+            ["prediction_without_reference_wallclock_seconds"], 1)
+        self.assertEqual(
+            result["error_by_reference_activity"]["single_reference"]
+            ["false_alarm_speaker_seconds"], 0)
+
+    def test_voice01p_no_prediction_and_segment_validation(self):
+        reference = [(0, 2, "p0")]
+        result = anatomy.describe(reference, [], duration=2)
+        self.assertEqual(result["total_miss_speaker_seconds"], 2)
+        self.assertEqual(result["automatic_speaker_groups"], 0)
+        with self.assertRaises(benchmark.BenchmarkError):
+            anatomy.describe([(0, float("nan"), "p0")], [], duration=2)
+        extra = [(0, 1, f"speaker_{i}") for i in
+                 range(benchmark.MAX_AUTOMATIC_CLUSTERS + 1)]
+        with self.assertRaisesRegex(
+            benchmark.BenchmarkError, "TOO_MANY_AUTOMATIC_CLUSTERS"
+        ):
+            anatomy.describe([(0, 1, "p0")], extra, duration=2)
+
+    def test_voice01p_doctor_and_consent_gate(self):
+        import json
+        from contextlib import redirect_stdout, redirect_stderr
+        with redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(anatomy.main(["--doctor"]), 0)
+        info = json.loads(out.getvalue())
+        self.assertFalse(info["microphone_enabled"])
+        self.assertFalse(info["network_enabled"])
+        self.assertEqual(info["files_written"], 0)
+        with redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(anatomy.main(["--run", "--compare"]), 1)
+        self.assertIn("CONSENT_REQUIRED", err.getvalue())
+
+    def test_voice01p_mock_dual_meetings_and_models_unchanged(self):
+        from unittest.mock import patch
+        with TemporaryDirectory() as directory:
+            base = Path(directory)
+            models = [base / "models" / benchmark.SEG_MODEL,
+                      base / "models" / benchmark.MODEL_NAME,
+                      base / "models" / benchmark.ERES_MODEL]
+            for filename in models:
+                filename.parent.mkdir(parents=True, exist_ok=True)
+                filename.write_bytes(b"synthetic only")
+            reference = [(0, 2, "p0"), (2, 4, "p1")]
+            turns = [{"start": 0, "end": 2, "speaker": "speaker_0"},
+                     {"start": 2, "end": 4, "speaker": "speaker_1"}]
+            before = sorted(str(x) for x in base.rglob("*"))
+            with (
+                patch.object(benchmark, "load_prepared",
+                             return_value=(b"dummy", reference)) as first,
+                patch.object(second, "load_prepared",
+                             return_value=(b"dummy", reference)) as second_meeting,
+                patch.object(benchmark, "sha_matches", return_value=True),
+                patch.object(benchmark.voice, "diarize",
+                             return_value=(turns, 2)) as inference,
+            ):
+                report = anatomy.run(base, anatomy.MEETINGS, compare=True)
+            self.assertTrue(report["ok"])
+            self.assertEqual(len(report["meetings"]), 2)
+            self.assertEqual(first.call_count, 1)
+            self.assertEqual(second_meeting.call_count, 1)
+            self.assertEqual(inference.call_count, 4)
+            for call in inference.call_args_list:
+                self.assertEqual(call.args[3], -1)
+                self.assertEqual(call.kwargs["cluster_threshold"], 0.5)
+            for meeting in report["meetings"]:
+                self.assertEqual(len(meeting["models"]), 2)
+                for model in meeting["models"]:
+                    self.assertEqual(model["der_like_error_percent"], 0)
+                    self.assertTrue(model["scorer_consistency_verified"])
+            self.assertEqual(before, sorted(str(x) for x in base.rglob("*")))
+            self.assertEqual(report["new_downloads"], 0)
+            self.assertEqual(report["files_written"], 0)
+            self.assertFalse(report["model_internal_stages_instrumented"])
 
     def test_voice01j_opt_in_json_save_only(self):
         with TemporaryDirectory() as directory:
