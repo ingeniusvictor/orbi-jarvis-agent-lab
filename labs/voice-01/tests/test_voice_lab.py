@@ -13,6 +13,7 @@ import voice00_metrics as metrics
 import voice01_listen as audition
 import voice01_review_gui as gui
 import voice01k_similarity as similarity
+import voice01l_stability as stability
 
 
 def make_wav(seconds=1.0, rate=16000, channels=1):
@@ -238,6 +239,61 @@ class VoiceLabTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()) as errors:
             self.assertEqual(similarity.main([]), 1)
         self.assertIn("CONSENT_REQUIRED", errors.getvalue())
+
+    def test_voice01l_windows_are_balanced_and_disjoint(self):
+        plan = stability.validate_windows()
+        self.assertEqual(len(plan), 8)
+        self.assertEqual([name for name, _, _, _ in plan],
+                         ["A1", "A2", "B1", "B2", "C1", "C2", "D1", "D2"])
+        for name, group, start, end in plan:
+            self.assertAlmostEqual(end - start, 1.5)
+            self.assertEqual(name[0], group)
+        for windows in (
+            (*plan[:-1], ("D2", "D", 51, 52)),
+            (*plan[:-1], ("D2", "D", 49.0, 50.5)),
+            (*plan[:-1], ("D2", "D", 51.0, 54.0)),
+            (*plan[:-1], ("D2", "D", float("nan"), 52.5)),
+            (*plan[:-1], ("D1", "D", 51.0, 52.5)),
+        ):
+            with self.subTest(windows=windows[-1]):
+                with self.assertRaises(stability.SimilarityError):
+                    stability.validate_windows(windows)
+
+    def test_voice01l_aggregates_only_28_cosine_values(self):
+        vectors = {
+            "A1": [1.0, 0.0], "A2": [0.98, 0.2],
+            "B1": [0.0, 1.0], "B2": [-0.1, 0.995],
+            "C1": [0.9, 0.4], "C2": [0.8, 0.6],
+            "D1": [0.95, 0.3], "D2": [0.92, 0.39],
+        }
+        data = stability.aggregate_scores(vectors)
+        self.assertEqual([x["group"] for x in data["within"]],
+                         list("ABCD"))
+        self.assertEqual(len(data["between"]), 6)
+        self.assertEqual(sum(len(x["window_pairs"]) for x in data["between"]), 24)
+        self.assertEqual([x["pair"] for x in data["between"]],
+                         ["A-B", "A-C", "A-D", "B-C", "B-D", "C-D"])
+        self.assertGreater(data["comparisons"]["mean_ac_minus_ab"], 0)
+        self.assertGreater(data["comparisons"]["mean_ad_minus_ab"], 0)
+        self.assertGreater(data["comparisons"]["worst_ac_minus_best_ab"], 0)
+        self.assertNotIn("vectors", data)
+        with self.assertRaises(stability.SimilarityError):
+            stability.aggregate_scores({"A1": [1.0]})
+
+    def test_voice01l_doctor_and_consent_gate(self):
+        from contextlib import redirect_stdout, redirect_stderr
+        import json
+        with redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(stability.main(["--doctor"]), 0)
+        doctor = json.loads(out.getvalue())
+        self.assertEqual(doctor["window_count"], 8)
+        self.assertEqual(doctor["equal_window_seconds"], 1.5)
+        self.assertFalse(doctor["microphone_enabled"])
+        self.assertFalse(doctor["network_enabled"])
+        self.assertEqual(doctor["files_written"], 0)
+        with redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(stability.main([]), 1)
+        self.assertIn("CONSENT_REQUIRED", err.getvalue())
 
     def test_voice01j_opt_in_json_save_only(self):
         with TemporaryDirectory() as directory:
