@@ -72,14 +72,21 @@ def pending_questions(answers: dict[str, str]) -> list[str]:
             if checked[key] == "pendiente"]
 
 
-def summary_text(answers: dict[str, str]) -> str:
+def review_keys(audio3_only: bool = False) -> tuple[str, ...]:
+    """Only the still-unanswered Audio 3 questions in guided mode."""
+    return ("audio3_c", "audio3_d") if audio3_only else tuple(CHOICES)
+
+
+def summary_text(answers: dict[str, str], audio3_only: bool = False) -> str:
     checked = validate_answers(answers)
     lines = [
-        "LUMIA VOICE-01J - revision auditiva local de WAV publicos",
+        ("LUMIA VOICE-01J - Audio 3 - revision auditiva dirigida de WAV publicos"
+         if audio3_only else
+         "LUMIA VOICE-01J - revision auditiva local de WAV publicos"),
         "Evaluacion subjetiva; no verifica precision DER ni identidad personal.",
     ]
     lines.extend(
-        f"{DESCRIPTIONS[key]}: {checked[key]}" for key in CHOICES
+        f"{DESCRIPTIONS[key]}: {checked[key]}" for key in review_keys(audio3_only)
     )
     return "\n".join(lines)
 
@@ -132,24 +139,27 @@ def save_review(answers: dict[str, str], target: Path) -> Path:
     return target
 
 
-def launch_gui(pcm: dict[str, bytes], out_dir: Path):
+def launch_gui(pcm: dict[str, bytes], out_dir: Path,
+               audio3_only: bool = False):
     import tkinter as tk
     from tkinter import messagebox, ttk
     import winsound
 
     root = tk.Tk()
-    root.title("LUMIA VOICE-01J | Revision auditiva offline")
+    root.title("LUMIA VOICE-01J | " +
+               ("SOLO AUDIO 3" if audio3_only else "Revision auditiva offline"))
     root.geometry("770x720")
     root.minsize(650, 620)
 
     status = tk.StringVar(value="Listo. Reproduce los clips. No se graba audio.")
     answers = {name: tk.StringVar(value="pendiente") for name in CHOICES}
-    progress = tk.StringVar(value="0 de 4 respuestas. Hay campos pendientes.")
+    keys = review_keys(audio3_only)
+    progress = tk.StringVar()
 
     def update_progress(*_args):
         selected = {key: var.get() for key, var in answers.items()}
-        missing = pending_questions(selected)
-        progress.set(f"{len(CHOICES) - len(missing)} de 4 respuestas. "
+        missing = [key for key in keys if selected[key] == "pendiente"]
+        progress.set(f"{len(keys) - len(missing)} de {len(keys)} respuestas. "
                      + ("Evaluacion completa." if not missing
                         else f"{len(missing)} pendientes (puedes copiar una revision parcial)."))
 
@@ -158,7 +168,9 @@ def launch_gui(pcm: dict[str, bytes], out_dir: Path):
 
     top = ttk.Frame(root, padding=12)
     top.pack(fill="both", expand=True)
-    ttk.Label(top, text="VOICE-01J - Comparar voces sin identificarlas",
+    ttk.Label(top, text=("VOICE-01J - SOLO AUDIO 3 (dos preguntas)"
+                         if audio3_only else
+                         "VOICE-01J - Comparar voces sin identificarlas"),
               font=("Segoe UI", 14, "bold")).pack(anchor="w")
     ttk.Label(
         top,
@@ -202,12 +214,13 @@ def launch_gui(pcm: dict[str, bytes], out_dir: Path):
             ).pack(fill="x", pady=2)
         return tab
 
-    audio2 = create_tab("2-two-speakers-en.wav", "Audio 2 - tres grupos")
-    add_question(audio2, "audio2_c", "¿La voz de C coincide con A o B?",
-                 [("A", "A"), ("B", "B"), ("otra", "Otra"), ("incierto", "Incierto")])
-    add_question(audio2, "audio2_overlap",
-                 "En el clip de solapamiento: ¿se escuchan dos personas al mismo tiempo?",
-                 [("si", "Si"), ("no", "No"), ("incierto", "Incierto")])
+    if not audio3_only:
+        audio2 = create_tab("2-two-speakers-en.wav", "Audio 2 - tres grupos")
+        add_question(audio2, "audio2_c", "¿La voz de C coincide con A o B?",
+                     [("A", "A"), ("B", "B"), ("otra", "Otra"), ("incierto", "Incierto")])
+        add_question(audio2, "audio2_overlap",
+                     "En el clip de solapamiento: ¿se escuchan dos personas al mismo tiempo?",
+                     [("si", "Si"), ("no", "No"), ("incierto", "Incierto")])
 
     audio3 = create_tab("3-two-speakers-en.wav", "Audio 3 - cuatro clips")
     add_question(audio3, "audio3_c", "¿La voz de C coincide con A o B?",
@@ -224,13 +237,15 @@ def launch_gui(pcm: dict[str, bytes], out_dir: Path):
     def selected():
         return {key: var.get() for key, var in answers.items()}
 
+    update_progress()
+
     def copy():
         try:
-            value = summary_text(selected())
+            value = summary_text(selected(), audio3_only=audio3_only)
             root.clipboard_clear()
             root.clipboard_append(value)
             root.update_idletasks()
-            missing = pending_questions(selected())
+            missing = [key for key in keys if selected()[key] == "pendiente"]
             if missing:
                 status.set(f"Resumen PARCIAL copiado: {len(missing)} respuestas pendientes. "
                            "Puedes completar el Audio 3 y copiarlo otra vez.")
@@ -269,6 +284,8 @@ def main(argv=None):
         description="VOICE-01J guided private human listening of public clips")
     parser.add_argument("--doctor", action="store_true")
     parser.add_argument("--consent", action="store_true")
+    parser.add_argument("--audio3-only", action="store_true",
+                        help="Mostrar solo Audio 3 y sus dos preguntas pendientes.")
     args = parser.parse_args(argv)
     if args.doctor:
         print(json.dumps({
@@ -292,7 +309,7 @@ def main(argv=None):
         return 1
     try:
         pcm = checked_public_audio(private / "samples")
-        launch_gui(pcm, private / "reviews")
+        launch_gui(pcm, private / "reviews", audio3_only=args.audio3_only)
         return 0
     except (OSError, ValueError, RuntimeError, ImportError) as error:
         print(json.dumps({"lab": "VOICE-01J", "ok": False,
