@@ -65,6 +65,36 @@ El propietario compartió otra salida de la GUI VOICE-01J. Se registra como **te
 
 **Estado VOICE-01J:** evaluación de Audio 2 reiterada tres veces; Audio 3 C/D siguen sin evaluarse. No calcular DER, no concluir cantidad real de personas, no modificar el threshold ni pasar CAM++ a LUMIA en vivo. Próximo paso: **abrir la segunda pestaña «Audio 3» de la GUI**, escuchar los botones A (1–6 s), B (14–20 s), C (27–30 s) y D (48–53 s) y completar solo esos dos selectores; «incierto» es un resultado legítimo.
 
+## Cuarta revisión parcial y mejora guiada Audio 3 (11-11-2026)
+
+**Cuarta respuesta compartida desde la ASUS:** Audio 2 C = **otra**, Audio 2 simultaneidad = **sí**; Audio 3 C = **pendiente**, Audio 3 D = **pendiente**. No borrar las tres revisiones previas: las respuestas sobre simultaneidad fueron **sí → incierto → no → sí**, por lo que existe variabilidad perceptual sin referencia independiente. El valor «otra» se ha repetido, pero sigue sin validar la existencia de una tercera persona.
+
+**Mejora VOICE-01J por observación real de uso:** el revisor abre por defecto la primera pestaña Audio 2. Para no seguir repitiendo esa evaluación, se añadió la bandera **`--audio3-only`**: muestra exclusivamente los botones A/B/C/D de Audio 3 y los dos selectores C/D; el resumen copiado contiene **únicamente los campos de Audio 3**. La GUI normal sin bandera permanece sin cambios de alcance. No abre micrófono, no altera WAV, embeddings ni LUMIA en vivo.
+
+Desde PowerShell, en la carpeta independiente y con rama actualizada por fast-forward:
+
+~~~powershell
+$lab = Join-Path $env:USERPROFILE "LUMIA-VOICE-LAB"
+$data = Join-Path $env:LOCALAPPDATA "ORBI\LUMIA-VOICE-LAB"
+$branch = "feature/lumia-voice01-offline-diarization-lab-20261109"
+Push-Location $lab
+try {
+    if (git status --porcelain) { throw "Hay cambios locales: revisar antes de actualizar" }
+    git fetch origin "refs/heads/${branch}:refs/remotes/origin/${branch}"
+    if ($LASTEXITCODE -ne 0) { throw "Error en git fetch" }
+    git merge --ff-only "refs/remotes/origin/$branch"
+    if ($LASTEXITCODE -ne 0) { throw "Error de fast-forward" }
+    & (Join-Path $data ".venv\Scripts\python.exe") -B (
+        Join-Path $lab "labs\voice-01\voice01_review_gui.py"
+    ) --consent --audio3-only
+}
+finally {
+    Pop-Location
+}
+~~~
+
+**Validación pendiente:** ejecutar el nuevo modo en la ASUS y comprobar que se muestran solo cuatro clips y dos preguntas, y que copiar devuelve los dos campos. Los tests sintéticos pueden verificar el contenido y los argumentos sin simular el oído humano. No declarar físico PASS por un commit en GitHub.
+
 ## Limitaciones explícitas
 
 1. La observación del oyente es **subjetiva y parcial**: escuchar unos fragmentos no equivale a etiquetar todos los turnos del WAV ni a medir DER.
