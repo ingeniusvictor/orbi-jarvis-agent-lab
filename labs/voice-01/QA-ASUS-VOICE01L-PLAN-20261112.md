@@ -75,7 +75,7 @@ Compartir **solo** las dos salidas JSON de PowerShell, no WAV, logs con voces ni
 - [x] VOICE-01J revisión perceptual C≈A/D≈A.
 - [x] VOICE-01K prueba física ASUS con seis cosenos y 1108 ms.
 - [x] VOICE-01L script y regresiones sintéticas preparados en rama de laboratorio.
-- [ ] VOICE-01L CI Windows/Linux: verificar commit final.
+- [x] VOICE-01L CI Windows/Linux: **PASS** del commit `89bc60b1` en run [43146852682](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43146852682), pruebas sintéticas sin inferencia ONNX real.
 - [ ] VOICE-01L inferencia real ASUS: pendiente.
 - [ ] Corpus humano anotado (incluidos solapamientos) y DER independiente: pendiente.
 
