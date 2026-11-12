@@ -16,6 +16,7 @@ import voice01k_similarity as similarity
 import voice01l_stability as stability
 import voice01m_ami_benchmark as benchmark
 import voice01n_reference_matrix as matrix
+import voice01o_second_meeting as second
 
 
 def make_wav(seconds=1.0, rate=16000, channels=1):
@@ -549,6 +550,127 @@ class VoiceLabTests(unittest.TestCase):
                 self.assertEqual(call.kwargs["cluster_threshold"], 0.5)
             self.assertEqual(payload["new_downloads"], 0)
             self.assertEqual(payload["files_written"], 0)
+
+    def test_voice01o_public_crop_preserves_100_seconds(self):
+        original = make_wav(seconds=115)
+        cropped = second.crop_audio(original)
+        self.assertEqual(len(cropped), 3_200_044)
+        with wave.open(io.BytesIO(cropped), "rb") as w:
+            self.assertEqual(w.getnframes(), 1_600_000)
+            self.assertEqual(w.getframerate(), 16_000)
+        with self.assertRaisesRegex(benchmark.BenchmarkError, "TOO_SHORT"):
+            second.crop_audio(make_wav(seconds=15))
+        with self.assertRaisesRegex(benchmark.BenchmarkError, "UNSUPPORTED_FORMAT"):
+            second.crop_audio(make_wav(seconds=115, rate=8000))
+
+    def test_voice01o_manual_rttm_four_speakers_and_anonymous(self):
+        gold = "\n".join([
+            "SPEAKER ES2003a 1 9 3 <NA> <NA> originalA <NA> <NA>",
+            "SPEAKER ES2003a 1 12 2 <NA> <NA> originalB <NA> <NA>",
+            "SPEAKER ES2003a 1 17 2 <NA> <NA> originalC <NA> <NA>",
+            "SPEAKER ES2003a 1 20 2 <NA> <NA> originalD <NA> <NA>",
+            "SPEAKER ES2003a 1 120 1 <NA> <NA> originalA <NA> <NA>",
+            "SPEAKER ES2002a 1 5 3 <NA> <NA> other <NA> <NA>",
+        ])
+        anonymized, turns = second.crop_reference(gold)
+        self.assertEqual(len(turns), 4)
+        self.assertEqual({p for _, _, p in turns}, {"p0", "p1", "p2", "p3"})
+        self.assertNotIn("original", anonymized)
+        self.assertEqual(turns[0][:2], (0.0, 2.0))
+        self.assertEqual(second.parse_local_reference(anonymized), turns)
+        with self.assertRaisesRegex(
+            benchmark.BenchmarkError, "REFERENCE_NOT_FOUR"
+        ):
+            second.crop_reference("\n".join(gold.splitlines()[:3]))
+
+    def test_voice01o_prepare_checksum_and_no_overwrite_without_network(self):
+        import json
+        from unittest.mock import patch
+        original = make_wav(seconds=115)
+        rttm = "\n".join([
+            f"SPEAKER ES2003a 1 {15 + 10*i} 1 <NA> <NA> tag{i} <NA> <NA>"
+            for i in range(4)
+        ]).encode("utf-8")
+        def fixture_download(url, limit):
+            self.assertGreater(limit, 0)
+            if url == second.AUDIO_URL:
+                return original
+            if url == second.REF_URL:
+                return rttm
+            raise AssertionError("unexpected URL")
+        with TemporaryDirectory() as folder:
+            base = Path(folder)
+            with patch.object(benchmark, "download_fixed",
+                              side_effect=fixture_download) as net:
+                ready = second.prepare(base)
+            self.assertTrue(ready["ok"])
+            self.assertEqual(net.call_count, 2)
+            self.assertFalse(ready["full_original_recording_saved"])
+            wav, rttm_path, meta = second.paths(base)
+            self.assertEqual(wav.stat().st_size, 3_200_044)
+            self.assertEqual(len(list(base.rglob("*.wav"))), 1)
+            manifest = json.loads(meta.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["meeting"], "ES2003a")
+            self.assertTrue(manifest["audio_sha256"])
+            pcm, reference = second.load_prepared(base)
+            self.assertEqual(len(pcm), 3_200_000)
+            self.assertEqual(len(reference), 4)
+            with self.assertRaisesRegex(benchmark.BenchmarkError, "ALREADY_PREPARED"):
+                second.prepare(base)
+            with rttm_path.open("ab") as outfile:
+                outfile.write(b"corruption")
+            with self.assertRaisesRegex(benchmark.BenchmarkError, "REFERENCE_MODIFIED"):
+                second.load_prepared(base)
+
+    def test_voice01o_second_meeting_models_auto_and_matrix(self):
+        from unittest.mock import patch
+        with TemporaryDirectory() as folder:
+            base = Path(folder)
+            models = [base / "models" / benchmark.SEG_MODEL,
+                      base / "models" / benchmark.MODEL_NAME,
+                      base / "models" / benchmark.ERES_MODEL]
+            for p in models:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(b"test only")
+            ref = [(0, 1, "p0"), (1, 2, "p1"),
+                   (2, 3, "p2"), (3, 4, "p3")]
+            predicted = [{"start": float(i), "end": float(i + 1),
+                          "speaker": f"speaker_{i}"} for i in range(4)]
+            before = sorted(str(x) for x in base.rglob("*"))
+            with (
+                patch.object(second, "load_prepared",
+                             return_value=(b"pcm_for_test", ref)),
+                patch.object(benchmark, "sha_matches", return_value=True),
+                patch.object(benchmark.voice, "diarize",
+                             return_value=(predicted, 4)) as diarize,
+            ):
+                result = second.evaluate(base, compare=True)
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["meeting"], "ES2003a")
+            self.assertEqual(len(result["models"]), 2)
+            self.assertEqual(result["models"][0]["der_like_error_percent"], 0)
+            self.assertEqual(len(result["models"][0]["reference_split_diagnostics"]), 4)
+            self.assertEqual(diarize.call_count, 2)
+            for called in diarize.call_args_list:
+                self.assertEqual(called.args[3], -1)
+                self.assertEqual(called.kwargs["cluster_threshold"], 0.5)
+            self.assertEqual(before, sorted(str(x) for x in base.rglob("*")))
+            self.assertEqual(result["new_downloads_during_inference"], 0)
+            self.assertEqual(result["files_written_during_inference"], 0)
+
+    def test_voice01o_doctor_and_consent_gate(self):
+        import json
+        from contextlib import redirect_stdout, redirect_stderr
+        with redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(second.main(["--doctor", "--compare"]), 0)
+        report = json.loads(out.getvalue())
+        self.assertEqual(report["meeting"], "ES2003a")
+        self.assertEqual(report["models"], ["CAM++", "ERes2Net"])
+        self.assertFalse(report["network_enabled"])
+        self.assertEqual(report["files_written"], 0)
+        with redirect_stderr(io.StringIO()) as out:
+            self.assertEqual(second.main(["--run", "--compare"]), 1)
+        self.assertIn("CONSENT_REQUIRED", out.getvalue())
 
     def test_voice01j_opt_in_json_save_only(self):
         with TemporaryDirectory() as directory:
