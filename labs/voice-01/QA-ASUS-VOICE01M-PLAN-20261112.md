@@ -75,14 +75,73 @@ finally {
 
 If already prepared, --prepare deliberately errors with LOCAL_BENCHMARK_ALREADY_EXISTS to prevent overwrite: re-run --run --compare --consent instead. Share JSON output only, not the WAV or RTTM.
 
+
+## ASUS physical QA — public corpus prepared; evaluator overcount bug fixed
+
+User's physical ASUS output on 12-Nov-2026:
+
+- Git updated c269d7a..fbf457a (fast-forward).
+- Doctor: prepared_files_present=false before preparation.
+- Preparation: ok=true, AMI reference_speakers=4, reference_turns=18; cropped 100-second public WAV, anonymized RTTM and checksum manifest saved locally; full meeting not saved.
+- Initial inference: ok=false, error_code=MORE_THAN_FOUR_SPEAKERS. **No evaluation scores from the initial run**. The audio and reference preparation **remain intact** and must not be repeated.
+
+**Diagnosis:** the initial scorer applied the four-reference-speaker cap to automatically inferred clusters as well, and used factorial permutation enumeration. Because this test is intended to detect overfragmentation, the inferred number must not be forced, discarded or truncated. A model that outputs five or more anonymous groups is valid evidence, not a fatal mismatch.
+
+**Fix:** maintain a maximum of four IDs for the human reference, but permit up to 64 anonymous automatic groups in the evaluator, counting excess groups via exact dynamic-programming maximum-weight matching (linear in predicted groups and exponential only in the max-four reference labels). The limit of 64 is an anti-abuse scoring guard, **not** a num_speakers inference limit. The model still uses num_speakers=-1 and threshold=0.50. A separate error TOO_MANY_AUTOMATIC_CLUSTERS is emitted if the guard is exceeded, rather than silently discarding voices.
+
+**CI (fix):** GitHub Actions run https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43150904324, 34 synthetic tests PASS on Windows and Linux at commit c85b242, including six automatically inferred groups, twenty groups (bounded algorithm) and a mocked end-to-end run retaining automatic speaker count. Does not prove actual CPU inference on AMI; repeat only that step on ASUS.
+
+### Re-run ASUS — without any new download or prepare step
+
+~~~powershell
+$lab = Join-Path $env:USERPROFILE "LUMIA-VOICE-LAB"
+$data = Join-Path $env:LOCALAPPDATA "ORBI\LUMIA-VOICE-LAB"
+$branch = "feature/lumia-voice01-offline-diarization-lab-20261109"
+Push-Location $lab
+try {
+    $top = git rev-parse --show-toplevel
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($top)) {
+        throw "No se encontro el laboratorio Git."
+    }
+    if ((Resolve-Path -LiteralPath $top).Path -ine
+        (Resolve-Path -LiteralPath $lab).Path) {
+        throw "La raiz Git no es el laboratorio aislado."
+    }
+    $changes = @(git status --porcelain)
+    if ($LASTEXITCODE -ne 0 -or $changes.Count -gt 0) {
+        throw "Hay cambios locales; no se actualizaran."
+    }
+    git fetch origin "refs/heads/$branch"
+    if ($LASTEXITCODE -ne 0) { throw "Error en git fetch." }
+    git merge-base --is-ancestor HEAD FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) { throw "Se requiere fast-forward seguro." }
+    git merge --ff-only FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) { throw "Git merge fallo." }
+
+    $py = Join-Path $data ".venv\Scripts\python.exe"
+    $bench = Join-Path $lab "labs\voice-01\voice01m_ami_benchmark.py"
+    & $py -B $bench --doctor
+    if ($LASTEXITCODE -ne 0) { throw "Doctor fallo." }
+    & $py -B $bench --run --compare --consent
+    if ($LASTEXITCODE -ne 0) { throw "La evaluacion offline fallo." }
+}
+finally {
+    Pop-Location
+}
+~~~
+
+The doctor should report prepared_files_present=true. **Do NOT run --prepare again:** existing prepared public WAV/RTTM and manifest are retained and checksummed. The run command uses them without downloading. Share only aggregate JSON, never audio or reference files.
+
+**Status:** public sample preparation physically PASS; physical AMI scoring remains pending a successful ASUS rerun. No DER-like measurement from the failed first run. No changes to LUMIA live, model count, threshold, weights or main.
+
 ## Gates
 
 - [x] External manual AMI reference source independently published.
 - [x] Local opt-in downloader/clipper, consent gate and checksum manifest.
 - [x] Time-integrated, overlap-aware DER-like evaluation code and synthetic tests.
 - [x] CI Windows and Linux: **PASS** del commit 2b9fc2c, run https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43150234154 (31 pruebas sintéticas y contrato de preparación sin red; no es inferencia AMI real).
-- [ ] Real ASUS preparation of AMI audio and reference.
-- [ ] Real ASUS comparison of CAM++ and ERes2Net.
+- [x] Real ASUS preparation of AMI audio and reference: PASS, 100 seconds, 4 reference speakers, 18 annotated turns.
+- [ ] Real ASUS comparison of CAM++ and ERes2Net: first run blocked by scorer cap; patched, rerun pending.
 - [ ] Later: additional meetings, Spanish, home audio, independent labeled ground truth and official DER scorer.
 
 PR #79 stays draft, main and LUMIA live unchanged.
