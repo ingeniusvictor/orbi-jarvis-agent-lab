@@ -14,6 +14,7 @@ import voice01_listen as audition
 import voice01_review_gui as gui
 import voice01k_similarity as similarity
 import voice01l_stability as stability
+import voice01m_ami_benchmark as benchmark
 
 
 def make_wav(seconds=1.0, rate=16000, channels=1):
@@ -294,6 +295,63 @@ class VoiceLabTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()) as err:
             self.assertEqual(stability.main([]), 1)
         self.assertIn("CONSENT_REQUIRED", err.getvalue())
+
+    def test_voice01m_crop_public_manual_rttm_anonymizes_labels(self):
+        source = "\n".join([
+            "SPEAKER ES2002a 1 59 3 <NA> <NA> human1 <NA> <NA>",
+            "SPEAKER ES2002a 1 60.5 2 <NA> <NA> human2 <NA> <NA>",
+            "SPEAKER ES2002a 1 100 1 <NA> <NA> human3 <NA> <NA>",
+            "SPEAKER ES2002a 1 159.5 2 <NA> <NA> human4 <NA> <NA>",
+            "SPEAKER ES2002a 1 200 2 <NA> <NA> human4 <NA> <NA>",
+        ])
+        raw, turns = benchmark.crop_manual_rttm(source)
+        self.assertEqual(len(turns), 4)
+        self.assertEqual({speaker for _, _, speaker in turns},
+                         {"p0", "p1", "p2", "p3"})
+        self.assertNotIn("human", raw)
+        self.assertAlmostEqual(turns[0][0], 0.0)
+        self.assertAlmostEqual(turns[0][1], 2.0)
+        self.assertEqual(benchmark.parse_private_rttm(raw)[0][:2], (0.0, 2.0))
+
+    def test_voice01m_overlap_metric_exact_perfect_swapped_labels(self):
+        gold = [(0, 2, "p0"), (0.5, 1.5, "p1")]
+        predicted = [(0, 2, "speaker_2"), (0.5, 1.5, "speaker_0")]
+        stats = benchmark.score_intervals(gold, predicted, duration=2.0)
+        self.assertEqual(stats["error_fraction"], 0)
+        self.assertEqual(stats["reference_speakers"], 2)
+        self.assertEqual(stats["predicted_speakers"], 2)
+        self.assertEqual(stats["overlap_wallclock_seconds"], 1.0)
+        self.assertEqual(stats["reference_speaker_seconds"], 3.0)
+        self.assertEqual(stats["confusion_seconds"], 0)
+        self.assertTrue(stats["overlap_included"])
+        self.assertIn("not_official_DER", stats["metric"])
+
+    def test_voice01m_metric_missed_overlap_and_false_alarm(self):
+        gold = [(0, 2, "p0"), (1, 2, "p1")]
+        pred = [(0, 2, "speaker_0")]
+        score = benchmark.score_intervals(gold, pred, duration=2.0)
+        self.assertEqual(score["miss_seconds"], 1.0)
+        self.assertEqual(score["false_alarm_seconds"], 0.0)
+        self.assertEqual(score["error_percent"], 33.333)
+        single = benchmark.score_intervals(
+            [(0, 1, "p0")], [(0, 2, "speaker_0")], duration=2.0)
+        self.assertEqual(single["false_alarm_seconds"], 1.0)
+        self.assertEqual(single["error_percent"], 100.0)
+        with self.assertRaises(benchmark.BenchmarkError):
+            benchmark.score_intervals([], [], duration=2.0)
+
+    def test_voice01m_consent_no_network_and_doctor(self):
+        import json
+        from contextlib import redirect_stdout, redirect_stderr
+        with redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(benchmark.main(["--doctor"]), 0)
+        doctor = json.loads(output.getvalue())
+        self.assertFalse(doctor["network_used"])
+        self.assertFalse(doctor["microphone_enabled"])
+        self.assertEqual(doctor["files_written"], 0)
+        with redirect_stderr(io.StringIO()) as errors:
+            self.assertEqual(benchmark.main(["--run"]), 1)
+        self.assertIn("CONSENT_REQUIRED", errors.getvalue())
 
     def test_voice01j_opt_in_json_save_only(self):
         with TemporaryDirectory() as directory:
