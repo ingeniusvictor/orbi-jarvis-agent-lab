@@ -35,6 +35,21 @@ El hecho de haber copiado este resumen desde la interfaz es evidencia de ejecuci
 
 **Próximo gate reducido:** reproducir en la pestaña Audio 3 los clips A, B, C y D, comparar C y D (A/B/C/otra/incierto), sin necesidad de volver a reproducir Audio 2. Si ambas respuestas permanecen inciertas, conservar ese resultado como incertidumbre válida. No forzar conteo ni pasar el modelo a LUMIA en vivo.
 
+## Segunda revisión auditiva parcial comunicada (11-11-2026)
+
+El propietario copió un **nuevo resumen** desde VOICE-01J, con dos respuestas modificadas respecto al anterior:
+
+| Campo | Primera evaluación | Segunda evaluación | Estado |
+| --- | --- | --- | --- |
+| Audio 2: C suena como | incierto | **otra** | Opinión auditiva cambió; **no prueba tercera persona real** |
+| Audio 2: hay dos voces simultáneas | sí | **incierto** | La simultaneidad está **sin confirmar**, pese al solapamiento detectado por algoritmo |
+| Audio 3: C suena como | pendiente | pendiente | Falta respuesta |
+| Audio 3: D suena como | pendiente | pendiente | Falta respuesta |
+
+**Criterio de QA:** conservar las dos valoraciones cronológicas, sin reescribir la primera como si nunca hubiera existido. La segunda, más reciente, no se declara verdad terreno; revela variabilidad o incertidumbre humana. Los intervalos que la diarización etiquetó con superposición (**17.817–18.627 y 18.374–21.142 s**) se solapan matemáticamente 0.253 s, pero ahora la percepción de voces simultáneas es **incierta**. El nuevo juicio «otra» acerca de C no valida que haya efectivamente tres personas ni invalida por sí mismo la descripción pública de un archivo de dos voces.
+
+**Pendiente:** dos campos del Audio 3; escuchar los clips de 1–6, 14–20, 27–30 y 48–53 s, y comparar C/D con los ejemplos. Si no son distinguibles, registrar «incierto» en vez de completar por conjetura. No convertir este revisor en reconocimiento de identidad real; no modificar CAM++ ni el umbral global basándose en estas respuestas.
+
 ## Limitaciones explícitas
 
 1. La observación del oyente es **subjetiva y parcial**: escuchar unos fragmentos no equivale a etiquetar todos los turnos del WAV ni a medir DER.
