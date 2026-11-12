@@ -46,7 +46,7 @@ def sha_matches(path: Path, size: int | None, sha256: str) -> bool:
 
 
 def cosine(first, second) -> float:
-    if len(first) != len(second) or not first:
+    if len(first) != len(second) or len(first) == 0:
         raise SimilarityError("INVALID_VECTOR")
     x = [float(i) for i in first]
     y = [float(i) for i in second]
@@ -93,7 +93,7 @@ def extract_pair_scores(pcm: bytes, model: Path, *, backend=None, numpy=None):
         if not extractor.is_ready(stream):
             raise SimilarityError("CLIP_NOT_READY")
         vector = extractor.compute(stream)
-        if not vector:
+        if vector is None or len(vector) == 0:
             raise SimilarityError("INVALID_VECTOR")
         embedded[name] = vector
     return pair_scores(embedded)
