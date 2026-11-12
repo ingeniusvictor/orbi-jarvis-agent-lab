@@ -146,6 +146,44 @@ class VoiceLabTests(unittest.TestCase):
             self.assertEqual(len(played), 2)
             self.assertEqual(before, sorted(str(x) for x in Path(directory).iterdir()))
 
+    def test_manual_review_uses_native_winsound_memory_flag(self):
+        # Regression: SND_SYNC does not exist in winsound. Synchronous
+        # playback is PlaySound's default unless SND_ASYNC is passed.
+        from contextlib import redirect_stdout
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        played = []
+        fake_winsound = SimpleNamespace(
+            SND_MEMORY=0x0004,
+            PlaySound=lambda data, flags: played.append((data, flags)),
+        )
+        # Intentionally no SND_SYNC attribute on the stand-in module.
+        with TemporaryDirectory() as directory:
+            wav_path = Path(directory) / "public.wav"
+            wav_path.write_bytes(make_wav(seconds=1.0))
+            with patch.object(audition.sys, "platform", "win32"), \
+                    patch.dict(sys.modules, {"winsound": fake_winsound}):
+                with redirect_stdout(io.StringIO()):
+                    rc = audition.main([
+                        "--wav", str(wav_path),
+                        "--clip", "0.1:0.2",
+                        "--clip", "0.4:0.5",
+                        "--consent",
+                    ])
+            self.assertEqual(rc, 0)
+            self.assertEqual(len(played), 2)
+            self.assertTrue(all(flags == fake_winsound.SND_MEMORY
+                                for _, flags in played))
+            for buffer, _ in played:
+                with wave.open(io.BytesIO(buffer), "rb") as clip:
+                    self.assertEqual(clip.getnframes(), 1600)
+            self.assertEqual(sorted(str(x) for x in Path(directory).iterdir()),
+                             [str(wav_path)])
+        if sys.platform == "win32":
+            import winsound
+            self.assertTrue(hasattr(winsound, "SND_MEMORY"))
+
     def test_manual_review_doctor_without_audio(self):
         from contextlib import redirect_stdout
         out = io.StringIO()
