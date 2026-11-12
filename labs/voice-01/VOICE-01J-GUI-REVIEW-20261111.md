@@ -17,6 +17,24 @@ VOICE-01H mostró que CAM++ todavía detecta grupos adicionales en dos WAV ofici
 - Antes de abrir la GUI valida ambos WAV frente a los **tamaños y SHA256 observados físicamente en ASUS**. El hash local no sustituye una firma/digest de procedencia oficial, pero impide abrir por accidente otro archivo en vez de los audios públicos.
 - Modo --doctor imprime un estado sin abrir GUI ni audio. --consent obligatorio para lanzar la ventana.
 
+
+## Primera revisión auditiva real compartida por el propietario (11-11-2026)
+
+Se recibió el resumen copiado de la interfaz física en ASUS:
+
+| Campo | Respuesta suministrada | Estado |
+| --- | --- | --- |
+| Audio 2: C suena como | incierto | Respondido; **NO** confirma que speaker_2 sea otra persona |
+| Audio 2: hay dos voces simultáneas | si | Observación auditiva **subjetiva** de simultaneidad en el intervalo de revisión 17.5–19.5 s |
+| Audio 3: C suena como | pendiente | Sin revisar; no inferir respuesta |
+| Audio 3: D suena como | pendiente | Sin revisar; no inferir respuesta |
+
+**Interpretación cuidadosamente limitada:** hay concordancia cualitativa entre la observación de voces simultáneas y los intervalos de CAM++ que se superponen 0.253 s en Audio 2 (17.817–18.627 vs 18.374–21.142), pero no hay anotación con precisión temporal humana ni identificación por nombres. La comparación A/B/C para Audio 2 queda incierta. **No tenemos opinión alguna sobre C o D del Audio 3.**
+
+El hecho de haber copiado este resumen desde la interfaz es evidencia de ejecución real en ASUS de **apertura de GUI, interacción con opciones y función de copiar texto**, pero no certifica que todos los botones de audio en la GUI hayan sido probados ni que se haya guardado JSON local. La anterior prueba CLI VOICE-01I sí certificó reproducción de siete clips fuera de la GUI. 
+
+**Próximo gate reducido:** reproducir en la pestaña Audio 3 los clips A, B, C y D, comparar C y D (A/B/C/otra/incierto), sin necesidad de volver a reproducir Audio 2. Si ambas respuestas permanecen inciertas, conservar ese resultado como incertidumbre válida. No forzar conteo ni pasar el modelo a LUMIA en vivo.
+
 ## Limitaciones explícitas
 
 1. La observación del oyente es **subjetiva y parcial**: escuchar unos fragmentos no equivale a etiquetar todos los turnos del WAV ni a medir DER.
