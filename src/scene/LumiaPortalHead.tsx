@@ -6,6 +6,7 @@ import { useStore } from '../store'
 import { R8BodyCompanion } from './lumia-motion-r8/portal-body-companion'
 import { reportVq03AvatarQA } from './lumia-motion-r8/avatar-runtime-audit-vq03'
 import { NaturalFaceMotionVQ04 } from './lumia-head/natural-face-vq04'
+import { SpeechExpressionVQ05 } from './lumia-head/speech-expressions-vq05'
 import { currentGuidedFaceExpression, guidedDemoSnapshot } from './lumia-motion-r8/avatar-demo-ph045'
 import { avatarPresenceSnapshot, subscribeAvatarPresence, type LumiaAvatarView } from './lumia-motion-r8/avatar-presence-ph04'
 import type { Drive } from './Scene'
@@ -33,6 +34,8 @@ const BUST_HEIGHT_M = 1.10
 const BODY_HEIGHT_M = 1.94
 // VQ-04 is OFF in production; only the QA launcher explicitly enables it.
 const NATURAL_FACE_VQ04 = import.meta.env.VITE_LUMIA_NATURAL_FACE_VQ04 === '1'
+// VQ-05: tied to ALREADY audible phrase events, never to inferred human mood.
+const SPEECH_EXPRESSIONS_VQ05 = import.meta.env.VITE_LUMIA_SPEECH_EXPRESSIONS_VQ05 === '1'
 
 type SpeechState = {
   active: boolean
@@ -51,6 +54,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
   const qaFirstFrameReported=useRef(false)
   const naturalFace=useMemo(()=>new NaturalFaceMotionVQ04(),[])
   const naturalBlinkReported=useRef(false)
+  const speechExpressions=useMemo(()=>new SpeechExpressionVQ05(),[])
+  const expressionReported=useRef(false)
   const ph02 = isPh02Presentation(window.location.search)
   const showNeck = isNeckPreviewEnabled(window.location.search)
   const showBody = avatarView === 'bust-vrm' || avatarView === 'body-vrm' || showNeck
@@ -136,6 +141,9 @@ export function LumiaPortalHead({ drive, avatarView }: {
         active: true, id: playing.turnId, text: playing.phrase,
         phraseStarted: playing.phraseStartedAt,
       }
+      if (SPEECH_EXPRESSIONS_VQ05 && playing.phrase) {
+        speechExpressions.onPhraseAudible(playing.phrase)
+      }
     }
     const move = (event: PointerEvent) => {
       pointer.current.x = THREE.MathUtils.clamp(
@@ -149,6 +157,7 @@ export function LumiaPortalHead({ drive, avatarView }: {
       const data = (event as CustomEvent<PortalSpeechEvent>).detail
       if (!data) return
       if (data.kind === 'start') {
+        if (SPEECH_EXPRESSIONS_VQ05) speechExpressions.onSpeechEnd()
         speech.current = {
           active: true, id: data.turnId, text: '',
           phraseStarted: performance.now() / 1000,
@@ -157,10 +166,12 @@ export function LumiaPortalHead({ drive, avatarView }: {
         if (!speech.current.active || speech.current.id !== data.turnId) return
         speech.current.text = data.text
         speech.current.phraseStarted = performance.now() / 1000
+        if (SPEECH_EXPRESSIONS_VQ05) speechExpressions.onPhraseAudible(data.text)
         body?.onSpokenPhrase(data.text)
       } else if (data.kind === 'end' && speech.current.id === data.turnId) {
         speech.current.active = false
         speech.current.text = ''
+        if (SPEECH_EXPRESSIONS_VQ05) speechExpressions.onSpeechEnd()
         body?.onSpeechEnd()
       }
     }
@@ -171,7 +182,7 @@ export function LumiaPortalHead({ drive, avatarView }: {
       window.removeEventListener('pointermove', move)
       window.removeEventListener(LUMIA_PORTAL_SPEECH_EVENT, voiceEvent)
     }
-  }, [body])
+  }, [body, speechExpressions])
 
   useFrame((state, dt) => {
     if (!root.current) return
@@ -288,7 +299,29 @@ export function LumiaPortalHead({ drive, avatarView }: {
     }
     if (phase === 'thinking' || phase === 'tooling') values.fun = 0.09
     const demoExpression = currentGuidedFaceExpression()
-    if (speakingAudio && !demoExpression) values.joy = 0.05
+    const demoActive = guidedDemoSnapshot().active
+    const faceCue = SPEECH_EXPRESSIONS_VQ05
+      ? speechExpressions.step(dt,speakingAudio,demoActive) : null
+    if (speakingAudio && !demoExpression && !faceCue?.dominant) values.joy = 0.05
+    if (faceCue && !demoActive) {
+      for (const name of ['joy','sorrow','fun'] as const) {
+        const weight=faceCue.weights[name]
+        // The real VRM0 asset defines which presets are actually available.
+        // The 3D model and its original morph binds are never fabricated.
+        if(weight>.001 && (rig.expressions.get(name)?.length??0)>0) {
+          values[name]=Math.max(values[name]??0,weight)
+        }
+      }
+      if (!expressionReported.current && faceCue.dominant &&
+          faceCue.weights[faceCue.dominant]>.10 &&
+          (rig.expressions.get(faceCue.dominant)?.length??0)>0) {
+        expressionReported.current=true
+        reportVq03AvatarQA({
+          event:'natural-expression-observed',expression:faceCue.dominant,
+          weight:Number(faceCue.weights[faceCue.dominant].toFixed(3)),
+        })
+      }
+    }
     // VRM0 standard facial presets are previewed only during the explicit
     // authorized guided demo. Keep vowel visemes and blink in parallel, and
     // never invent morph targets not exposed by the owner's VRM.
