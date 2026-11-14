@@ -52,31 +52,44 @@ try {
   }
 
   $installer=Join-Path $qa 'scripts\PREPARAR_LUMIA_MOTION_R9_ASUS_QA.ps1'
-  # Emulate the user's occupied frontend port without touching their processes.
-  $listener=$null
+  # Emulate occupied frontend + bridge ports using local dummy listeners.
+  $frontListener=$null
+  $bridgeListener=$null
   $bound=@(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty LocalPort -Unique)
   if($bound -notcontains 5190){
-    $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,5190)
-    $listener.Start()
+    $frontListener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,5190)
+    $frontListener.Start()
+  }
+  if($bound -notcontains 8790){
+    $bridgeListener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,8790)
+    $bridgeListener.Start()
   }
   try {
-    $selected=[int](& $installer -Mode Ports -Source $source)
+    $ports=& $installer -Mode Ports -Source $source
+    $selected=[int]$ports.Frontend
+    $selectedBridge=[int]$ports.Bridge
     if($selected -eq 5190 -or $selected -eq 5173 -or $selected -eq 5183){
       throw ('Reserved or occupied frontend port selected: '+$selected)
+    }
+    if($selectedBridge -eq 8790 -or $selectedBridge -eq 8787){
+      throw ('Reserved or occupied bridge port selected: '+$selectedBridge)
     }
     $reservedRejected=$false
     try { & $installer -Mode Ports -Source $source -FrontendPort 5183 | Out-Null } catch {
       if($_.Exception.Message -match 'no admitido'){$reservedRejected=$true}else{throw}
     }
-    if(-not $reservedRejected){throw 'Reserved port 5183 was accepted'}
+    if(-not $reservedRejected){throw 'Reserved frontend port 5183 was accepted'}
     $occupiedRejected=$false
     try { & $installer -Mode Ports -Source $source -FrontendPort 5190 | Out-Null } catch {
-      if($_.Exception.Message -match 'No hay un puerto'){$occupiedRejected=$true}else{throw}
+      if($_.Exception.Message -match 'No hay frontend'){$occupiedRejected=$true}else{throw}
     }
-    if(-not $occupiedRejected){throw 'Occupied port 5190 was accepted'}
-    Write-Host ('R9 safe port selection PASS: candidate '+$selected+', excludes busy 5190, 5173 and 5183.')
-  } finally { if($listener){$listener.Stop()} }
+    if(-not $occupiedRejected){throw 'Occupied frontend port 5190 was accepted'}
+    Write-Host ('R9 isolated port selection PASS: frontend '+$selected+' bridge '+$selectedBridge+'; preserved 5173, 5183, 8787.')
+  } finally {
+    if($frontListener){$frontListener.Stop()}
+    if($bridgeListener){$bridgeListener.Stop()}
+  }
   $errors=$null;$tokens=$null
   [Management.Automation.Language.Parser]::ParseFile($installer,[ref]$tokens,[ref]$errors)|Out-Null
   if(@($errors).Count){throw ('PowerShell parser errors: '+(@($errors)|Out-String))}
