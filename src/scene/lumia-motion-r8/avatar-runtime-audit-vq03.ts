@@ -13,7 +13,7 @@ export const VQ03_AVATAR_QA_ENABLED = typeof import.meta.env !== 'undefined' &&
 export type Vq03AvatarAuditEvent = {
   event: 'vrm-first-frame' | 'motion-requested' | 'motion-started' |
     'motion-pose-progress' | 'motion-completed' | 'motion-interrupted' |
-    'motion-unavailable'
+    'motion-unavailable' | 'natural-face-observed'
   view?: 'head-vrm' | 'bust-vrm' | 'body-vrm' | 'legacy'
   id?: string
   fbxFrames?: number
@@ -24,6 +24,8 @@ export type Vq03AvatarAuditEvent = {
   reason?: string
   clipEnabled?: boolean
   bodyBones?: number
+  blink?: number
+  eyeYaw?: number
 }
 
 export function reportVq03AvatarQA(event:Vq03AvatarAuditEvent):void {
