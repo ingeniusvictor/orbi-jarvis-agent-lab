@@ -50,6 +50,8 @@ No llamar «LUMIA v3.1» a una sesión AMR-03.1 ni «reconocimiento facial funci
 
 **LUMIA-BASE-ASUS-20261109** = commit `1580a5182eba540893e35e37065be77da4ed014c` de la rama VI-04C.1, **sin promoverlo ni modificarlo**. Es un **punto de recuperación comprobado**, no una release estable certificada.
 
+**Puntero de rescate del código:** rama [`recovery/lumia-asus-1580a51-20261113`](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/tree/recovery/lumia-asus-1580a51-20261113), fijada al mismo commit; no incluye archivos locales ignorados por Git. El respaldo LM-01 en la ASUS **no se ha ejecutado ni certificado aún**.
+
 Preservar:
 - `qwen3.5:2b-q4_K_M` por defecto, selector Ollama local y opción manual 4B.
 - Whisper CLI/local y Kokoro local con permisos explícitos de micrófono; no habilitar un receptor always-on como efecto lateral.
@@ -66,6 +68,8 @@ Preservar:
 - [MATRIZ-MODULOS.md](MATRIZ-MODULOS.md): inventario, evidencia de integración y mapa real de dependencias de lanzadores.
 - [PLAN-QA-Y-PROMOCION.md](PLAN-QA-Y-PROMOCION.md): fases secuenciales, criterios para ascender a una release MASTER y procedimiento de reversión.
 - [scripts/lumia-master-inventory.ps1](../../scripts/lumia-master-inventory.ps1): herramienta **solo lectura** para verificar una instalación local antes de cualquier promoción. No necesita ejecutarse hasta que el código sea instalado intencionalmente en un worktree independiente.
+- [LM01-RESPALDO-SEGURO-ASUS.md](LM01-RESPALDO-SEGURO-ASUS.md): procedimiento específico para preservar el commit, VRM y 17 animaciones privadas de la ASUS, con SHA-256 y pruebas físicas pendientes.
+- [scripts/lumia-master-protect.mjs](../../scripts/lumia-master-protect.mjs): auditoría de solo lectura o **respaldo local autorizado** fuera del repositorio; **no respalda todavía Ollama/Whisper/Kokoro ni los demás recursos locales**.
 
 ## 6. Fuentes de verdad — orden de precedencia
 
