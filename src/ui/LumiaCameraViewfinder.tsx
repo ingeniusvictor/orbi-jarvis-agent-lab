@@ -18,6 +18,7 @@ import {chooseVisionResolution} from '../lib/vision-routing-amr024'
 import {ACTIVE_VISION_SAMPLE_MS,ACTIVE_VISION_MAX_SESSION_MS,type ActiveVisionFrame} from '../lib/vision-active-vi031'
 import {OpticalSentinel,SENTINEL_WIDTH,SENTINEL_HEIGHT,SENTINEL_INTERVAL_MS,toSentinelLuma,type SentinelZone} from '../lib/vision-sentinel-vi032'
 import {FaceCountGate,FACE_DETECTOR_INTERVAL_MS,FACE_DETECTOR_MAX_WIDTH,FACE_DETECTOR_MAX_HEIGHT,type FaceBox} from '../lib/vision-faces-vi04'
+import type {VisionFaceSample} from '../lib/vision-audit-vi041'
 
 type Props={
   live:boolean
@@ -28,6 +29,7 @@ type Props={
   visionActiveAvailable:boolean
   sentinelAvailable:boolean
   faceDetectorAvailable:boolean
+  auditEnabled:boolean
   onActiveVisionChange:(active:boolean)=>void
   onActiveVisionFrame:(image:LocalVisualImage,resolution:VisionResolution,at:number)=>void
   onRegisterActiveCapture:(fn:(()=>ActiveVisionFrame|null)|null)=>void
@@ -54,7 +56,7 @@ type Props={
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
-  visionActiveAvailable,sentinelAvailable,faceDetectorAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,onRegisterActiveCapture,
+  visionActiveAvailable,sentinelAvailable,faceDetectorAvailable,auditEnabled,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,onRegisterActiveCapture,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
   visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
   visualDetailOffer,visualDetailPurpose,visualDetailBusy,onRequestDetailedReanalysis,
@@ -88,6 +90,7 @@ export function LumiaCameraViewfinder({
   const [visionActive,setVisionActive]=useState(false)
   const [visionSamples,setVisionSamples]=useState(0)
   const faceGateRef=useRef(new FaceCountGate())
+  const faceAuditRef=useRef<VisionFaceSample|null>(null)
   const faceLastLoggedRef=useRef<number|null>(null)
   const [faceEnabled,setFaceEnabled]=useState(false)
   const [faceStatus,setFaceStatus]=useState<'off'|'loading'|'ready'|'error'>('off')
@@ -116,6 +119,7 @@ export function LumiaCameraViewfinder({
     sentinelRef.current.reset()
     sentinelCanvasRef.current=null
     setFaceEnabled(false)
+    faceAuditRef.current=null
     faceGateRef.current.reset()
     setFaceBoxes([])
     setFaceCount(null)
@@ -247,6 +251,7 @@ export function LumiaCameraViewfinder({
     let responseTimer:number|null=null
     const worker=new Worker(new URL('../lib/vision-face-worker-vi04.ts',import.meta.url),{type:'module'})
     faceGateRef.current.reset()
+    faceAuditRef.current=null
     faceLastLoggedRef.current=null
     setFaceCount(null)
     setFaceBoxes([])
@@ -257,6 +262,7 @@ export function LumiaCameraViewfinder({
       if(cancelled)return
       workerReady=false
       setFaceStatus('error')
+      faceAuditRef.current=null
       setFaceError(reason.slice(0,160))
       setFaceBoxes([])
       setFaceCount(null)
@@ -302,7 +308,12 @@ export function LumiaCameraViewfinder({
         busy=false
         if(msg.sequence!==sequence||!Array.isArray(msg.faces))return
         setFaceBoxes(msg.faces)
-        const confirmed=faceGateRef.current.observe(msg.faces.length,Date.now())
+        const now=Date.now()
+        const confirmed=faceGateRef.current.observe(msg.faces.length,now)
+        // A transitional one-off change is NOT fresh confirmation of the old
+        // stable count. Never attach that old count to a new voice frame.
+        faceAuditRef.current=(confirmed!==null && confirmed===msg.faces.length)
+          ? {count:confirmed,observedAt:now} : null
         setFaceCount(confirmed)
         setFaceLatency(Number.isFinite(msg.elapsedMs)?Math.round(msg.elapsedMs!):null)
         if(confirmed!==null && confirmed!==faceLastLoggedRef.current){
@@ -326,6 +337,7 @@ export function LumiaCameraViewfinder({
       if(responseTimer!==null)window.clearTimeout(responseTimer)
       worker.terminate()
       faceGateRef.current.reset()
+      faceAuditRef.current=null
     }
   },[faceDetectorAvailable,faceEnabled,live,visionActive,ready])
 
@@ -401,7 +413,12 @@ export function LumiaCameraViewfinder({
   captureForVoiceRef.current=()=>{
     if(!activeRef.current)return null
     const image=takeActiveFrame()
-    return image ? {image,resolution:effectiveResolution,capturedAt:lastActiveShotRef.current} : null
+    return image ? {
+      image,resolution:effectiveResolution,capturedAt:lastActiveShotRef.current,
+      faceAuditEnabled:auditEnabled && faceEnabled,
+      faceAudit:auditEnabled && faceEnabled && faceStatus==='ready'
+        ? faceAuditRef.current : null,
+    } : null
   }
   useEffect(()=>{
     onRegisterActiveCapture(()=>captureForVoiceRef.current())
