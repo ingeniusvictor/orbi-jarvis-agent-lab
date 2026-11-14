@@ -7,6 +7,10 @@ on:
       - 'bridge/orbia/vrm-tech-grounding-vq03.mjs'
       - 'src/lib/vrm-tech-grounding-vq03.ts'
       - 'src/scene/lumia-motion-r8/avatar-presence-ph04.ts'
+      - 'src/scene/lumia-motion-r8/portal-body-companion.ts'
+      - 'src/scene/lumia-motion-r8/avatar-runtime-audit-vq03.ts'
+      - 'src/scene/LumiaPortalHead.tsx'
+      - 'scripts/certify-lumia-vq032-avatar-runtime.ts'
       - 'scripts/certify-lumia-vq03-vrm-clarity.ts'
       - 'scripts/lumia-private-avatar-assets-vq03.mjs'
       - 'scripts/certify-lumia-vq03-private-avatar-assets.mjs'
@@ -30,6 +34,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/certify-lumia-vq03-private-avatar-assets.mjs
+      - run: npx tsx scripts/certify-lumia-vq032-avatar-runtime.ts
       - run: npx tsx scripts/certify-lumia-vq03-vrm-clarity.ts
       - run: npx tsx scripts/certify-lumia-avatar-presence-ph04.ts
       - run: npx tsx scripts/certify-lumia-avatar-ph042.ts
