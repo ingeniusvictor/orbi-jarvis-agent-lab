@@ -104,9 +104,15 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
     if (/\b(?:vistas|modos de vista|apariencias|presentaciones)\b/.test(said)) {
       return { kind: 'list-views' }
     }
-    if (/\b(?:cuerpo virtual|avatar|cuerpo animado|presencia virtual)\b/.test(said)) {
-      return { kind: 'describe' }
-    }
+    // VQ-03.1: describe ONLY LUMIA's own avatar when explicitly requested.
+    // "¿Cómo conseguir que un avatar VRM tenga animaciones fluidas?" is a
+    // technical HOW question, not a request to list our character's features.
+    const aboutOurAvatar =
+      /\b(?:cuerpo virtual|avatar|cuerpo animado|presencia virtual)\b/.test(said) &&
+      /^(?:que|cual|cuales|dime|cuentame|comentame|explicame)\b/.test(said) &&
+      /\b(?:tu|tus|tienes|usas|utilizas|propio)\b/.test(said) &&
+      !asksTechnicalExplanation
+    if (aboutOurAvatar) return { kind: 'describe' }
     return null
   }
 
