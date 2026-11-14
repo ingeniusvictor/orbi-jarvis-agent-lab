@@ -17,6 +17,9 @@ on:
       - 'scripts/certify-lumia-vq04-natural-face.ts'
       - 'src/scene/lumia-head/speech-expressions-vq05.ts'
       - 'scripts/certify-lumia-vq05-speech-expressions.ts'
+      - 'src/scene/lumia-head/face-preview-vq051.ts'
+      - 'scripts/certify-lumia-vq051-facial-contrast.ts'
+      - 'docs/lumia-convergence/54-VQ051-EXPRESIONES-VISIBLES-ASUS-20261114.md'
       - 'docs/lumia-convergence/53-VQ05-EXPRESIONES-VOZ-ASUS-20261114.md'
       - 'docs/lumia-convergence/52-VQ04-ROSTRO-NATURAL-ASUS-20261114.md'
       - 'scripts/lumia-vq03-local-voice-qa.mjs'
@@ -65,6 +68,7 @@ jobs:
       - run: npx tsx scripts/certify-lumia-vq032-avatar-runtime.ts
       - run: npx tsx scripts/certify-lumia-vq04-natural-face.ts
       - run: npx tsx scripts/certify-lumia-vq05-speech-expressions.ts
+      - run: npx tsx scripts/certify-lumia-vq051-facial-contrast.ts
       - run: node scripts/certify-lumia-vq033-voice-reuse.mjs
       - run: node scripts/certify-lumia-va02-kokoro-baseline.mjs
       - run: node scripts/certify-lumia-va021-kokoro-breakdown.mjs
