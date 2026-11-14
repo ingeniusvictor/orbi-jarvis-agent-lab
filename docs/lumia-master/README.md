@@ -91,5 +91,7 @@ Al aprobar el plan: emitir un **tag inmutable del commit exacto**, manifest con 
 | 2026-11-09 | Commit activo de ASUS `1580a51`, VQ-02 corregido solo por CI | Consola ASUS + docs 39/40 + PR #77 |
 | 2026-11-12/13 | Laboratorio VOICE-01M/N/O/P pasó pruebas físicas acotadas AMI; no integrado a runtime | [PR #79](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/79), [Issue #78](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/78) |
 | 2026-11-13 | Se abrió **inventario/documentación MASTER separado**, sin editar el código vivo | Rama `docs/lumia-master-audit-20261113` |
+| 2026-11-13 | Visión **VI-04.1** para auditar captura reciente vs detección CPU, **aislada, sin identidad y sin QA ASUS** | [PR #82](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/82) |
+| 2026-11-13 | Voz **VOICE-01Q**: estudio de instrumentación interna antes de atribuir causas; **solo diseño**, laboratorio separado | [Protocolo Q](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/blob/feature/lumia-voice01-offline-diarization-lab-20261109/labs/voice-01/QA-ASUS-VOICE01Q-PROPOSAL-20261113.md) |
 
 **Responsable de promoción:** revisión humana con resultados reales en ASUS y decisión explícita del propietario. Esta documentación no autoriza merges, reconocimiento de identidades ni despliegue.
