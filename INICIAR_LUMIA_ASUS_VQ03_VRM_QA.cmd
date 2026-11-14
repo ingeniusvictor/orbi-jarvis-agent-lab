@@ -30,6 +30,9 @@ echo  Primero probar por TEXTO. STT/TTS requieren runtime local
 echo  separado; NO declarar voz lista sin comprobar Whisper/Kokoro.
 echo  Sin camara automatica, biometria ni escrituras al PC.
 echo ===============================================================
+rem Only VQ-03 isolated QA runs the Ollama bridge grounding extension.
+rem Normal AMR-03.0 / baseline production launchers remain untouched.
+set "ORBIA_LUMIA_VRM_GROUNDING_VQ03=1"
 echo.
 call "%~dp0INICIAR_LUMIA_ASUS_2B_DIARIA_AMR030.cmd"
 exit /b %ERRORLEVEL%
