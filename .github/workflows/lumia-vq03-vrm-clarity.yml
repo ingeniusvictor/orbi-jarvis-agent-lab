@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'src/App.tsx'
+      - 'bridge/ollama.mjs'
+      - 'bridge/orbia/vrm-tech-grounding-vq03.mjs'
       - 'src/lib/vrm-tech-grounding-vq03.ts'
       - 'src/scene/lumia-motion-r8/avatar-presence-ph04.ts'
       - 'scripts/certify-lumia-vq03-vrm-clarity.ts'
