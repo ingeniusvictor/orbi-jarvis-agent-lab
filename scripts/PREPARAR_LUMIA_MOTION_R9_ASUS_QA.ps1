@@ -14,7 +14,9 @@ Never performs git pull, checkout, delete, model download or API key copy.
 param(
   [ValidateSet('Install','Verify','Launch')]
   [string]$Mode = 'Install',
-  [string]$Source = (Join-Path $env:USERPROFILE 'LUMIA-ASUS')
+  [string]$Source = (Join-Path $env:USERPROFILE 'LUMIA-ASUS'),
+  [ValidateRange(0,65535)]
+  [int]$FrontendPort = 0
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -223,11 +225,34 @@ if ($Mode -eq 'Install') {
   [Environment]::SetEnvironmentVariable('JARVIS_ALLOW_WRITES', '0', 'Process')
   [Environment]::SetEnvironmentVariable('ORBIA_REALTIME_EXPERIMENT', '0', 'Process')
   [Environment]::SetEnvironmentVariable('VITE_LUMIA_REALTIME_EXPERIMENT', '0', 'Process')
+  # R9 experiment only: honor existing applications on 5173 and 5183.
+  # The frontend can use any unoccupied localhost port in the trusted dev range;
+  # the backend remains on 8787. No processes are terminated.
+  $busyPorts = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+    Select-Object -ExpandProperty LocalPort -Unique)
+  if ($busyPorts -contains 8787) {
+    throw 'El bridge necesita 8787, que esta ocupado. No se cerrara ningun proceso; libera el bridge anterior antes de iniciar R9.'
+  }
+  $candidates = @(5190..5199) + @(5174..5182) + @(5184..5189)
+  if ($FrontendPort -ne 0) {
+    if ($FrontendPort -lt 5174 -or $FrontendPort -gt 5199 -or $FrontendPort -eq 5183) {
+      throw 'Puerto frontend no admitido: usa 5174-5199, excepto el 5183 reservado. 5173 tambien se conserva.'
+    }
+    $candidates = @($FrontendPort)
+  }
+  $chosen = @($candidates | Where-Object { $busyPorts -notcontains $_ } |
+    Select-Object -First 1)
+  if ($chosen.Count -ne 1) {
+    throw 'No hay un puerto frontend disponible en 5174-5199 (excluyendo 5183). No se cerro ningun proceso.'
+  }
+  $front = [int]$chosen[0]
+  [Environment]::SetEnvironmentVariable('PORT', [string]$front, 'Process')
+  [Environment]::SetEnvironmentVariable('JARVIS_BRIDGE_PORT', '8787', 'Process')
   Write-Host ''
-  Write-Host 'ANTES DE ABRIR: detener LUMIA-ASUS habitual con CTRL+C; no cerrar Ollama.' -ForegroundColor Yellow
-  Write-Host 'R9 ACTIVO: http://localhost:5173/?lumiaAvatar=bust-vrm&lumiaR9=1' -ForegroundColor Cyan
-  Write-Host 'CONTROL R8: http://localhost:5173/?lumiaAvatar=bust-vrm&lumiaR9=0' -ForegroundColor Cyan
-  Write-Host 'Moverse entre URLs recarga el visor. No lanzar dos LUMIA simultaneas.' -ForegroundColor Yellow
+  Write-Host ('LUMIA R9 QA: frontend ' + $front + ' / bridge 8787. Puertos 5173 y 5183 intactos.') -ForegroundColor Green
+  Write-Host ('R9 ACTIVO: http://localhost:' + $front + '/?lumiaAvatar=bust-vrm&lumiaR9=1') -ForegroundColor Cyan
+  Write-Host ('CONTROL R8: http://localhost:' + $front + '/?lumiaAvatar=bust-vrm&lumiaR9=0') -ForegroundColor Cyan
+  Write-Host 'Moverse entre URLs recarga el visor. No lanzar otra instancia de bridge en 8787.' -ForegroundColor Yellow
   Push-Location $qaRoot
   try {
     & (Join-Path $qaRoot 'INICIAR_LUMIA_ASUS_2B_DIARIA_AMR030.cmd')
