@@ -1,0 +1,31 @@
+name: LUMIA VQ-03 - VRM Intent vs VRAM and PH04 Regression
+on:
+  pull_request:
+    paths:
+      - 'src/App.tsx'
+      - 'src/lib/vrm-tech-grounding-vq03.ts'
+      - 'src/scene/lumia-motion-r8/avatar-presence-ph04.ts'
+      - 'scripts/certify-lumia-vq03-vrm-clarity.ts'
+      - 'docs/lumia-convergence/41-VQ03-VRM-CLARITY-ASUS-20261113.md'
+      - '.github/workflows/lumia-vq03-vrm-clarity.yml'
+  workflow_dispatch:
+jobs:
+  vq03:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/certify-lumia-vq03-vrm-clarity.ts
+      - run: npx tsx scripts/certify-lumia-avatar-presence-ph04.ts
+      - run: npx tsx scripts/certify-lumia-avatar-ph042.ts
+      - run: node scripts/certify-amr-model-runtime.mjs
+      - run: npm run lint
+      - run: npm run build
