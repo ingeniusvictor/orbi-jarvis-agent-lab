@@ -75,7 +75,7 @@ export class SpeechExpressionVQ05 {
       this.age>=MOOD_DELAY ? this.emotion : null
     for(const name of ['joy','sorrow','fun'] as const){
       const target=chosen===name?WEIGHTS[name]:0
-      const rate=target>this.levels[name]?5.0:8.0
+      const rate=target>this.levels[name]?3.5:8.0
       this.levels[name]+=(target-this.levels[name])*(1-Math.exp(-delta*rate))
       if(this.levels[name]<.0001)this.levels[name]=0
     }
