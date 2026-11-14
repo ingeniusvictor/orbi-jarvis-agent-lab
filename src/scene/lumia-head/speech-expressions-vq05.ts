@@ -22,6 +22,11 @@ function normalized(s:string):string {
 export function explicitSpokenEmotionVQ05(phrase:string):Vq05Emotion|null {
   const spoken=normalized(String(phrase??'').slice(0,900))
   if(!spoken)return null
+  // A vocabulary explanation containing an emotion word is not itself
+  // an emotional utterance (e.g. "¿qué significa felicidades?").
+  if(/\b(?:significado|significa|definicion|la palabra|la frase|traduce|explica que es)\b/.test(spoken)){
+    return null
+  }
   if(/\b(?:lo siento mucho|siento mucho lo ocurrido|lamento (?:mucho |profundamente |lo )?|que pena|mis condolencias|siento que estes pasando|entiendo que sea dificil)\b/.test(spoken)) {
     return 'sorrow'
   }
