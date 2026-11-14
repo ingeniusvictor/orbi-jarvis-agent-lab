@@ -41,8 +41,11 @@ export function explicitSpokenEmotionVQ05(phrase:string):Vq05Emotion|null {
 }
 const clamp=(v:number,min:number,max:number)=>
   Number.isFinite(v)?Math.min(max,Math.max(min,v)):min
+// VQ-05.1: the original 0.20–0.28 weights were too subtle on Vita.
+// Conversational reactions stay below the 0.80 explicit preview and
+// never become full-strength theatrical expressions.
 const WEIGHTS:Record<Vq05Emotion,number>={
-  joy:.28,sorrow:.20,fun:.24,
+  joy:.48,sorrow:.48,fun:.50,
 }
 const MOOD_DELAY=.12
 
