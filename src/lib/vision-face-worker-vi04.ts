@@ -25,7 +25,10 @@ async function initialise():Promise<void>{
   if(initialising||detector||stopped)return
   initialising=true
   try{
-    const vision=await FilesetResolver.forVisionTasks('/mediapipe')
+    // This is a type:module Web Worker. The classic WASM glue does not
+    // expose ModuleFactory on the worker global; request MediaPipe's native
+    // ES-module glue instead (tasks-vision 1.0.1, no eval or CDN).
+    const vision=await FilesetResolver.forVisionTasks('/mediapipe',true)
     if(stopped)return
     const created=await FaceDetector.createFromOptions(vision,{
       baseOptions:{
