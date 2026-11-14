@@ -55,6 +55,7 @@ jobs:
       - run: node scripts/certify-lumia-va02-kokoro-baseline.mjs
       - run: node scripts/certify-lumia-va021-kokoro-breakdown.mjs
       - run: node scripts/certify-lumia-va022-cpu-ab.mjs
+      - run: python -c "import ast,pathlib; ast.parse(pathlib.Path('bridge/runtime/kokoro/resident.py').read_text(encoding='utf-8'))"
       - run: npx tsx scripts/certify-lumia-vq03-vrm-clarity.ts
       - run: npx tsx scripts/certify-lumia-avatar-presence-ph04.ts
       - run: npx tsx scripts/certify-lumia-avatar-ph042.ts
