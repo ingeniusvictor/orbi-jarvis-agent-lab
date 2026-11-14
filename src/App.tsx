@@ -19,6 +19,7 @@ import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visual
 import {requiresFreshVisualObservation,frozenVisualTruthReply} from './lib/vision-temporal-vi030'
 import {isActiveVisionQuestion,asksActiveVisionChange,recentActiveVisionFrame,type ActiveVisionFrame} from './lib/vision-active-vi031'
 import {classifyFreshCameraSpeech,freshCameraScenePrompt} from './lib/vision-voice-grounding-vi032b'
+import {auditFreshSceneAtTurn} from './lib/vision-audit-vi041'
 import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -34,7 +35,7 @@ import { shouldProtectWhisperCommandAtExpiry } from './lib/complex-voice-turn'
 import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { portalSpeechStart, portalSpeechPhrase, portalSpeechEnd, portalSpeechInterrupt } from './scene/lumia-head/portal-speech-events'
-import { parseLumiaAvatarAction, respondToLumiaAvatarAction } from './scene/lumia-motion-r8/avatar-presence-ph04'
+import { parseLumiaAvatarAction, parseLumiaFaceActionVQ051, respondToLumiaAvatarAction } from './scene/lumia-motion-r8/avatar-presence-ph04'
 import { LUMIA_GUIDED_DEMO_STEPS, beginGuidedDemo, cancelGuidedDemo, cueGuidedDemoPhrase, cueGuidedDemoStage, endGuidedDemo, checkGuidedDemoAssets, guidedDemoScript, guidedDemoSnapshot, waitForGuidedDemoClip } from './scene/lumia-motion-r8/avatar-demo-ph045'
 import { LumiaDemoIndicator } from './ui/LumiaDemoIndicator'
 
@@ -121,6 +122,10 @@ const VISION_FRESH_VOICE_VI032B_ENABLED = import.meta.env.VITE_LUMIA_VISION_FRES
 /** VI-04A: explicit facial presence detector; not a biometric identity recognizer. */
 const VISION_FACE_DETECTOR_VI04A_ENABLED = VISION_ACTIVE_VI031_ENABLED &&
   import.meta.env.VITE_LUMIA_VISION_FACES_VI04A === '1'
+/** VI-04.1 audit: diagnostic ONLY, does not modify replies or inference. */
+const VISION_SCENE_AUDIT_VI041_ENABLED = VISION_FRESH_VOICE_VI032B_ENABLED &&
+  VISION_FACE_DETECTOR_VI04A_ENABLED &&
+  import.meta.env.VITE_LUMIA_VISION_QA_VI041 === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -389,6 +394,18 @@ export default function App() {
           visionActive:activeVisionAuthorized.current,
         }))
       }
+      if(VISION_SCENE_AUDIT_VI041_ENABLED && (freshSceneRequested || activeVisionQuestion)){
+        // Coarse metadata from the SAME owner-authorized camera stream;
+        // face count is not people count or personal identification.
+        const audit=auditFreshSceneAtTurn({
+          cameraAuthorized:activeVisionAuthorized.current,
+          capturedAt:liveFrame?.capturedAt??null,
+          detectorEnabled:rawLiveFrame?.faceAuditEnabled??false,
+          faceSample:rawLiveFrame?.faceAudit??null,
+          now:Date.now(),
+        })
+        console.info('[lumia:vision-vi041]',JSON.stringify(audit))
+      }
       const pendingReference=pendingReferenceQuestion.current
       const resolvingReference=Boolean(VISION_CONTEXT_AMR025_ENABLED && pendingReference &&
         !image && !cameraRequested && isVisualReferenceAnswer(said))
@@ -532,7 +549,9 @@ export default function App() {
       }
       if(visualImage) activeVisualReply.current=turnId
       const avatarAction = AVATAR_PH04_ENABLED && !visualImage && !captureFailure
-        ? parseLumiaAvatarAction(said) : null
+        ? (import.meta.env.VITE_LUMIA_FACE_DIRECT_VQ051 === '1'
+          ? parseLumiaFaceActionVQ051(said) : null) ?? parseLumiaAvatarAction(said)
+        : null
       const { text } = contextualReply
         ? {text:contextualReply}
         : captureFailure
@@ -1851,6 +1870,7 @@ export default function App() {
           visionActiveAvailable={VISION_ACTIVE_VI031_ENABLED}
           sentinelAvailable={VISION_SENTINEL_VI032_ENABLED}
           faceDetectorAvailable={VISION_FACE_DETECTOR_VI04A_ENABLED}
+          auditEnabled={VISION_SCENE_AUDIT_VI041_ENABLED}
           onActiveVisionChange={changeActiveVision}
           onActiveVisionFrame={receiveActiveVisionFrame}
           onRegisterActiveCapture={registerActiveVisionCapture}

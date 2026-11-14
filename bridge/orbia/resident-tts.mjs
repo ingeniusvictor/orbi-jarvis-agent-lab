@@ -7,6 +7,7 @@
  * Crashes or timeouts release the worker and allow the legacy path to recover.
  */
 import { spawn } from 'node:child_process'
+import { performance } from 'node:perf_hooks'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -20,6 +21,30 @@ let resident = null
 let starting = null
 let fifo = Promise.resolve()
 let nextId = 0
+// VA-02.1 diagnostic only; never a transcript, path, audio or machine identity.
+let lastVa021 = null
+const toMs = (n) => Math.round(n * 10) / 10
+export function validateVa021WorkerTimings(value) {
+  if (!value || typeof value !== 'object') return null
+  const fields = ['g2pMs', 'inferenceMs', 'wavWriteMs']
+  if (fields.some(k => typeof value[k] !== 'number' || !Number.isFinite(value[k]) ||
+        value[k] < 0 || value[k] > 30000)) return null
+  return Object.freeze(Object.fromEntries(fields.map(k => [k, toMs(value[k])])))
+}
+export function lastResidentKokoroVa021Timing() {
+  return lastVa021
+}
+export function validateVa022Ready(value) {
+  if (!value || !['auto','2','4'].includes(value.threads) ||
+      !Array.isArray(value.providers) || !value.providers.length ||
+      value.providers.some(x=>typeof x!=='string'||!/^[A-Za-z]+ExecutionProvider$/.test(x))){
+    return null
+  }
+  return Object.freeze({threads:value.threads,providers:[...value.providers]})
+}
+export function residentKokoroVa022Info() {
+  return resident?.ready && !resident.dead ? resident.va022Info ?? null : null
+}
 
 function failResident(state, error) {
   if (state.dead) return
@@ -55,7 +80,7 @@ function startResident(env = process.env) {
   const state = {
     child, dead: false, ready: false, buffer: '', current: null,
     resolveStart: () => {}, rejectStart: () => {}, startTimer: null,
-    startPromise: null,
+    startPromise: null, va022Info: null,
   }
   resident = state
   const ready = new Promise((resolveReady, rejectReady) => {
@@ -99,6 +124,12 @@ function startResident(env = process.env) {
           failResident(state, new Error('Kokoro resident initialization failed'))
           return
         }
+        state.va022Info = env.ORBIA_VA022_CPU_AB === '1'
+          ? validateVa022Ready(msg.va022) : null
+        if (env.ORBIA_VA022_CPU_AB === '1' && !state.va022Info) {
+          failResident(state, new Error('VA022_PROVIDER_INFO_MISSING'))
+          return
+        }
         state.ready = true
         clearTimeout(state.startTimer)
         state.startTimer = null
@@ -114,7 +145,7 @@ function startResident(env = process.env) {
       }
       clearTimeout(job.timer)
       state.current = null
-      if (msg.ok === true) job.resolve()
+      if (msg.ok === true) job.resolve(validateVa021WorkerTimings(msg.timingsMs))
       else job.reject(new Error(String(msg.errorCode || 'VOICE_TTS_FAILED')))
     }
   })
@@ -156,17 +187,32 @@ export function synthesizeResidentKokoro(
 ) {
   // Serialize all phrase syntheses; the previous item finishes and releases
   // its temporary file before the next uses the shared Kokoro ONNX object.
+  const queuedAtVa021 = performance.now()
   const task = fifo.then(async () => {
+    const startedAtVa021 = performance.now()
     const state = await startResident(env)
     const directory = await mkdtemp(join(tmpdir(), 'orbia-kokoro-resident-'))
     const outputPath = join(directory, 'speech.wav')
     try {
-      await dispatch(state, { text, outputPath, speaker }, timeoutMs)
+      const sentAtVa021 = performance.now()
+      const partsVa021 = await dispatch(state, { text, outputPath, speaker }, timeoutMs)
+      const returnedAtVa021 = performance.now()
       const bytes = new Uint8Array(await readFile(outputPath))
+      const readDoneAtVa021 = performance.now()
       if (bytes.byteLength <= 44 || bytes.byteLength > MAX_AUDIO_BYTES ||
           Buffer.from(bytes.subarray(0, 4)).toString('ascii') !== 'RIFF' ||
           Buffer.from(bytes.subarray(8, 12)).toString('ascii') !== 'WAVE') {
         throw new Error('Kokoro resident returned invalid WAV output')
+      }
+      if (env.ORBIA_VA021_KOKORO_PROFILE === '1') {
+        // No changes to WAV bytes, FIFO order, speaker, model or playback.
+        // The snapshot is read by a STRICTLY sequential local benchmark.
+        lastVa021 = partsVa021 && Object.freeze({
+          ...partsVa021,
+          queueWaitMs: toMs(startedAtVa021 - queuedAtVa021),
+          workerRoundTripMs: toMs(returnedAtVa021 - sentAtVa021),
+          wavReadMs: toMs(readDoneAtVa021 - returnedAtVa021),
+        })
       }
       return bytes
     } finally {
@@ -175,6 +221,36 @@ export function synthesizeResidentKokoro(
   })
   fifo = task.then(() => {}, () => {})
   return task
+}
+
+/**
+ * Graceful endpoint strictly for the VA-02.1 standalone measurement.
+ * Refuses ordinary daily / conversational runtime. With no active job, close
+ * the benchmark's warm Python process so PowerShell can regain its prompt.
+ */
+export function stopResidentKokoroVa021(env = process.env) {
+  if (env.ORBIA_VA021_KOKORO_PROFILE !== '1') return false
+  const state = resident
+  if (!state || state.dead || state.current) return false
+  state.dead = true
+  resident = null
+  if (starting === state.startPromise) starting = null
+  try { state.child.stdin.end() } catch { /* already closed */ }
+  try { state.child.kill() } catch { /* already exited */ }
+  return true
+}
+
+/** Separate owner-only A/B lifecycle; cannot stop unprofiled assistant. */
+export function stopResidentKokoroVa022(env = process.env) {
+  if (env.ORBIA_VA022_CPU_AB !== '1') return false
+  const state = resident
+  if (!state || state.dead || state.current) return false
+  state.dead = true
+  resident = null
+  if (starting === state.startPromise) starting = null
+  try { state.child.stdin.end() } catch {}
+  try { state.child.kill() } catch {}
+  return true
 }
 
 process.once('exit', () => {

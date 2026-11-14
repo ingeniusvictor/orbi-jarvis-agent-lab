@@ -10,9 +10,11 @@
 import { motionCatalog } from './motion-library-catalog.js'
 
 export type LumiaAvatarView = 'head-vrm' | 'bust-vrm' | 'body-vrm' | 'legacy'
+export type Vq051FacePreset = 'joy' | 'sorrow' | 'fun' | 'angry' | 'neutral'
 export type LumiaAvatarAction =
   | { kind: 'view'; view: Exclude<LumiaAvatarView, 'legacy'> }
   | { kind: 'motion'; id: string }
+  | { kind: 'face'; preset: Vq051FacePreset }
   | { kind: 'auto' }
   | { kind: 'list-views' }
   | { kind: 'list-motions' }
@@ -26,6 +28,7 @@ export type LumiaAvatarSnapshot = {
   view: LumiaAvatarView
   sequence: number
   motion: { sequence: number; id: string | null; kind: 'play' | 'auto'; sentAt: number } | null
+  face: { sequence: number; preset: Vq051FacePreset; sentAt: number } | null
 }
 
 const AVAILABLE_VIEWS: Record<Exclude<LumiaAvatarView, 'legacy'>, string> = {
@@ -39,6 +42,38 @@ const motionIds = new Set(motionCatalog.map((item) => item.id))
 const fold = (text: string): string => String(text ?? '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
+
+/**
+ * VQ-05.1: explicit commands for FACE only, never semantic guesses or
+ * questions about how emotions work. Ambiguous animation requests stay R8.
+ * This parser is activated ONLY by the isolated QA flag in App.tsx.
+ */
+export function parseLumiaFaceActionVQ051(prompt:string):LumiaAvatarAction|null {
+  const said=fold(prompt).replace(
+    /^(?:(?:hola|oye|hey)\s+)?(?:lumi|lumia|lumiar|silumia|si lumia|lo mi)\s+/,'',
+  )
+  if(!said || /\b(?:como|por que|explicame|significa|definicion|programa|crear|crea|tutorial)\b/.test(said)){
+    return null
+  }
+  // FBX catalog gestures must remain under PH-04. In particular "anímate
+  // con sorpresa" is not consent to change facial morphs.
+  if(/\b(?:animacion|animaciones|fbx|motion r8|gesto corporal|movimiento corporal)\b/.test(said)){
+    return null
+  }
+  const command=/^(?:(?:por favor|ahora)\s+)?(?:(?:me|nos)\s+)?(?:muestra|muestrame|ensena|ensename|pon|ponte|haz|demuestra|quiero ver|quiero que muestres|quiero que pongas|puedes mostrarme|puedes poner|puedes hacer)\b/.test(said)
+  const faceContext=/\b(?:expresion|expresiones|cara|rostro|sonrisa|gesto facial|mirada)\b/.test(said)
+  if(!command || !faceContext)return null
+  const targets:Array<[RegExp,Vq051FacePreset]>=[
+    [/\b(?:alegria|felicidad|feliz|sonrisa|sonriendo|sonreir|sonrie)\b/,'joy'],
+    [/\b(?:tristeza|triste|melancolia|pena)\b/,'sorrow'],
+    [/\b(?:sorpresa|sorprendida|sorprendido|diversion|divertida|asombro)\b/,'fun'],
+    [/\b(?:enojo|enojada|enojado|enfado|molestia|enojarse)\b/,'angry'],
+    [/\b(?:neutral|normal|seria|serio|reposo)\b/,'neutral'],
+  ]
+  const chosen=targets.filter(([pattern])=>pattern.test(said))
+  if(chosen.length!==1)return null
+  return {kind:'face',preset:chosen[0][1]}
+}
 
 export function resolveAvatarView(search = '', enabled = false): LumiaAvatarView {
   const requested = new URLSearchParams(search).get('lumiaAvatar') as LumiaAvatarView | null
@@ -89,16 +124,30 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
 
   // Read-only questions are allowed and never cause a view or gesture change.
   if (/^(?:que|cuales|cuantas|como|dime|cuentame|comentame|explicame)\b/.test(said)) {
-    if (/\b(?:animaciones|movimientos|gestos)\b/.test(said) &&
-      /\b(?:tienes|disponibles|puedes|haces|sabes|catalogo)\b/.test(said)) {
+    // VQ-03: catalog intent needs an explicit possessive or a direct request
+    // for WHAT motions LUMIA has. Merely containing "sabes" + "animaciones"
+    // once hijacked the owner's VRM-fluidity question into a 17-item list.
+    const requestsOwnMotionCatalog =
+      /\b(?:tus|mis)\s+(?:(?:17|diecisiete)\s+)?(?:animaciones|movimientos|gestos)\b/.test(said) ||
+      /\b(?:que|cuales|cuantas)\s+(?:animaciones|movimientos|gestos)\s+(?:tienes|haces|puedes|sabes|hay)\b/.test(said) ||
+      /\b(?:animaciones|movimientos|gestos)\s+(?:que\s+)?(?:tienes|disponibles)\b/.test(said)
+    const asksTechnicalExplanation =
+      /\b(?:como|por que|para que|construir|disenar|desarrollar|programar|funcionan|funciona|fluida|fluidas|sistema nervioso)\b/.test(said)
+    if (requestsOwnMotionCatalog && !asksTechnicalExplanation) {
       return { kind: 'list-motions' }
     }
     if (/\b(?:vistas|modos de vista|apariencias|presentaciones)\b/.test(said)) {
       return { kind: 'list-views' }
     }
-    if (/\b(?:cuerpo virtual|avatar|cuerpo animado|presencia virtual)\b/.test(said)) {
-      return { kind: 'describe' }
-    }
+    // VQ-03.1: describe ONLY LUMIA's own avatar when explicitly requested.
+    // "¿Cómo conseguir que un avatar VRM tenga animaciones fluidas?" is a
+    // technical HOW question, not a request to list our character's features.
+    const aboutOurAvatar =
+      /\b(?:cuerpo virtual|avatar|cuerpo animado|presencia virtual)\b/.test(said) &&
+      /^(?:que|cual|cuales|dime|cuentame|comentame|explicame)\b/.test(said) &&
+      /\b(?:tu|tus|tienes|usas|utilizas|propio)\b/.test(said) &&
+      !asksTechnicalExplanation
+    if (aboutOurAvatar) return { kind: 'describe' }
     return null
   }
 
@@ -220,6 +269,7 @@ let snapshot: LumiaAvatarSnapshot = {
   view: resolveAvatarView(typeof window === 'undefined' ? '' : window.location.search, ph04Enabled),
   sequence: 0,
   motion: null,
+  face: null,
 }
 const listeners = new Set<() => void>()
 const notify = () => { for (const listener of listeners) listener() }
@@ -260,6 +310,20 @@ export function setLumiaAvatarView(view: LumiaAvatarView): boolean {
   return applyLumiaAvatarView(view, true)
 }
 
+/** Local one-shot owner request, no FBX, no network and no model inference. */
+export function requestLumiaAvatarFaceVQ051(preset:Vq051FacePreset):boolean {
+  if(!(['joy','sorrow','fun','angry','neutral'] as string[]).includes(preset)){
+    return false
+  }
+  if(snapshot.view==='legacy'||snapshot.view!=='head-vrm') {
+    setLumiaAvatarView('head-vrm')
+  }
+  const sequence=snapshot.sequence+1
+  snapshot={...snapshot,sequence,face:{sequence,preset,sentAt:Date.now()}}
+  notify()
+  return true
+}
+
 export function requestLumiaAvatarMotion(id: string): boolean {
   if (!motionIds.has(id)) return false
   if (snapshot.view === 'legacy' || snapshot.view === 'head-vrm') {
@@ -284,6 +348,18 @@ export function respondToLumiaAvatarAction(action: LumiaAvatarAction): string {
   if (action.kind === 'view') {
     setLumiaAvatarView(action.view)
     return 'He cambiado mi presentación a ' + avatarViewLabel(action.view) + '.'
+  }
+  if (action.kind === 'face') {
+    if(!requestLumiaAvatarFaceVQ051(action.preset)){
+      return 'Esa expresión no está disponible en el catálogo facial.'
+    }
+    const labels:Record<Vq051FacePreset,string>={
+      joy:'alegría',sorrow:'tristeza',fun:'diversión o sorpresa',
+      angry:'enojo',neutral:'neutral',
+    }
+    return action.preset==='neutral'
+      ? 'Voy a regresar suavemente a mi expresión facial neutral.'
+      : 'Voy a mostrar con mi rostro la expresión de '+labels[action.preset]+'.'
   }
   if (action.kind === 'motion') {
     // Do not claim an FBX was even requested while the user deliberately
