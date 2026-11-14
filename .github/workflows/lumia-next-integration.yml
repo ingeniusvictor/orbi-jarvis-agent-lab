@@ -13,6 +13,8 @@ on:
       - 'src/lib/vision-audit-vi041.ts'
       - 'src/lib/vision-active-vi031.ts'
       - 'src/ui/LumiaCameraViewfinder.tsx'
+      - 'vite.config.ts'
+      - 'scripts/certify-lumia-vision040a-wasm-route.mjs'
       - '.github/workflows/lumia-next-integration.yml'
   workflow_dispatch:
 jobs:
@@ -30,6 +32,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/certify-lumia-next-integration.mjs
+      - run: node scripts/certify-lumia-vision040a-wasm-route.mjs
       - run: npx tsx scripts/certify-lumia-vq04-natural-face.ts
       - run: npx tsx scripts/certify-lumia-vq05-speech-expressions.ts
       - run: npx tsx scripts/certify-lumia-vq051-facial-contrast.ts
