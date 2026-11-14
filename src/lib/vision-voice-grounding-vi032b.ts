@@ -29,6 +29,13 @@ export function classifyFreshCameraSpeech(value:string):CameraSpeechIntent{
       && /\b(?:camara|imagen|fotograma|viendo|mira|ver|ves|frente)\b/.test(q))
     return 'visual-correction'
 
+  // The same respond() path handles voice and the general text composer.
+  // An explicit present-scene command must attach the CURRENT authorized
+  // JPEG rather than reaching Qwen 2B as an ungrounded text-only question.
+  // Do not infer this from generic "observa" or from past photos.
+  if(/^(?:(?:por favor|puedes|podrias|me puedes|me podrias|quiero que|necesito que)\\s+)*(?:observa|mira|describe|analiza|revisa)\\s+(?:lo que (?:tienes|hay|ves) (?:delante|frente a ti|en la camara)|la escena (?:actual|frente a ti)|frente a (?:ti|la camara)|la (?:imagen|camara) (?:actual|en vivo))\\b/.test(q))
+    return 'fresh-scene'
+
   // Whisper sometimes drops /v/ in "¿qué ves ahora?" or outputs
   // "ahora que veas Lumia". This correction is for camera-session routing
   // only, NOT a global rewrite of all user speech.
