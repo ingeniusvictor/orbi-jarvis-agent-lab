@@ -13,7 +13,7 @@
 import {existsSync,realpathSync,statSync} from 'node:fs'
 import {spawn,execFileSync} from 'node:child_process'
 import {homedir} from 'node:os'
-import {basename,join,resolve} from 'node:path'
+import {join,resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import process from 'node:process'
 import {probeLocalVoiceCapabilities} from '../bridge/orbia/local-voice-probe.mjs'
@@ -27,7 +27,6 @@ function git(cwd,...args){
   }).trim()
 }
 const fileOk=(p)=>{try{return statSync(p).isFile()&&statSync(p).size>0}catch{return false}}
-const firstPresent=(paths)=>paths.find(fileOk)||null
 
 export function resolveOriginalVoiceFiles(original,{exists=fileOk}={}){
   const runtime=join(original,'.local-runtime')
