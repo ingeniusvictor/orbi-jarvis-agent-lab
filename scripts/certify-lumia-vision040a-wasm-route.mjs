@@ -31,9 +31,9 @@ try{
   // The bundle must request the ES-module fileset from its module Web Worker;
   // a plain/classic fileset silently recreates "ModuleFactory not set".
   const worker=readFileSync(join(root,'src','lib','vision-face-worker-vi04.ts'),'utf8')
-  assert.match(worker,/FilesetResolver\\.forVisionTasks\\('\/mediapipe',true\\)/)
-  assert.match(readFileSync(join(root,'scripts','start.mjs'),'utf8'),
-    /vision_wasm_module_internal\\.wasm/)
+  assert.ok(worker.includes("FilesetResolver.forVisionTasks('/mediapipe',true)"))
+  assert.ok(readFileSync(join(root,'scripts','start.mjs'),'utf8')
+    .includes('vision_wasm_module_internal.wasm'))
   server=await createServer({
     configFile:resolve(root,'vite.config.ts'),
     logLevel:'silent',
@@ -59,7 +59,6 @@ try{
   const wasmResponse=await fetch(`http://127.0.0.1:${address.port}/mediapipe/${wasmFile}`,{
     signal:AbortSignal.timeout(15_000),
   })
-  // It is not copied above: duplicate the test into the transient local vendor dir.
   assert.equal(wasmResponse.status,200,`GET ${wasmFile}`)
   const wasmBytes=Buffer.from(await wasmResponse.arrayBuffer())
   assert.ok(wasmBytes.length>1000)
