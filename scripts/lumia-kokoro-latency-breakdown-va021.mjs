@@ -14,7 +14,7 @@ import {join,resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {synthesizeLocalSpeech,isWave} from '../bridge/orbia/local-tts.mjs'
 import {
-  prewarmResidentKokoro,lastResidentKokoroVa021Timing,
+  prewarmResidentKokoro,lastResidentKokoroVa021Timing,stopResidentKokoroVa021,
 } from '../bridge/orbia/resident-tts.mjs'
 import {auditQaCheckout,makeVoiceQaChildEnv} from './lumia-vq03-local-voice-qa.mjs'
 import {VA02_TEST_PHRASES,measureVa02,percentile} from './lumia-kokoro-latency-baseline-va02.mjs'
@@ -56,7 +56,8 @@ async function main(){
     // This flag exists in the benchmark CHILD ONLY. Daily QA/ASUS unaffected.
     ORBIA_VA021_KOKORO_PROFILE:'1',
   }
-  const prepared=await prewarmResidentKokoro(env)
+  try {
+    const prepared=await prewarmResidentKokoro(env)
   if(!prepared?.ready)throw Error('VA021_KOKORO_NOT_READY')
   const warm=await synthesizeLocalSpeech('Prueba breve de voz local.',{env})
   if(warm.provider!=='kokoro-local-resident'||!isWave(warm.audio)||
@@ -97,6 +98,10 @@ async function main(){
   console.log('[VA-02.1] total p50 '+totals.p50Ms+
     ' ms | p95 '+totals.p95Ms+' ms | max '+totals.maxMs+' ms')
   console.log('[VA-02.1] Diagnóstico únicamente. No compara aún un cambio de voz ni mide reproducción Chrome.')
+  } finally {
+    // Return control to PowerShell; this closes only the benchmark's worker.
+    stopResidentKokoroVa021(env)
+  }
 }
 if(process.argv[1]&&resolve(process.argv[1])===resolve(fileURLToPath(import.meta.url))){
   main().catch(e=>{
