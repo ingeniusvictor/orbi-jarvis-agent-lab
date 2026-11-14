@@ -27,6 +27,9 @@ VOICES = Path(os.environ.get("ORBI_LOCAL_TTS_VOICES") or ROOT / "models" / "voic
 MAX_TEXT = 4000
 # VA-02.1: opt-in diagnostic, disabled in ordinary LUMIA runs.
 PROFILE_VA021 = os.environ.get('ORBIA_VA021_KOKORO_PROFILE') == '1'
+# VA-02.2: opt-in CPU threading A/B in this isolated QA worker ONLY.
+CPU_AB_VA022 = os.environ.get('ORBIA_VA022_CPU_AB') == '1'
+THREAD_MODE_VA022 = os.environ.get('ORBIA_VA022_INTRA_THREADS', 'auto')
 
 
 def emit(payload):
@@ -38,12 +41,37 @@ def main():
     try:
         espeak.EspeakFallback(british=False)
         g2p = EspeakG2P(language="es")
-        tts = Kokoro(str(MODEL), str(VOICES))
+        if CPU_AB_VA022 and THREAD_MODE_VA022 in ("2", "4"):
+            # Use the documented session constructor; do not change model,
+            # voices, ONNX graph or user's installed Python dependencies.
+            import onnxruntime as ort
+            if not callable(getattr(Kokoro, "from_session", None)):
+                raise RuntimeError("VA022_KOKORO_FROM_SESSION_UNAVAILABLE")
+            opts = ort.SessionOptions()
+            opts.intra_op_num_threads = int(THREAD_MODE_VA022)
+            opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            session = ort.InferenceSession(
+                str(MODEL), sess_options=opts,
+                providers=["CPUExecutionProvider"],
+            )
+            tts = Kokoro.from_session(session, str(VOICES))
+        elif not CPU_AB_VA022 or THREAD_MODE_VA022 == "auto":
+            tts = Kokoro(str(MODEL), str(VOICES))
+        else:
+            raise ValueError("VA022_UNSUPPORTED_THREADS")
     except Exception:
         emit({"ready": False, "errorCode": "VOICE_TTS_UNAVAILABLE"})
         return 1
 
-    emit({"ready": True})
+    ready_packet = {"ready": True}
+    if CPU_AB_VA022:
+        session = getattr(tts, "sess", None)
+        providers = session.get_providers() if session else []
+        ready_packet["va022"] = {
+            "threads": THREAD_MODE_VA022,
+            "providers": providers,
+        }
+    emit(ready_packet)
 
     for raw in sys.stdin:
         try:
