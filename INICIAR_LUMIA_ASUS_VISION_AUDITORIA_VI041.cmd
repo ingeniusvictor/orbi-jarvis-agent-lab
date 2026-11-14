@@ -17,5 +17,16 @@ echo  NO identifica personas. ROSTROS no son PERSONAS totales.
 echo  La camara requiere consentimiento y cierra a los 3 minutos.
 echo  Primera ejecucion puede instalar modelo publico BlazeFace.
 echo ============================================================
+rem PH-04 VRM/FBX are gitignored private local assets; a fresh git worktree
+rem does not inherit them. Fail CLOSED rather than silently render legacy GLB.
+node "%~dp0scripts\lumia-private-avatar-assets.mjs" --require
+if errorlevel 1 (
+  echo.
+  echo ERROR: Faltan archivos privados VRM o Motion R8 en este laboratorio.
+  echo No se iniciara la version antigua GLB como si fuera VI-04.1.
+  echo Consulta el protocolo VI-04.1 para copiar recursos locales sin sobrescribir.
+  pause
+  exit /b 3
+)
 call "%~dp0INICIAR_LUMIA_ASUS_ROSTROS_VI040A.cmd"
 exit /b %ERRORLEVEL%
