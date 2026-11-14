@@ -12,7 +12,7 @@ Never performs git pull, checkout, delete, model download or API key copy.
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('Install','Verify','Launch')]
+  [ValidateSet('Install','Verify','Launch','Ports')]
   [string]$Mode = 'Install',
   [string]$Source = (Join-Path $env:USERPROFILE 'LUMIA-ASUS'),
   [ValidateRange(0,65535)]
@@ -100,6 +100,31 @@ function Resolve-VoiceTools {
     'ORBI_LOCAL_TTS_VOICES'=$kokoroVoices
   }
 }
+function Select-QAFrontendPort([int]$FrontendPort) {
+  # R9 experiment only: honor existing applications on 5173 and 5183.
+  # The frontend can use any unoccupied localhost port in the trusted dev range;
+  # the backend remains on 8787. No processes are terminated.
+  $busyPorts = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+    Select-Object -ExpandProperty LocalPort -Unique)
+  if ($busyPorts -contains 8787) {
+    throw 'El bridge necesita 8787, que esta ocupado. No se cerrara ningun proceso; libera el bridge anterior antes de iniciar R9.'
+  }
+  $candidates = @(5190..5199) + @(5174..5182) + @(5184..5189)
+  if ($FrontendPort -ne 0) {
+    if ($FrontendPort -lt 5174 -or $FrontendPort -gt 5199 -or $FrontendPort -eq 5183) {
+      throw 'Puerto frontend no admitido: usa 5174-5199, excepto el 5183 reservado. 5173 tambien se conserva.'
+    }
+    $candidates = @($FrontendPort)
+  }
+  $chosen = @($candidates | Where-Object { $busyPorts -notcontains $_ } |
+    Select-Object -First 1)
+  if ($chosen.Count -ne 1) {
+    throw 'No hay un puerto frontend disponible en 5174-5199 (excluyendo 5183). No se cerro ningun proceso.'
+  }
+  return [int]$chosen[0]
+
+}
+
 function Verify-SourceAssets {
   Assert-File $manifestFile 'manifiesto R8'
   $m = Get-Content -LiteralPath $manifestFile -Raw | ConvertFrom-Json
@@ -215,6 +240,9 @@ if ($Mode -eq 'Install') {
     if ($LASTEXITCODE -ne 0) { throw 'La compilacion R9 no paso.' }
   } finally { Pop-Location }
   Write-Host 'QA LOCAL DE CODIGO PASS. Todavia falta revision visual humana.' -ForegroundColor Green
+} elseif ($Mode -eq 'Ports') {
+  # Read-only port probe for CI and local diagnostics. Never launches LUMIA.
+  Select-QAFrontendPort -FrontendPort $FrontendPort
 } else {
   # Launch without changing Windows environment globally. The existing
   # certified ASUS starter sets all usual Ollama/Whisper/Kokoro flags.
@@ -225,27 +253,7 @@ if ($Mode -eq 'Install') {
   [Environment]::SetEnvironmentVariable('JARVIS_ALLOW_WRITES', '0', 'Process')
   [Environment]::SetEnvironmentVariable('ORBIA_REALTIME_EXPERIMENT', '0', 'Process')
   [Environment]::SetEnvironmentVariable('VITE_LUMIA_REALTIME_EXPERIMENT', '0', 'Process')
-  # R9 experiment only: honor existing applications on 5173 and 5183.
-  # The frontend can use any unoccupied localhost port in the trusted dev range;
-  # the backend remains on 8787. No processes are terminated.
-  $busyPorts = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
-    Select-Object -ExpandProperty LocalPort -Unique)
-  if ($busyPorts -contains 8787) {
-    throw 'El bridge necesita 8787, que esta ocupado. No se cerrara ningun proceso; libera el bridge anterior antes de iniciar R9.'
-  }
-  $candidates = @(5190..5199) + @(5174..5182) + @(5184..5189)
-  if ($FrontendPort -ne 0) {
-    if ($FrontendPort -lt 5174 -or $FrontendPort -gt 5199 -or $FrontendPort -eq 5183) {
-      throw 'Puerto frontend no admitido: usa 5174-5199, excepto el 5183 reservado. 5173 tambien se conserva.'
-    }
-    $candidates = @($FrontendPort)
-  }
-  $chosen = @($candidates | Where-Object { $busyPorts -notcontains $_ } |
-    Select-Object -First 1)
-  if ($chosen.Count -ne 1) {
-    throw 'No hay un puerto frontend disponible en 5174-5199 (excluyendo 5183). No se cerro ningun proceso.'
-  }
-  $front = [int]$chosen[0]
+  $front = Select-QAFrontendPort -FrontendPort $FrontendPort
   [Environment]::SetEnvironmentVariable('PORT', [string]$front, 'Process')
   [Environment]::SetEnvironmentVariable('JARVIS_BRIDGE_PORT', '8787', 'Process')
   Write-Host ''
