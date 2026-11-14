@@ -17,7 +17,7 @@
 ## 2. Corrección mínima VQ-03
 
 - **Parser PH-04**: las preguntas de catálogo deben pedir **tus animaciones/movimientos/gestos** o indicar directamente «qué animaciones tienes». `sabes` y `animaciones` en una misma frase técnica ya no secuestran la consulta. Preguntas sobre **cómo se construye/controla la animación** pasan a Qwen.
-- **Anclaje técnico local** `src/lib/vrm-tech-grounding-vq03.ts`: en preguntas técnicas no visuales que mencionen VRM, o donde un «VRAM» de STT aparece claramente en un contexto de avatar/animación, añade SOLO al prompt generativo una aclaración breve: **VRM es avatar humanoide 3D; VRAM es memoria de GPU**. Para la pregunta de «sistema nervioso», orientar a una arquitectura verificable: LLM de nivel alto → controlador de estados/gestos acotado → mezcla de clips Motion R8 / IK / visemas y rig VRM.
+- **Anclaje técnico VQ-03.1:** se trasladó desde la consulta del usuario a la instrucción SYSTEM de Ollama en `bridge/orbia/vrm-tech-grounding-vq03.mjs`; se activa solo con `ORBIA_LUMIA_VRM_GROUNDING_VQ03=1` en el lanzador experimental. No modifica la transcripción ni el historial de conversación, ni llega como contenido de usuario al clasificador SKILL-01. VRM designa un avatar humanoide; VRAM es memoria gráfica. Qwen puede explicar el controlador de estados, Motion R8, IK y visemas.
 - El texto original de Whisper **no se altera** en la transcripción presentada, ni se reescribe el historial visible. Nunca cambiar **VRAM** si el usuario pregunta explícitamente por memoria gráfica/GPU.
 - Ninguna nueva herramienta o permiso: no abrir webcam, micrófono, modelos, archivos, escritorio ni red por este contexto; **2B sigue siendo el cerebro predeterminado**.
 - No tocar código de generación Kokoro/WAV por este PR: la pausa de 3.114 s merece **experimento A/B separado** y un presupuesto de latencia, no confundirla con el bug de comprensión.
@@ -25,6 +25,22 @@
 ## 3. Pruebas
 
 `scripts/certify-lumia-vq03-vrm-clarity.ts`: las tres frases VRM/VRAM del propietario NO producen `list-motions` ni cambios Ollama, sí reciben hint breve si pasan al modelo. Mantiene comandos de vista/saludo y preguntas sobre el catálogo, excluye preguntas VRAM/GPU puras. Ejecutar regresiones existentes `certify-lumia-avatar-presence-ph04.ts`, `certify-lumia-avatar-ph042.ts`, `certify-amr-model-runtime.mjs`, `npm run lint`, `npm run build` en Windows/Linux.
+
+## 2A. QA física por texto, 13-11-2026, 23:56–23:58 — regresión descubierta
+
+En el clon VQ-03, el propietario pegó cinco preguntas escritas (STT vacío). El primer texto fue extremadamente rápido, pero **dos respuestas eran falsas derivaciones a atajos**:
+
+| Texto de prueba | Primer texto | Primer audio | Observación |
+| --- | ---: | ---: | --- |
+| «¿Cómo puedo conseguir que un avatar VRM tenga animaciones fluidas?» | 2 ms | 106 ms | FALLO: PH-04 contestó con la descripción de su propia presencia virtual; regla demasiado amplia por la palabra «avatar» y «cómo». |
+| «Si quisiera convertir una IA local en el sistema nervioso que controla un VRM, ¿qué tendría que hacer?» | 24 ms | 120 ms | FALLO: registro SKILL-01 devolvió el texto de MEM-01. La inyección anterior de contexto añadía «memoria», y la frase tenía «qué», lo que activó el atajo. |
+| «¿Cuánta VRAM dedicada necesita una GPU para trabajar con animaciones?» | 5,31 s | 5,42 s | Qwen sí respondió sobre VRAM hardware. La cifra genérica indicada no está validada como compra. |
+| «Lumi, salúdame con la mano» | 2 ms | 481 ms | Orden rápida detectada, pero el texto no certifica que el FBX se movió visualmente. |
+| «Lumi, cambia a la vista de medio cuerpo» | 2 ms | 113 ms | Orden rápida detectada, pero el texto no certifica renderizado correcto. |
+
+**Conclusión:** 2/24 ms para primer texto son respuestas locales predeterminadas, no benchmark de inferencia Qwen. 106/120 ms para primer audio no demuestran que el clon tenga el mismo runtime Whisper/Kokoro que ASUS original.
+
+**VQ-03.1** corrigió ambas colisiones: regla PH-04 de descripción limitada al *propio avatar*; instrucción técnica en SYSTEM de Ollama, y pregunta original sin alteración en registro SKILL-01, RC-03 ni historial. Se añadieron las frases exactas a regresión. La corrección todavía necesita CI nuevo y QA física antes de promoverse.
 
 **Limitación crucial:** esas pruebas certifican **enrutamiento/prompt** y compatibilidad de código, **NO** garantizan que Qwen 2B vaya a responder correctamente en vivo ni que mejoren automáticamente las pausas de audio. No promover a MASTER sin QA física.
 
