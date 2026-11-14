@@ -7,6 +7,7 @@ import { R8BodyCompanion } from './lumia-motion-r8/portal-body-companion'
 import { reportVq03AvatarQA } from './lumia-motion-r8/avatar-runtime-audit-vq03'
 import { NaturalFaceMotionVQ04 } from './lumia-head/natural-face-vq04'
 import { SpeechExpressionVQ05 } from './lumia-head/speech-expressions-vq05'
+import { FacePreviewVQ051 } from './lumia-head/face-preview-vq051'
 import { currentGuidedFaceExpression, guidedDemoSnapshot } from './lumia-motion-r8/avatar-demo-ph045'
 import { avatarPresenceSnapshot, subscribeAvatarPresence, type LumiaAvatarView } from './lumia-motion-r8/avatar-presence-ph04'
 import type { Drive } from './Scene'
@@ -36,6 +37,7 @@ const BODY_HEIGHT_M = 1.94
 const NATURAL_FACE_VQ04 = import.meta.env.VITE_LUMIA_NATURAL_FACE_VQ04 === '1'
 // VQ-05: tied to ALREADY audible phrase events, never to inferred human mood.
 const SPEECH_EXPRESSIONS_VQ05 = import.meta.env.VITE_LUMIA_SPEECH_EXPRESSIONS_VQ05 === '1'
+const FACE_DIRECT_VQ051 = import.meta.env.VITE_LUMIA_FACE_DIRECT_VQ051 === '1'
 
 type SpeechState = {
   active: boolean
@@ -56,6 +58,9 @@ export function LumiaPortalHead({ drive, avatarView }: {
   const naturalBlinkReported=useRef(false)
   const speechExpressions=useMemo(()=>new SpeechExpressionVQ05(),[])
   const expressionReported=useRef(false)
+  const facePreview=useMemo(()=>new FacePreviewVQ051(),[])
+  const lastFaceSequence=useRef(0)
+  const directFaceReported=useRef(0)
   const ph02 = isPh02Presentation(window.location.search)
   const showNeck = isNeckPreviewEnabled(window.location.search)
   const showBody = avatarView === 'bust-vrm' || avatarView === 'body-vrm' || showNeck
@@ -287,6 +292,19 @@ export function LumiaPortalHead({ drive, avatarView }: {
     applyBone(rig.leftEye, eyeYaw, eyePitch)
     applyBone(rig.rightEye, eyeYaw, eyePitch)
 
+    // VQ-05.1: read a bounded, in-memory owner command. This survives the
+    // voice-triggered view switch to head-vrm without polling the network.
+    const faceCmd=FACE_DIRECT_VQ051 ? avatarPresenceSnapshot().face : null
+    if(faceCmd && faceCmd.sequence>lastFaceSequence.current){
+      lastFaceSequence.current=faceCmd.sequence
+      // Ignore stale state after refresh, not commands remounting the face.
+      if(Date.now()-faceCmd.sentAt<10000){
+        facePreview.cue(faceCmd.preset)
+      }
+    }
+    const preview=FACE_DIRECT_VQ051
+      ? facePreview.step(dt,guidedDemoSnapshot().active) : null
+
     // VRM0 expression blends are owned by this head renderer only.
     const cycle = t % 3.73
     const blink = micro?.blink ??
@@ -319,6 +337,26 @@ export function LumiaPortalHead({ drive, avatarView }: {
         reportVq03AvatarQA({
           event:'natural-expression-observed',expression:faceCue.dominant,
           weight:Number(faceCue.weights[faceCue.dominant].toFixed(3)),
+        })
+      }
+    }
+    // Owner-requested VQ-05.1 FACE preview takes priority over the
+    // probabilistic normal-speech hint. Never override guided-demo clips.
+    if(preview?.active && !demoActive){
+      // Do not blend a default thinking smile with sadness/anger.
+      for(const name of ['joy','sorrow','fun','angry'] as const){
+        delete values[name]
+        const weight=preview.weights[name]
+        if(weight>.001 && (rig.expressions.get(name)?.length??0)>0){
+          values[name]=weight
+        }
+      }
+      if(faceCmd && directFaceReported.current!==faceCmd.sequence){
+        directFaceReported.current=faceCmd.sequence
+        reportVq03AvatarQA({
+          event:'face-preview-observed',
+          expression:faceCmd.preset,
+          weight:Number(preview.weights[faceCmd.preset==='neutral'?'joy':faceCmd.preset].toFixed(3)),
         })
       }
     }
