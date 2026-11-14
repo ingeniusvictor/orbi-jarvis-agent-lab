@@ -5,6 +5,8 @@ on:
       - 'src/App.tsx'
       - 'bridge/ollama.mjs'
       - 'bridge/orbia/vrm-tech-grounding-vq03.mjs'
+      - 'bridge/orbia/speech-vocabulary.mjs'
+      - 'docs/lumia-convergence/46-VQ035-BRM-REPETICION-ASUS-20261114.md'
       - 'src/lib/vrm-tech-grounding-vq03.ts'
       - 'src/scene/lumia-motion-r8/avatar-presence-ph04.ts'
       - 'src/scene/lumia-motion-r8/portal-body-companion.ts'
