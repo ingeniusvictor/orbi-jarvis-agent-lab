@@ -33,7 +33,7 @@ export function classifyFreshCameraSpeech(value:string):CameraSpeechIntent{
   // An explicit present-scene command must attach the CURRENT authorized
   // JPEG rather than reaching Qwen 2B as an ungrounded text-only question.
   // Do not infer this from generic "observa" or from past photos.
-  if(/^(?:(?:por favor|puedes|podrias|me puedes|me podrias|quiero que|necesito que)\\s+)*(?:observa|mira|describe|analiza|revisa)\\s+(?:lo que (?:tienes|hay|ves) (?:delante|frente a ti|en la camara)|la escena (?:actual|frente a ti)|frente a (?:ti|la camara)|la (?:imagen|camara) (?:actual|en vivo))\\b/.test(q))
+  if(/^(?:(?:por favor|puedes|podrias|me puedes|me podrias|quiero que|necesito que)\s+)*(?:observa|mira|describe|analiza|revisa)\s+(?:lo que (?:tienes|hay|ves) (?:delante|frente a ti|en la camara)|la escena (?:actual|frente a ti)|frente a (?:ti|la camara)|la (?:imagen|camara) (?:actual|en vivo))\b/.test(q))
     return 'fresh-scene'
 
   // Whisper sometimes drops /v/ in "¿qué ves ahora?" or outputs
