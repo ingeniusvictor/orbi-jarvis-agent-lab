@@ -6,6 +6,10 @@ on:
       - 'src/lib/vrm-tech-grounding-vq03.ts'
       - 'src/scene/lumia-motion-r8/avatar-presence-ph04.ts'
       - 'scripts/certify-lumia-vq03-vrm-clarity.ts'
+      - 'scripts/lumia-private-avatar-assets-vq03.mjs'
+      - 'scripts/certify-lumia-vq03-private-avatar-assets.mjs'
+      - 'INICIAR_LUMIA_ASUS_VQ03_VRM_QA.cmd'
+      - 'docs/lumia-convergence/42-VQ03-ASUS-ISOLATED-QA-20261113.md'
       - 'docs/lumia-convergence/41-VQ03-VRM-CLARITY-ASUS-20261113.md'
       - '.github/workflows/lumia-vq03-vrm-clarity.yml'
   workflow_dispatch:
@@ -23,6 +27,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: node scripts/certify-lumia-vq03-private-avatar-assets.mjs
       - run: npx tsx scripts/certify-lumia-vq03-vrm-clarity.ts
       - run: npx tsx scripts/certify-lumia-avatar-presence-ph04.ts
       - run: npx tsx scripts/certify-lumia-avatar-ph042.ts
