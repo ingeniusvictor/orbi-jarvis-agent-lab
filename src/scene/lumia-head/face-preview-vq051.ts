@@ -30,6 +30,11 @@ export class FacePreviewVQ051 {
     this.elapsed=0
   }
   step(dt:number,blocked=false):FacePreviewFrameVQ051 {
+    if(blocked){
+      // Guided demo owns all face morphs. Cancel, never replay on its exit.
+      this.hasCue=false
+      this.requested=null
+    }
     const delta=clamp(dt,0,.05)
     if(this.hasCue && !blocked)this.elapsed+=delta
     const hold=this.hasCue && !blocked && this.elapsed<HOLD_SECONDS
