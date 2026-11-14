@@ -1,0 +1,48 @@
+name: LUMIA Motion R9-01-02 - safe live spoken expressivity
+
+on:
+  push:
+    branches:
+      - feature/lumia-motion-r9-intent-contract-20261114
+  pull_request:
+    branches:
+      - feature/lumia-vi04c1-open-set-calibration-cpu-20261109
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumia-motion-r9-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install exactly locked dependencies
+        run: npm ci
+      - name: Motion R9-00 strict JSON contract
+        run: node scripts/certify-lumia-motion-r9-contract.mjs
+      - name: Motion R9-01-02 director and bounded body tests
+        run: node scripts/certify-lumia-motion-r9-director.mjs
+      - name: PH-03 R8 original fallback
+        run: npx tsx scripts/certify-lumia-motion-r8-portal-ph03.ts
+      - name: PH-04.7 manual clips and guided demo priority
+        run: npx tsx scripts/certify-lumia-ph047-owner-motions.ts
+      - name: PH-04.8 walking stage regression
+        run: npx tsx scripts/certify-lumia-ph048-walk-paths.ts
+      - name: Production build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
