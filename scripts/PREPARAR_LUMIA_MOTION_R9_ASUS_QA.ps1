@@ -100,29 +100,32 @@ function Resolve-VoiceTools {
     'ORBI_LOCAL_TTS_VOICES'=$kokoroVoices
   }
 }
-function Select-QAFrontendPort([int]$FrontendPort) {
-  # R9 experiment only: honor existing applications on 5173 and 5183.
-  # The frontend can use any unoccupied localhost port in the trusted dev range;
-  # the backend remains on 8787. No processes are terminated.
+function Select-QAPorts([int]$FrontendPort) {
+  # Isolated QA instances must never seize ports used by daily projects.
+  # Frontend 5173 / 5183 and bridge 8787 are reserved for existing apps.
   $busyPorts = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty LocalPort -Unique)
-  if ($busyPorts -contains 8787) {
-    throw 'El bridge necesita 8787, que esta ocupado. No se cerrara ningun proceso; libera el bridge anterior antes de iniciar R9.'
-  }
-  $candidates = @(5190..5199) + @(5174..5182) + @(5184..5189)
+  $frontendCandidates = @(5190..5199) + @(5174..5182) + @(5184..5189)
   if ($FrontendPort -ne 0) {
     if ($FrontendPort -lt 5174 -or $FrontendPort -gt 5199 -or $FrontendPort -eq 5183) {
-      throw 'Puerto frontend no admitido: usa 5174-5199, excepto el 5183 reservado. 5173 tambien se conserva.'
+      throw 'Puerto frontend no admitido: usa 5174-5199, excepto 5183. Se reserva 5173.'
     }
-    $candidates = @($FrontendPort)
+    $frontendCandidates = @($FrontendPort)
   }
-  $chosen = @($candidates | Where-Object { $busyPorts -notcontains $_ } |
+  $front = @($frontendCandidates | Where-Object { $busyPorts -notcontains $_ } |
     Select-Object -First 1)
-  if ($chosen.Count -ne 1) {
-    throw 'No hay un puerto frontend disponible en 5174-5199 (excluyendo 5183). No se cerro ningun proceso.'
+  if ($front.Count -ne 1) {
+    throw 'No hay frontend disponible en 5174-5199 excluyendo 5183. No se cerraron procesos.'
   }
-  return [int]$chosen[0]
-
+  $bridge = @(8790..8799 | Where-Object { $busyPorts -notcontains $_ } |
+    Select-Object -First 1)
+  if ($bridge.Count -ne 1) {
+    throw 'No hay bridge disponible en 8790-8799. El puerto 8787 se conserva.'
+  }
+  return [pscustomobject]@{
+    Frontend = [int]$front[0]
+    Bridge   = [int]$bridge[0]
+  }
 }
 
 function Verify-SourceAssets {
@@ -242,7 +245,7 @@ if ($Mode -eq 'Install') {
   Write-Host 'QA LOCAL DE CODIGO PASS. Todavia falta revision visual humana.' -ForegroundColor Green
 } elseif ($Mode -eq 'Ports') {
   # Read-only port probe for CI and local diagnostics. Never launches LUMIA.
-  Select-QAFrontendPort -FrontendPort $FrontendPort
+  Select-QAPorts -FrontendPort $FrontendPort
 } else {
   # Launch without changing Windows environment globally. The existing
   # certified ASUS starter sets all usual Ollama/Whisper/Kokoro flags.
@@ -253,14 +256,17 @@ if ($Mode -eq 'Install') {
   [Environment]::SetEnvironmentVariable('JARVIS_ALLOW_WRITES', '0', 'Process')
   [Environment]::SetEnvironmentVariable('ORBIA_REALTIME_EXPERIMENT', '0', 'Process')
   [Environment]::SetEnvironmentVariable('VITE_LUMIA_REALTIME_EXPERIMENT', '0', 'Process')
-  $front = Select-QAFrontendPort -FrontendPort $FrontendPort
+  $ports = Select-QAPorts -FrontendPort $FrontendPort
+  $front = $ports.Frontend
+  $bridge = $ports.Bridge
   [Environment]::SetEnvironmentVariable('PORT', [string]$front, 'Process')
-  [Environment]::SetEnvironmentVariable('JARVIS_BRIDGE_PORT', '8787', 'Process')
+  [Environment]::SetEnvironmentVariable('JARVIS_BRIDGE_PORT', [string]$bridge, 'Process')
+  [Environment]::SetEnvironmentVariable('VITE_BRIDGE_URL', ('ws://localhost:' + $bridge), 'Process')
   Write-Host ''
-  Write-Host ('LUMIA R9 QA: frontend ' + $front + ' / bridge 8787. Puertos 5173 y 5183 intactos.') -ForegroundColor Green
+  Write-Host ('LUMIA R9 QA: frontend ' + $front + ' / bridge ' + $bridge + '. Puertos 5173, 5183 y 8787 intactos.') -ForegroundColor Green
   Write-Host ('R9 ACTIVO: http://localhost:' + $front + '/?lumiaAvatar=bust-vrm&lumiaR9=1') -ForegroundColor Cyan
   Write-Host ('CONTROL R8: http://localhost:' + $front + '/?lumiaAvatar=bust-vrm&lumiaR9=0') -ForegroundColor Cyan
-  Write-Host 'Moverse entre URLs recarga el visor. No lanzar otra instancia de bridge en 8787.' -ForegroundColor Yellow
+  Write-Host 'El bridge y el visor se levantan en puertos aislados. No se cierra ninguna otra app.' -ForegroundColor Yellow
   Push-Location $qaRoot
   try {
     & (Join-Path $qaRoot 'INICIAR_LUMIA_ASUS_2B_DIARIA_AMR030.cmd')
