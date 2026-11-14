@@ -7,13 +7,14 @@ import type {Plugin} from 'vite'
 
 // MediaPipe's WASM loader is dynamically imported by the bundled task library.
 // Vite 8 rejects imports of JavaScript under /public unless they are served
-// raw, even though direct static GETs work. Intercept only the two known
+// raw, even though direct static GETs work. Intercept only the three known
 // loader scripts, before Vite's transform middleware; never expose arbitrary
 // files or bypass transforms for the rest of the app.
 const mediaPipeRoot=fileURLToPath(new URL('./public/mediapipe/',import.meta.url))
 const rawLoaderNames=new Set([
   'vision_wasm_internal.js',
   'vision_wasm_nosimd_internal.js',
+  'vision_wasm_module_internal.js',
 ])
 const rawMediaPipeWasmLoader=():Plugin=>({
   name:'lumia-mediapipe-raw-wasm-loader',
