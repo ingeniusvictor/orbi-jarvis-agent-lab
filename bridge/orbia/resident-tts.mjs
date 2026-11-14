@@ -206,6 +206,23 @@ export function synthesizeResidentKokoro(
   return task
 }
 
+/**
+ * Graceful endpoint strictly for the VA-02.1 standalone measurement.
+ * Refuses ordinary daily / conversational runtime. With no active job, close
+ * the benchmark's warm Python process so PowerShell can regain its prompt.
+ */
+export function stopResidentKokoroVa021(env = process.env) {
+  if (env.ORBIA_VA021_KOKORO_PROFILE !== '1') return false
+  const state = resident
+  if (!state || state.dead || state.current) return false
+  state.dead = true
+  resident = null
+  if (starting === state.startPromise) starting = null
+  try { state.child.stdin.end() } catch { /* already closed */ }
+  try { state.child.kill() } catch { /* already exited */ }
+  return true
+}
+
 process.once('exit', () => {
   if (resident && !resident.dead) {
     try { resident.child.kill() } catch { /* no running worker */ }
