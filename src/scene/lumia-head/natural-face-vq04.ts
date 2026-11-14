@@ -77,8 +77,8 @@ export class NaturalFaceMotionVQ04 {
     if(this.elapsed>=this.nextGaze){
       const thinking=phase==='thinking'||phase==='tooling'
       const listening=phase==='listening'||phase==='waking'
-      const horizontal=thinking?.022:listening?.008:speaking?.014:.017
-      const vertical=thinking?.012:listening?.006:.008
+      const horizontal=thinking ? .022 : listening ? .008 : speaking ? .014 : .017
+      const vertical=thinking ? .012 : listening ? .006 : .008
       this.targetYaw=(this.random()*2-1)*horizontal
       this.targetPitch=(this.random()*2-1)*vertical
       this.nextGaze=this.elapsed+1.25+this.random()*2.6
