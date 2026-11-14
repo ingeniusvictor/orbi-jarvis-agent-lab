@@ -56,6 +56,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
   const fullBody = avatarView === 'body-vrm'
   // QA rollback: &lumiaWalk=legacy reproduces PH-04.7 in-place behavior.
   const walkStageEnabled = new URLSearchParams(window.location.search).get('lumiaWalk') !== 'legacy'
+  // R9 remains opt-in, independent from R8 / voice / Ollama launch flags.
+  const r9Enabled = new URLSearchParams(window.location.search).get('lumiaR9') === '1'
   const bust = avatarView === 'bust-vrm'
   // Align face centre with the centre of the holographic rings. In the
   // screenshot the old bust centre (1.28) lifted the face too high.
@@ -66,8 +68,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
     [gltf, ph02, showNeck, showBody],
   )
   const body = useMemo(
-    () => showBody ? new R8BodyCompanion(rig, { allowClips: clipEnabled, safePose, fullBodySafe: fullBody, walkStageEnabled }) : null,
-    [rig, showBody, clipEnabled, safePose, fullBody, walkStageEnabled],
+    () => showBody ? new R8BodyCompanion(rig, { allowClips: clipEnabled, safePose, fullBodySafe: fullBody, walkStageEnabled, r9Enabled }) : null,
+    [rig, showBody, clipEnabled, safePose, fullBody, walkStageEnabled, r9Enabled],
   )
   useEffect(() => () => { body?.dispose() }, [body])
   // The view switch is a React remount; replay a newly authorised gesture
@@ -129,6 +131,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
         active: true, id: playing.turnId, text: playing.phrase,
         phraseStarted: playing.phraseStartedAt,
       }
+      body?.onAudioStart(playing.turnId)
+      if (playing.phrase) body?.onSpokenPhrase(playing.phrase, playing.turnId)
     }
     const move = (event: PointerEvent) => {
       pointer.current.x = THREE.MathUtils.clamp(
@@ -146,11 +150,12 @@ export function LumiaPortalHead({ drive, avatarView }: {
           active: true, id: data.turnId, text: '',
           phraseStarted: performance.now() / 1000,
         }
+        body?.onAudioStart(data.turnId)
       } else if (data.kind === 'phrase') {
         if (!speech.current.active || speech.current.id !== data.turnId) return
         speech.current.text = data.text
         speech.current.phraseStarted = performance.now() / 1000
-        body?.onSpokenPhrase(data.text)
+        body?.onSpokenPhrase(data.text, data.turnId)
       } else if (data.kind === 'end' && speech.current.id === data.turnId) {
         speech.current.active = false
         speech.current.text = ''
@@ -268,6 +273,13 @@ export function LumiaPortalHead({ drive, avatarView }: {
     if (avatarView === 'head-vrm' && demoExpression &&
         demoExpression !== 'neutral' && rig.expressions.has(demoExpression)) {
       values[demoExpression] = 0.78
+    }
+    // R9 never overrides demo facial expressions, blink or Kokoro visemes.
+    const r9Expression = semantic?.expression
+    if (!demoExpression && speakingAudio && r9Expression &&
+        rig.expressions.has(r9Expression.name)) {
+      values[r9Expression.name] = Math.max(values[r9Expression.name] ?? 0,
+        r9Expression.weight)
     }
     setHeadExpressions(rig, values)
   })
