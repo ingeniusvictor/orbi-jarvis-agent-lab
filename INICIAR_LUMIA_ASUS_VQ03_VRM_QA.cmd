@@ -36,6 +36,9 @@ set "ORBIA_LUMIA_VRM_GROUNDING_VQ03=1"
 rem VQ-03.2: read-only browser console audit of first VRM frame + FBX arm pose.
 rem Never enabled in the daily production launcher. No camera/audio recording.
 set "VITE_LUMIA_AVATAR_QA_VQ03=1"
+rem VQ-04: subtle real blink and eye micro-gaze, exclusive to this isolated clone.
+rem Legacy facial animation remains active if disabled. No webcam or audio analysis.
+set "VITE_LUMIA_NATURAL_FACE_VQ04=1"
 echo.
 call "%~dp0INICIAR_LUMIA_ASUS_2B_DIARIA_AMR030.cmd"
 exit /b %ERRORLEVEL%
