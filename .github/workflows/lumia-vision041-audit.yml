@@ -1,0 +1,32 @@
+name: LUMIA VI-04.1 - Fresh Scene / Face Presence Audit
+on:
+  pull_request:
+    paths:
+      - 'src/lib/vision-audit-vi041.ts'
+      - 'src/lib/vision-active-vi031.ts'
+      - 'src/ui/LumiaCameraViewfinder.tsx'
+      - 'src/App.tsx'
+      - 'scripts/certify-lumia-vision041-audit.ts'
+      - 'INICIAR_LUMIA_ASUS_VISION_AUDITORIA_VI041.cmd'
+      - '.github/workflows/lumia-vision041-audit.yml'
+  workflow_dispatch:
+jobs:
+  certify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/certify-lumia-vision041-audit.ts
+      - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
+      - run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
+      - run: npx tsx scripts/certify-lumia-vision032-sentinel-cpu.ts
+      - run: npm run lint
+      - run: npm run build
