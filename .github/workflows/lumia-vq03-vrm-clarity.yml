@@ -11,6 +11,9 @@ on:
       - 'src/scene/lumia-motion-r8/avatar-runtime-audit-vq03.ts'
       - 'src/scene/LumiaPortalHead.tsx'
       - 'scripts/certify-lumia-vq032-avatar-runtime.ts'
+      - 'scripts/lumia-vq03-local-voice-qa.mjs'
+      - 'scripts/certify-lumia-vq033-voice-reuse.mjs'
+      - 'docs/lumia-convergence/44-VQ03-VOICE-REUSE-ASUS-20261114.md'
       - 'scripts/certify-lumia-vq03-vrm-clarity.ts'
       - 'scripts/lumia-private-avatar-assets-vq03.mjs'
       - 'scripts/certify-lumia-vq03-private-avatar-assets.mjs'
@@ -35,6 +38,7 @@ jobs:
       - run: npm ci
       - run: node scripts/certify-lumia-vq03-private-avatar-assets.mjs
       - run: npx tsx scripts/certify-lumia-vq032-avatar-runtime.ts
+      - run: node scripts/certify-lumia-vq033-voice-reuse.mjs
       - run: npx tsx scripts/certify-lumia-vq03-vrm-clarity.ts
       - run: npx tsx scripts/certify-lumia-avatar-presence-ph04.ts
       - run: npx tsx scripts/certify-lumia-avatar-ph042.ts
