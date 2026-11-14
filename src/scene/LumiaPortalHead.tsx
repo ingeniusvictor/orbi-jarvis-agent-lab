@@ -132,7 +132,7 @@ export function LumiaPortalHead({ drive, avatarView }: {
         phraseStarted: playing.phraseStartedAt,
       }
       body?.onAudioStart(playing.turnId)
-      if (playing.phrase) body?.onSpokenPhrase(playing.phrase, playing.turnId)
+      if (playing.phrase) body?.onSpokenPhrase(playing.phrase)
     }
     const move = (event: PointerEvent) => {
       pointer.current.x = THREE.MathUtils.clamp(
@@ -155,7 +155,7 @@ export function LumiaPortalHead({ drive, avatarView }: {
         if (!speech.current.active || speech.current.id !== data.turnId) return
         speech.current.text = data.text
         speech.current.phraseStarted = performance.now() / 1000
-        body?.onSpokenPhrase(data.text, data.turnId)
+        body?.onSpokenPhrase(data.text)
       } else if (data.kind === 'end' && speech.current.id === data.turnId) {
         speech.current.active = false
         speech.current.text = ''
