@@ -3,11 +3,12 @@ import {readFileSync} from 'node:fs'
 import {auditFreshSceneAtTurn,AUDIT_CURRENT_FRAME_MAX_AGE_MS} from '../src/lib/vision-audit-vi041'
 import {FACE_DETECTOR_STALE_MS} from '../src/lib/vision-faces-vi04'
 
-const base={
+type AuditArgs=Parameters<typeof auditFreshSceneAtTurn>[0]
+const base:AuditArgs={
   cameraAuthorized:true, capturedAt:9_990,
   detectorEnabled:true, faceSample:{count:2,observedAt:9_550},now:10_000,
 }
-const check=(partial:Partial<typeof base>)=>auditFreshSceneAtTurn({...base,...partial})
+const check=(partial:Partial<AuditArgs>)=>auditFreshSceneAtTurn({...base,...partial})
 assert.equal(AUDIT_CURRENT_FRAME_MAX_AGE_MS,2_000)
 assert.equal(FACE_DETECTOR_STALE_MS,3_500)
 
