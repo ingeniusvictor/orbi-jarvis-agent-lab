@@ -57,4 +57,4 @@ Se observaron en ASUS respuestas de Qwen 2B que omitían figuras visibles o desc
 
 Si se confirma la relación temporal, diseñar VI-04.2 con un protocolo **verdaderamente sincronizado** de análisis semántico y test de casos de error, sin fusionar identidades. Si el detector falla en QA, corregir primero presencia VI-04A; no subir Qwen 4B por defecto para esconder el fallo.
 
-**Estado CI:** pendiente de verificar en el commit final. **Estado ASUS:** pendiente. **MASTER:** la rama de auditoría [PR #81](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/81) permanece separada; no agregar VI-04.1 a producción.
+**Estado CI:** primer run [43542504075](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43542504075) **PASS Windows y Linux**, incluidas pruebas VI-04.1, VI-04A y VI-03.2B, lint y build. Las pruebas son sintéticas sin cámara real; el estado CI del último commit se verificará por separado. **Estado ASUS:** pendiente. **MASTER:** la rama de auditoría [PR #81](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/81) permanece separada; no agregar VI-04.1 a producción.
