@@ -107,7 +107,7 @@ test('R9 opt-in por URL, R8 intacto por defecto',()=>{
   assert.match(scene,/get\('lumiaR9'\) === '1'/);
   assert.match(scene,/new R8BodyCompanion\(/);
   assert.match(scene,/onAudioStart\(data.turnId\)/);
-  assert.match(scene,/onSpokenPhrase\(data.text, data.turnId\)/);
+  assert.match(scene,/onSpokenPhrase\(data.text\)/);
 });
 test('sin segundo LLM ni websocket de voz',()=>{
   const files=['../src/scene/lumia-motion-r9/intent-contract.js',
