@@ -34,6 +34,17 @@ export function validateVa021WorkerTimings(value) {
 export function lastResidentKokoroVa021Timing() {
   return lastVa021
 }
+export function validateVa022Ready(value) {
+  if (!value || !['auto','2','4'].includes(value.threads) ||
+      !Array.isArray(value.providers) || !value.providers.length ||
+      value.providers.some(x=>typeof x!=='string'||!/^[A-Za-z]+ExecutionProvider$/.test(x))){
+    return null
+  }
+  return Object.freeze({threads:value.threads,providers:[...value.providers]})
+}
+export function residentKokoroVa022Info() {
+  return resident?.ready && !resident.dead ? resident.va022Info ?? null : null
+}
 
 function failResident(state, error) {
   if (state.dead) return
@@ -69,7 +80,7 @@ function startResident(env = process.env) {
   const state = {
     child, dead: false, ready: false, buffer: '', current: null,
     resolveStart: () => {}, rejectStart: () => {}, startTimer: null,
-    startPromise: null,
+    startPromise: null, va022Info: null,
   }
   resident = state
   const ready = new Promise((resolveReady, rejectReady) => {
@@ -111,6 +122,12 @@ function startResident(env = process.env) {
       if (!state.ready) {
         if (msg.ready !== true) {
           failResident(state, new Error('Kokoro resident initialization failed'))
+          return
+        }
+        state.va022Info = env.ORBIA_VA022_CPU_AB === '1'
+          ? validateVa022Ready(msg.va022) : null
+        if (env.ORBIA_VA022_CPU_AB === '1' && !state.va022Info) {
+          failResident(state, new Error('VA022_PROVIDER_INFO_MISSING'))
           return
         }
         state.ready = true
@@ -220,6 +237,19 @@ export function stopResidentKokoroVa021(env = process.env) {
   if (starting === state.startPromise) starting = null
   try { state.child.stdin.end() } catch { /* already closed */ }
   try { state.child.kill() } catch { /* already exited */ }
+  return true
+}
+
+/** Separate owner-only A/B lifecycle; cannot stop unprofiled assistant. */
+export function stopResidentKokoroVa022(env = process.env) {
+  if (env.ORBIA_VA022_CPU_AB !== '1') return false
+  const state = resident
+  if (!state || state.dead || state.current) return false
+  state.dead = true
+  resident = null
+  if (starting === state.startPromise) starting = null
+  try { state.child.stdin.end() } catch {}
+  try { state.child.kill() } catch {}
   return true
 }
 
