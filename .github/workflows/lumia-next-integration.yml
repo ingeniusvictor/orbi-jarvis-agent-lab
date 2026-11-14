@@ -12,6 +12,8 @@ on:
       - 'src/scene/lumia-motion-r8/avatar-presence-ph04.ts'
       - 'src/lib/vision-audit-vi041.ts'
       - 'src/lib/vision-active-vi031.ts'
+      - 'src/lib/vision-voice-grounding-vi032b.ts'
+      - 'scripts/certify-lumia-vision032b-fresh-voice.ts'
       - 'src/ui/LumiaCameraViewfinder.tsx'
       - 'vite.config.ts'
       - 'scripts/certify-lumia-vision040a-wasm-route.mjs'
