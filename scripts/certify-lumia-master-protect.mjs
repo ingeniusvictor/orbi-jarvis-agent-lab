@@ -96,6 +96,13 @@ try{
   assert.equal(manifest.full_system_backup,false)
   assert.ok(manifest.excluded.includes('Ollama_model_weight_blobs'))
   assert.ok((await stat(join(result.backup_directory,'lumia-git-HEAD.bundle'))).size>0)
+  // Prove the Git bundle is genuinely RESTORABLE, not merely checksum-valid.
+  const restored=join(tmp,'restored-from-bundle')
+  execFileSync('git',[
+    'clone','-q',join(result.backup_directory,'lumia-git-HEAD.bundle'),restored,
+  ],{cwd:tmp,encoding:'utf8',timeout:30000,stdio:['ignore','pipe','pipe']})
+  assert.equal(git(restored,'rev-parse','HEAD'),sha)
+  assert.equal(await readFile(join(restored,'README.md'),'utf8'),'synthetic test content')
   const verified=await verifyBackup(result.backup_directory,{expectedCommit:sha})
   assert.equal(verified.ok,true)
   assert.equal(verified.assets_verified,19)
@@ -115,7 +122,7 @@ try{
     backupProject(source,destination,{expectedCommit:sha}),
     /UNCLEAN_SOURCE_WORKTREE_ABORT/,
   )
-  console.log('LUMIA MASTER LM-01 PASS: 18 VRM/FBX, baseline bundle, SHA256 verify, no overwrite, refuses missing/dirty/in-tree, original intact')
+  console.log('LUMIA MASTER LM-01 PASS: 18 VRM/FBX, RESTORED git bundle, SHA256 verify, no overwrite, refuses missing/dirty/in-tree, original intact')
 }finally{
   await rm(tmp,{recursive:true,force:true})
 }
