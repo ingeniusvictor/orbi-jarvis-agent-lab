@@ -368,9 +368,10 @@ export class R8BodyCompanion {
   }
 
   /** Phrase events are dispatched only for audio actually being played. */
-  onSpokenPhrase(text:string,turnId?:string):void {
-    if(this.r9Enabled && turnId && this.r9TurnId===turnId &&
+  onSpokenPhrase(text:string):void {
+    if(this.r9Enabled && this.r9TurnId &&
        this.manualUntil<=this.elapsed && !guidedDemoSnapshot().active){
+      const turnId=this.r9TurnId
       const cue=inferR9CueFromSpokenPhrase(text)
       if(cue){
         const now=performance.now()
