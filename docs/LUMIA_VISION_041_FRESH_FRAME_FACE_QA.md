@@ -30,6 +30,79 @@ Se observaron en ASUS respuestas de Qwen 2B que omitían figuras visibles o desc
 | `face-detector-stale` | Conteo anterior, futuro/incompatible o fuera de ventana temporal. |
 | `face-presence-available` | Número de **rostros** cercano en tiempo al JPEG; **no** equivale a número de personas y mucho menos a reconocimiento. |
 
+## Incidente real: worktree nuevo muestra GLB antiguo (13-11-2026)
+
+**Síntoma reportado por el propietario:** al iniciar el entorno aislado `LUMIA-VISION041-QA` se abrió la apariencia vieja GLB, sin las animaciones VRM/R8. **No atribuirlo a regresión del avatar hasta descartar recursos privados ausentes.**
+
+**Causa arquitectónica verificada en código (presencia local pendiente):**
+
+- `.gitignore` excluye `public/models/lumia-motion/*.vrm` y `public/models/lumia-motion/clips/`. Git `worktree add` **solo materializa archivos controlados por Git**, no los privados ignorados del checkout ASUS.
+- `LumiaPortalHead.tsx` carga `/models/lumia-motion/LUMIA_VITA_NATURAL_V05.vrm` y `portal-body-companion.ts` carga los 17 FBX indicados por el catálogo.
+- `Scene.tsx` muestra `LumiaAvatar` (GLB antiguo) como fallback durante suspense, o cuando falla el VRM, registrando `[lumia:ph01] VRM Head failed; restoring legacy GLB`. Esta vía explica directamente el síntoma observado. No se han revisado aún los archivos del equipo del propietario ni se puede descartar una pestaña/servidor antiguo en los puertos 5173/8787.
+
+**Corrección implementada:** `scripts/lumia-private-avatar-assets.mjs` introduce preflight local de **1 VRM + 17 FBX**, coteja hashes SHA256 en copias existentes y permite copiar solo tras `--copy --from`. No sobrescribe archivos, cambia pesos, inicia cámara/micrófono, abre red ni guarda material privado en Git. El lanzador VI-04.1 ahora se detiene ANTES de arrancar si faltan estos recursos. La copia es opcional y local, **solo hacia el worktree de QA**; el original no se modifica.
+
+### Recuperación controlada desde PowerShell
+
+Cerrar primero el terminal de la instancia experimental con Ctrl+C, sin terminar por fuerza Ollama ni procesos ajenos. Abrir PowerShell normal (no administrador), copiar:
+
+```powershell
+$original = Join-Path $env:USERPROFILE "LUMIA-ASUS"
+$qa = Join-Path $env:USERPROFILE "LUMIA-VISION041-QA"
+$rama = "feature/lumia-vi041-fresh-frame-face-audit-20261113"
+
+if (-not (Test-Path $original -PathType Container) -or
+    -not (Test-Path $qa -PathType Container)) {
+    throw "No estan ambas carpetas. No se modifica ninguna."
+}
+
+$raizOriginal = (Resolve-Path -LiteralPath $original).Path
+$raizQA = (Resolve-Path -LiteralPath $qa).Path
+if ($raizOriginal -ieq $raizQA) { throw "Las carpetas no pueden coincidir." }
+
+$repoOriginal = git -C $raizOriginal rev-parse --show-toplevel
+$repoQA = git -C $raizQA rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0 -or
+    (Resolve-Path -LiteralPath $repoOriginal).Path -ine $raizOriginal -or
+    (Resolve-Path -LiteralPath $repoQA).Path -ine $raizQA) {
+    throw "No son repositorios separados esperados."
+}
+
+$cambios = @(git -C $raizQA status --porcelain)
+if ($LASTEXITCODE -ne 0 -or $cambios.Count -gt 0) {
+    throw "Revisar cambios locales QA, no hacer merge."
+}
+
+git -C $raizQA fetch origin "refs/heads/$rama"
+if ($LASTEXITCODE -ne 0) { throw "Fetch fallo." }
+git -C $raizQA merge-base --is-ancestor HEAD FETCH_HEAD
+if ($LASTEXITCODE -ne 0) { throw "La rama local no permite fast-forward." }
+git -C $raizQA merge --ff-only FETCH_HEAD
+if ($LASTEXITCODE -ne 0) { throw "Fast-forward fallo." }
+
+Push-Location $raizQA
+try {
+    node .\scripts\lumia-private-avatar-assets.mjs --doctor --from $raizOriginal
+    if ($LASTEXITCODE -ne 0) { throw "Doctor de assets fallo." }
+
+    # Copia voluntaria local: 18 archivos privados, sin overwrite y SHA256.
+    node .\scripts\lumia-private-avatar-assets.mjs --copy --from $raizOriginal
+    if ($LASTEXITCODE -ne 0) { throw "Copia privada fallo, revisar diagnostico." }
+
+    node .\scripts\lumia-private-avatar-assets.mjs --require
+    if ($LASTEXITCODE -ne 0) { throw "Preflight de VRM/R8 fallo." }
+
+    # Arranque opcional (solo si no hay otra LUMIA ocupando 5173/8787).
+    & .\INICIAR_LUMIA_ASUS_VISION_AUDITORIA_VI041.cmd
+} finally {
+    Pop-Location
+}
+```
+
+**Nota de privacidad:** los 18 archivos permanecen bajo el perfil Windows del propietario, en rutas ignoradas por Git. No se copian a repositorio remoto ni se publican. El reporte solo incluye cantidad de recursos y nombres de los que falten, sin imágenes ni contenido personal. No ejecutar Git add/commit sobre modelos privados.
+
+**Si aún aparece GLB:** comprobar en consola del navegador el mensaje `[lumia:ph01]`, que la pestaña corresponde a la URL de Vite impresa por **el nuevo terminal** y verificar qué procesos escuchan 5173/8787. No borrar `dist/`, worktree o configuración privada a ciegas. Un `Ctrl+F5` solo después de confirmar la instancia puede eliminar la vista web anterior, sin tocar datos.
+
 ## QA física ASUS (pendiente)
 
 **NO cambiar el worktree `C:\Users\ingvm\LUMIA-ASUS`.** Cuando CI pase, preparar un worktree separado de la rama VI-04.1, con dependencias y assets necesarios, sin copiar material privado al repositorio. No publicar imágenes, nombres ni voz en GitHub ni compartirlas en el chat. Solo resultados de métricas.
