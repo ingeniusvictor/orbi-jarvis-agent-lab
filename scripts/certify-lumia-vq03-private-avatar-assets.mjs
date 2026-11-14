@@ -53,10 +53,10 @@ try{
   assert.equal((await inspectAvatarAssets(qa)).presentCount,17)
   // The production/base launcher is untouched, there is no upload route.
   const launcher=readFileSync(
-    new URL('../INICIAR_LUMIA_ASUS_VISION_AUDITORIA_VQ03.cmd',import.meta.url),
+    new URL('../INICIAR_LUMIA_ASUS_VQ03_VRM_QA.cmd',import.meta.url),
     'utf8',
   )
-  assert.match(launcher,/lumia-private-avatar-assets\.mjs" --require/)
+  assert.match(launcher,/lumia-private-avatar-assets-vq03\.mjs" --require/)
   assert.ok(launcher.indexOf('--require')<launcher.indexOf('INICIAR_LUMIA_ASUS_2B_DIARIA_AMR030.cmd'))
   assert.doesNotMatch(launcher,/git (?:reset|checkout|clean)|ollama (?:rm|pull)/i)
   const ignore=readFileSync(new URL('../.gitignore',import.meta.url),'utf8')
