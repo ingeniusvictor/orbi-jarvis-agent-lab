@@ -180,11 +180,28 @@ export async function backupProject(source,dest,{expectedCommit=BASELINE_SHA}={}
   if(!Object.values(a.launchers).every(Boolean))throw Error('MISSING_DAILY_LAUNCHER')
   // Check BEFORE even creating destination: no writes inside or above source.
   const proposed=resolve(dest)
-  if(isContained(a.source,proposed)||isContained(proposed,a.source)){
+  // Windows temporary directories and junctions may have a different
+  // canonical path from their display path; resolve the EXISTING parent
+  // first so an inside-source destination cannot evade the no-write gate.
+  let ancestor=dirname(proposed)
+  const missingParts=[basename(proposed)]
+  let canonicalParent
+  for(;;){
+    try {canonicalParent=await realpath(ancestor);break}
+    catch(error){
+      if(error?.code!=='ENOENT')throw Error('INVALID_BACKUP_PARENT')
+      const parent=dirname(ancestor)
+      if(parent===ancestor)throw Error('INVALID_BACKUP_PARENT')
+      missingParts.unshift(basename(ancestor))
+      ancestor=parent
+    }
+  }
+  const canonicalProposed=resolve(canonicalParent,...missingParts)
+  if(isContained(a.source,canonicalProposed)||isContained(canonicalProposed,a.source)){
     throw Error('BACKUP_TARGET_MUST_BE_OUTSIDE_SOURCE_TREE')
   }
-  // Destination must ALREADY exist, ensuring no path through unexpected
-  // parent symlinks is created before containment is verified.
+  // Destination must ALREADY exist. No implicit directory creation or
+  // traversal through a symlink before the previous check is permitted.
   let target
   try {target=await realpath(dest)}
   catch {throw Error('BACKUP_DESTINATION_MUST_ALREADY_EXIST')}
@@ -288,7 +305,7 @@ async function main(args){
 if(process.argv[1]&&resolve(process.argv[1])===resolve(fileURLToPath(import.meta.url))){
   main(process.argv.slice(2)).catch(err=>{
     const msg=String(err?.message||'UNKNOWN')
-    const known=/^(SOURCE_MUST_BE_EXACT_GIT_ROOT|BASELINE_COMMIT_CHANGED_ABORT|UNCLEAN_SOURCE_WORKTREE_ABORT|MISSING_PRIVATE_ASSETS|MISSING_DAILY_LAUNCHER|ABSOLUTE_DESTINATION_REQUIRED|BACKUP_DESTINATION_MUST_ALREADY_EXIST|BACKUP_TARGET_MUST_BE_OUTSIDE_SOURCE_TREE|BACKUP_NOT_COMPLETED|BACKUP_DIR_REQUIRED|SOURCE_AND_DEST_REQUIRED|SELECT_ONE_MODE_AUDIT_BACKUP_VERIFY|INVALID_BACKUP_MANIFEST|INVALID_BACKUP_ALLOWLIST|BACKUP_HASH_MISMATCH|MISSING_REQUIRED_BACKUP_ASSET|GIT_BUNDLE_HASH_MISMATCH)/.test(msg)
+    const known=/^(SOURCE_MUST_BE_EXACT_GIT_ROOT|BASELINE_COMMIT_CHANGED_ABORT|UNCLEAN_SOURCE_WORKTREE_ABORT|MISSING_PRIVATE_ASSETS|MISSING_DAILY_LAUNCHER|ABSOLUTE_DESTINATION_REQUIRED|BACKUP_DESTINATION_MUST_ALREADY_EXIST|INVALID_BACKUP_PARENT|BACKUP_TARGET_MUST_BE_OUTSIDE_SOURCE_TREE|BACKUP_NOT_COMPLETED|BACKUP_DIR_REQUIRED|SOURCE_AND_DEST_REQUIRED|SELECT_ONE_MODE_AUDIT_BACKUP_VERIFY|INVALID_BACKUP_MANIFEST|INVALID_BACKUP_ALLOWLIST|BACKUP_HASH_MISMATCH|MISSING_REQUIRED_BACKUP_ASSET|GIT_BUNDLE_HASH_MISMATCH)/.test(msg)
     console.error('[LUMIA MASTER] '+(known?msg:'LOCAL_AUDIT_OR_BACKUP_ERROR'))
     process.exitCode=1
   })
