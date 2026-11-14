@@ -21,6 +21,7 @@ import {constants} from 'node:fs'
 import {execFileSync} from 'node:child_process'
 import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path'
 import process from 'node:process'
+import {fileURLToPath} from 'node:url'
 
 export const BASELINE_SHA='1580a5182eba540893e35e37065be77da4ed014c'
 export const PRIVATE_VRM='public/models/lumia-motion/LUMIA_VITA_NATURAL_V05.vrm'
@@ -177,7 +178,11 @@ export async function backupProject(source,dest,{expectedCommit=BASELINE_SHA}={}
   if(a.required_assets_missing.length)throw Error(
     'MISSING_PRIVATE_ASSETS:'+a.required_assets_missing.join(','))
   if(!Object.values(a.launchers).every(Boolean))throw Error('MISSING_DAILY_LAUNCHER')
-  // A destination inside source or an ancestor of it is not an independent backup.
+  // Check BEFORE even creating destination: no writes inside or above source.
+  const proposed=resolve(dest)
+  if(isContained(a.source,proposed)||isContained(proposed,a.source)){
+    throw Error('BACKUP_TARGET_MUST_BE_OUTSIDE_SOURCE_TREE')
+  }
   await mkdir(dest,{recursive:true})
   const target=await realpath(dest)
   if(isContained(a.source,target)||isContained(target,a.source)){
@@ -277,7 +282,7 @@ async function main(args){
   if(!source||!dest)throw Error('SOURCE_AND_DEST_REQUIRED')
   console.log(JSON.stringify(await backupProject(source,dest)))
 }
-if(process.argv[1]&&resolve(process.argv[1])===resolve(new URL(import.meta.url).pathname)){
+if(process.argv[1]&&resolve(process.argv[1])===resolve(fileURLToPath(import.meta.url))){
   main(process.argv.slice(2)).catch(err=>{
     const msg=String(err?.message||'UNKNOWN')
     const known=/^(SOURCE_MUST_BE_EXACT_GIT_ROOT|BASELINE_COMMIT_CHANGED_ABORT|UNCLEAN_SOURCE_WORKTREE_ABORT|MISSING_PRIVATE_ASSETS|MISSING_DAILY_LAUNCHER|ABSOLUTE_DESTINATION_REQUIRED|BACKUP_TARGET_MUST_BE_OUTSIDE_SOURCE_TREE|BACKUP_NOT_COMPLETED|BACKUP_DIR_REQUIRED|SOURCE_AND_DEST_REQUIRED|SELECT_ONE_MODE_AUDIT_BACKUP_VERIFY|INVALID_BACKUP_MANIFEST|INVALID_BACKUP_ALLOWLIST|BACKUP_HASH_MISMATCH|MISSING_REQUIRED_BACKUP_ASSET|GIT_BUNDLE_HASH_MISMATCH)/.test(msg)
