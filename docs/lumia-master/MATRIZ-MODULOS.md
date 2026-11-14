@@ -11,6 +11,7 @@
 | **Modelo 4B / Vision4096** | Tags instalados y lanzadores `VISION4096`, `GRUPOS` | NO predeterminado con AMR-03.0; opt-in vía otro lanzador o selector | Memoria/VRAM y latencia exigen QA propia; no activarlo como predeterminado |
 | **Whisper STT local** | Rutas y adaptadores en `RAPIDA.cmd` | Configurado local; servidor Whisper residente desactivado | QA histórica de voz, pero falta revalidación de sesión VQ-02 y falsa activación con dos personas |
 | **Kokoro TTS local** | Residente local + prefetch + recuperación WAV; AMR-03.0 compacta frases | Configurado local en sesión | Pausas 3–6 s observadas en QA real; gate de latencia audio abierto |
+| **VQ-03 VRM/VRAM semántica** | **NO instalado** en ASUS `1580a51`; experimento [PR #83](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/83) | Corrección limitada a preguntas técnicas VRM y enrutamiento de catálogo, sin cambiar STT/TTS/modelo | [CI Windows/Linux PASS](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43547579425), pero respuesta real Qwen 2B, pausas Kokoro y regresión física ASUS **PENDIENTES** |
 | **AMR-03.1** | NO existe lanzador específico en `1580a51`; sí en PR [#69](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/69) | AISLADO — telemetría de WAV/Kokoro, no parte de AMR-03.0 | Medir A/B, decidir si integrar métricas sin afectar audio |
 | **Compositor multimodal / LT / RC** | Activados en `RAPIDA.cmd`: texto, voz, foto, traducción seleccionada y grounding | Configuración de piloto ASUS | Confirmar comandos de dominio; no asumir lectura automática de WhatsApp, correo o escritorio |
 | **Avatar VRM PH-04** | `RAPIDA.cmd` activa PH-04; tres vistas y 17 Motion R8 | Integrado en el perfil | 3 vistas funcionaron históricamente; parsers VQ-02 corregidos pero falta QA física posterior |
@@ -85,6 +86,7 @@ La cadena #70–#77 es **apilada**: las ramas hijas tienen de base a la anterior
 
 1. **P0 / VQ-02:** parser de «cuántas IA locales», «Qwen 2B» y «medio cuerpo» corregido por CI, pero **no existe QA física posterior confirmada**. Consultar [VQ-02](../lumia-convergence/40-VQ02-COMPRENSION-COMANDOS-ASUS-20261109.md).
 2. **P0 / Kokoro-WAV:** pausas audibles de ~3–6 s reportadas; no resueltas por simplemente cambiar de cerebro ni confirmar la primera respuesta textual.
+   **ASUS 13-11-2026:** 3.146 s de pausa, de los cuales 3.114 s fueron Kokoro/WAV; VQ-03 no interviene el TTS.
 3. **P1 / visión:** verificar en ASUS que el fotograma es reciente, permisos de cámara y errores de descripción bajo condiciones reales.
 4. **P1 / avatar:** separar parser de comandos, estado de vista y renderizado visual de PH-04; preservar 17 movimientos y tres vistas.
 5. **P2 / facial:** terminar gate 0/1/2 caras de VI-04A antes de considerar identidad; C0/C1 siguen bloqueados por ausencia de datos de calibración real.
