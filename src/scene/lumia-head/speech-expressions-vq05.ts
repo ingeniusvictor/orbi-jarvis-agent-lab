@@ -9,8 +9,8 @@
  */
 export type Vq05Emotion = 'joy' | 'sorrow' | 'fun'
 export type Vq05ExpressionFrame = {
-  emotion: Vq05Emotion | null
-  weight: number
+  weights: Record<Vq05Emotion,number>
+  dominant: Vq05Emotion | null
 }
 
 function normalized(s:string):string {
@@ -45,13 +45,15 @@ export class SpeechExpressionVQ05 {
   private emotion:Vq05Emotion|null=null
   private active=false
   private age=0
-  private strength=0
+  private readonly levels:Record<Vq05Emotion,number>={
+    joy:0,sorrow:0,fun:0,
+  }
 
   onPhraseAudible(phrase:string):void {
     this.emotion=explicitSpokenEmotionVQ05(phrase)
     this.active=Boolean(this.emotion)
     this.age=0
-    // Smoothly return toward neutral between phrases, no jump.
+    // Do not reset the previous shape abruptly when a new phrase starts.
   }
   onSpeechEnd():void {
     this.active=false
@@ -61,17 +63,17 @@ export class SpeechExpressionVQ05 {
   step(dt:number,audible:boolean,blocked=false):Vq05ExpressionFrame {
     const delta=clamp(dt,0,.05)
     if(this.active && audible && !blocked)this.age+=delta
-    const target=this.active && audible && !blocked &&
-      this.age>=MOOD_DELAY && this.emotion
-      ? WEIGHTS[this.emotion] : 0
-    const rate=target>this.strength ? 5.0 : 8.0
-    this.strength+=(target-this.strength)*(1-Math.exp(-delta*rate))
-    if(this.strength<.0001)this.strength=0
-    // Fade-out keeps the previous selected shape until neutral, unless a new
-    // phrase explicitly changes it. Never blend two semantic expressions.
-    return {
-      emotion:this.emotion,
-      weight:clamp(this.strength,0,.28),
+    const chosen=this.active && audible && !blocked &&
+      this.age>=MOOD_DELAY ? this.emotion : null
+    for(const name of ['joy','sorrow','fun'] as const){
+      const target=chosen===name?WEIGHTS[name]:0
+      const rate=target>this.levels[name]?5.0:8.0
+      this.levels[name]+=(target-this.levels[name])*(1-Math.exp(-delta*rate))
+      if(this.levels[name]<.0001)this.levels[name]=0
     }
+    const dominant=(['joy','sorrow','fun'] as const).reduce<Vq05Emotion|null>(
+      (best,name)=>this.levels[name]>(best?this.levels[best]:.025)?name:best,null,
+    )
+    return {weights:{...this.levels},dominant}
   }
 }
