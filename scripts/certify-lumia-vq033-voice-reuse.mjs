@@ -39,7 +39,10 @@ assert.deepEqual(probeLocalVoiceCapabilities({
 const absent=makeVoiceQaChildEnv(root,base,{exists:p=>p!==names.ttsVoices})
 assert.equal(absent.env,null)
 assert.ok(absent.missing.includes('ttsVoices'))
-const noWhisper=makeVoiceQaChildEnv(root,base,{exists:p=>p!==names.sttModel})
+// base->small is a valid multilingual fallback; absence means BOTH missing.
+const noWhisper=makeVoiceQaChildEnv(root,base,{
+  exists:p=>!p.endsWith('ggml-base.bin')&&!p.endsWith('ggml-small.bin'),
+})
 assert.equal(noWhisper.env,null)
 assert.ok(noWhisper.missing.includes('sttModel'))
 
