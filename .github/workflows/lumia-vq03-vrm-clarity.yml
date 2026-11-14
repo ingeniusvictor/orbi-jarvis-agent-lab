@@ -23,6 +23,9 @@ on:
       - 'bridge/orbia/resident-tts.mjs'
       - 'scripts/lumia-kokoro-latency-breakdown-va021.mjs'
       - 'scripts/certify-lumia-va021-kokoro-breakdown.mjs'
+      - 'scripts/lumia-kokoro-cpu-ab-va022.mjs'
+      - 'scripts/certify-lumia-va022-cpu-ab.mjs'
+      - 'docs/lumia-convergence/49-VA022-CPU-AB-ASUS-20261114.md'
       - 'docs/lumia-convergence/48-VA021-KOKORO-PERFIL-ASUS-20261114.md'
       - 'docs/lumia-convergence/47-VA02-KOKORO-BASELINE-ASUS-20261114.md'
       - 'scripts/lumia-private-avatar-assets-vq03.mjs'
@@ -51,6 +54,7 @@ jobs:
       - run: node scripts/certify-lumia-vq033-voice-reuse.mjs
       - run: node scripts/certify-lumia-va02-kokoro-baseline.mjs
       - run: node scripts/certify-lumia-va021-kokoro-breakdown.mjs
+      - run: node scripts/certify-lumia-va022-cpu-ab.mjs
       - run: npx tsx scripts/certify-lumia-vq03-vrm-clarity.ts
       - run: npx tsx scripts/certify-lumia-avatar-presence-ph04.ts
       - run: npx tsx scripts/certify-lumia-avatar-ph042.ts
