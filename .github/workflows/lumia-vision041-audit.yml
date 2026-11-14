@@ -8,6 +8,7 @@ on:
       - 'src/App.tsx'
       - 'scripts/certify-lumia-vision041-audit.ts'
       - 'INICIAR_LUMIA_ASUS_VISION_AUDITORIA_VI041.cmd'
+      - 'docs/LUMIA_VISION_041_FRESH_FRAME_FACE_QA.md'
       - '.github/workflows/lumia-vision041-audit.yml'
   workflow_dispatch:
 jobs:
