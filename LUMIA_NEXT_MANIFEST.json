@@ -60,6 +60,12 @@
       "capability": "single camera JPEG shared with Qwen and on-demand CPU face detector (metadata only, no reply changes)",
       "qa": "new experimental implementation, CI pending and actual ASUS physical QA pending",
       "source_issue": 87
+    },
+    {
+      "module": "VI-04.2B.1",
+      "capability": "single-JPEG CPU facial evidence as advisory prompt and less suggestive visual counting instructions",
+      "qa": "pilot only; CI and physical ASUS 1-vs-3 false person count retest pending",
+      "source_issue": 87
     }
   ],
   "excluded_from_production": [
@@ -69,7 +75,7 @@
     "CPU thread tuning or reinstallation of original Kokoro",
     "automatic merge to main/ASUS"
   ],
-  "next_gate": "VI-04.2A: verify [lumia:vision-vi042a] status=matched on the same photo ID sent to Qwen, 0/1/2 faces, motion, detector OFF, 180s expiry and cancellation; no facial identity",
+  "next_gate": "VI-04.2B.1: retest one person moving and two visible people, compare Qwen wording with VI-04.2A matched faceCount and same JPEG; assess false 3-person claims, without forcing face count equal to people",
   "promotion_policy": "Change NEXT only after review/CI/owner QA; promote to protected production only with separate explicit owner approval and rollback evidence",
   "qa_observations_20261114": [
     {

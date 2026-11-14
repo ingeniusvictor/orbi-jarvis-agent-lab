@@ -28,6 +28,8 @@ set "VITE_LUMIA_FACE_DIRECT_VQ051=1"
 rem VI-04.2A pilot: exact-JPEG CPU QA on explicitly authorized visual questions.
 rem No extra camera access, no identity, no automatic LLM retakes.
 set "VITE_LUMIA_VISION_SAME_FRAME_VI042A=1"
+rem VI-04.2B pilot: prompt calibration only, no forced person count.
+set "VITE_LUMIA_VISION_COUNT_GROUNDING_VI042B=1"
 
 echo.
 echo ===============================================================

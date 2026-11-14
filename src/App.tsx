@@ -21,6 +21,7 @@ import {isActiveVisionQuestion,asksActiveVisionChange,recentActiveVisionFrame,ty
 import {classifyFreshCameraSpeech,freshCameraScenePrompt} from './lib/vision-voice-grounding-vi032b'
 import {auditFreshSceneAtTurn} from './lib/vision-audit-vi041'
 import {sameFrameLog} from './lib/vision-same-frame-vi042a'
+import {groundedFreshScenePrompt} from './lib/vision-count-grounding-vi042b'
 import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -130,6 +131,9 @@ const VISION_SCENE_AUDIT_VI041_ENABLED = VISION_FRESH_VOICE_VI032B_ENABLED &&
 /** VI-04.2A experimental: CPU diagnostics on the exact user-authorized Qwen JPEG. */
 const VISION_SAME_FRAME_VI042A_ENABLED = VISION_SCENE_AUDIT_VI041_ENABLED &&
   import.meta.env.VITE_LUMIA_VISION_SAME_FRAME_VI042A === '1'
+/** VI-04.2B pilot: optional same-JPEG facial evidence in visual prompt, NOT a hard count. */
+const VISION_COUNT_GROUNDING_VI042B_ENABLED = VISION_SAME_FRAME_VI042A_ENABLED &&
+  import.meta.env.VITE_LUMIA_VISION_COUNT_GROUNDING_VI042B === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -594,7 +598,9 @@ export default function App() {
             (visionTracingEnabled()?visualPrecisionInstruction(visualQuestion):'')
           : visualImage
           ? (liveFrame && VISION_FRESH_VOICE_VI032B_ENABLED
-              ? cameraVisionPrompt(freshCameraScenePrompt(said,voiceIntent==='visual-correction'))
+              ? cameraVisionPrompt(VISION_COUNT_GROUNDING_VI042B_ENABLED
+                ? groundedFreshScenePrompt(said,voiceIntent==='visual-correction',liveFrame.sameFrameFace)
+                : freshCameraScenePrompt(said,voiceIntent==='visual-correction'))
               : cameraIntent || cameraRequested || fromCameraPreview || liveFrame
               ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
               (liveFrame ? ' Es un único fotograma actual, no vídeo. No atribuyas movimiento ni cambios entre instantes sin comparar dos imágenes. ' : '') +
