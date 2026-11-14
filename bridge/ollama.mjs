@@ -39,7 +39,7 @@ import { isComplexVoicePrompt, COMPLEX_VOICE_INSTRUCTION } from './orbia/complex
 import { rc03GroundedReply, RC03_VOICE_GROUNDING_INSTRUCTION } from './orbia/grounded-claims-rc03.mjs'
 import { rc04TranslationCapabilityReply, RC04_TRANSLATION_FACTS } from './orbia/translation-capabilities-rc04.mjs'
 import { buildLumiaSkillRegistry, isSkillRegistryInquiry, skillRegistryReply } from './orbia/skill-registry-skill01.mjs'
-import { technicalVrmSystemHint, clarifyVq03AmbiguousTechnicalSpeech } from './orbia/vrm-tech-grounding-vq03.mjs'
+import { technicalVrmSystemHint, clarifyVq03AmbiguousTechnicalSpeech, isVq03UnreliableAvatarAdvice } from './orbia/vrm-tech-grounding-vq03.mjs'
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 import { safeVisionTrace,createVisionCountLedger } from './orbia/vision-trace-amr026.mjs'
 import { formatVisionCacheMetrics } from './orbia/vision-cache-metrics-amr027.mjs'
@@ -654,7 +654,12 @@ export async function streamOllama({
   // A smaller local model may answer a *new* question by recycling a long
   // earlier reply. Do not play the previous answer as if it were new.
   // The model path is buffered on the ASUS, so one bounded retry is safe.
-  if (isStaleModelReply({ answer: text, prompt, history }) || isGenericReplyForQuestion({ answer: text, prompt })) {
+  const vq035AdviceGuard = process.env.ORBIA_LUMIA_VRM_GROUNDING_VQ03==='1' && !image
+  const unreliableVq035 = (answer) => vq035AdviceGuard &&
+    isVq03UnreliableAvatarAdvice({prompt,answer,history})
+  if (isStaleModelReply({ answer: text, prompt, history }) ||
+      isGenericReplyForQuestion({ answer: text, prompt }) ||
+      unreliableVq035(text)) {
     console.warn('[lumia] probable repeated old answer to a different user prompt; retrying once')
     const latestPriorUser = [...history].reverse().find((entry) => entry.role === 'user')
     const correctionMessages = [
@@ -678,7 +683,10 @@ export async function streamOllama({
       const retryText = sanitizeLumiaVoiceOutput(
         parseAnswer(await runStructured(correctionMessages)),
       )
-      if (retryText && !isStaleModelReply({ answer: retryText, prompt, history }) && !isGenericReplyForQuestion({ answer: retryText, prompt })) {
+      if (retryText &&
+          !isStaleModelReply({ answer: retryText, prompt, history }) &&
+          !isGenericReplyForQuestion({ answer: retryText, prompt }) &&
+          !unreliableVq035(retryText)) {
         text = retryText
       } else {
         console.warn('[lumia] regenerated reply remained stale; returning a brief explicit non-answer')
