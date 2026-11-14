@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { useStore } from '../store'
 import { R8BodyCompanion } from './lumia-motion-r8/portal-body-companion'
 import { reportVq03AvatarQA } from './lumia-motion-r8/avatar-runtime-audit-vq03'
+import { NaturalFaceMotionVQ04 } from './lumia-head/natural-face-vq04'
 import { currentGuidedFaceExpression, guidedDemoSnapshot } from './lumia-motion-r8/avatar-demo-ph045'
 import { avatarPresenceSnapshot, subscribeAvatarPresence, type LumiaAvatarView } from './lumia-motion-r8/avatar-presence-ph04'
 import type { Drive } from './Scene'
@@ -30,6 +31,8 @@ const HEAD_FRACTION_PH01 = 0.54
 const HEAD_FRACTION_PH02 = 0.70
 const BUST_HEIGHT_M = 1.10
 const BODY_HEIGHT_M = 1.94
+// VQ-04 is OFF in production; only the QA launcher explicitly enables it.
+const NATURAL_FACE_VQ04 = import.meta.env.VITE_LUMIA_NATURAL_FACE_VQ04 === '1'
 
 type SpeechState = {
   active: boolean
@@ -46,6 +49,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
   const pivot = useRef<THREE.Group>(null)
   const walkStageGroup = useRef<THREE.Group>(null)
   const qaFirstFrameReported=useRef(false)
+  const naturalFace=useMemo(()=>new NaturalFaceMotionVQ04(),[])
+  const naturalBlinkReported=useRef(false)
   const ph02 = isPh02Presentation(window.location.search)
   const showNeck = isNeckPreviewEnabled(window.location.search)
   const showBody = avatarView === 'bust-vrm' || avatarView === 'body-vrm' || showNeck
@@ -174,6 +179,18 @@ export function LumiaPortalHead({ drive, avatarView }: {
     const phase = useStore.getState().phase
     const k = 1 - Math.exp(-Math.min(dt, 0.05) * 6)
     const speakingAudio = speech.current.active
+    // Independent head/eye/viseme rendering. No effect on Motion R8 clips,
+    // body poses or Kokoro playback, and legacy stays byte-for-byte intact.
+    const micro=NATURAL_FACE_VQ04
+      ? naturalFace.step(dt,phase,speakingAudio) : null
+    if (micro && !naturalBlinkReported.current && micro.blink>.65) {
+      naturalBlinkReported.current=true
+      reportVq03AvatarQA({
+        event:'natural-face-observed',
+        blink:Number(micro.blink.toFixed(2)),
+        eyeYaw:Number(micro.eyeYaw.toFixed(4)),
+      })
+    }
 
     // Independent optics: portrait, conversational bust and full-body
     // companion share the SAME avatar rig and same Portal/HUD/TTS stack.
@@ -217,8 +234,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
     const headPitch = (ph02 ? motion.headPitch
       : py * 0.052 * attention + (phase === 'thinking' ? -0.028 : 0)) +
       (semantic?.head.pitch ?? 0)
-    const eyeYaw = ph02 ? motion.eyeYaw : -px * 0.20
-    const eyePitch = ph02 ? motion.eyePitch : py * 0.13
+    const eyeYaw = (ph02 ? motion.eyeYaw : -px * 0.20) + (micro?.eyeYaw??0)
+    const eyePitch = (ph02 ? motion.eyePitch : py * 0.13) + (micro?.eyePitch??0)
     const applyBone = (node: THREE.Object3D | null, yaw: number, pitch: number, roll = 0) => {
       if (!node) return
       const base = bones.get(node)
@@ -261,7 +278,8 @@ export function LumiaPortalHead({ drive, avatarView }: {
 
     // VRM0 expression blends are owned by this head renderer only.
     const cycle = t % 3.73
-    const blink = Math.exp(-Math.pow((cycle - 3.57) / 0.046, 2))
+    const blink = micro?.blink ??
+      Math.exp(-Math.pow((cycle - 3.57) / 0.046, 2))
     const values: Record<string, number> = { blink }
     if (speakingAudio) {
       const elapsed = Math.max(0, performance.now() / 1000 - speech.current.phraseStarted)
