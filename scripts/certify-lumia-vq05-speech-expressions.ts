@@ -45,12 +45,12 @@ let last=0
 for(let i=0;i<100;i++){
   const next=engine.step(frameSeconds,true)
   assert.ok(next.weights.joy>=last-1e-9)
-  assert.ok(next.weights.joy<=.28+1e-9)
+  assert.ok(next.weights.joy<=.48+1e-9)
   assert.ok(next.weights.sorrow===0 && next.weights.fun===0)
   assert.ok(next.weights.joy-last<.03,'no frame-to-frame expression pop')
   last=next.weights.joy
 }
-assert.ok(last>.25)
+assert.ok(last>.45)
 assert.equal(engine.step(0,true).dominant,'joy')
 
 // A new audible phrase changes the expression, old one FADES out.
@@ -60,7 +60,7 @@ for(let i=0;i<60;i++){
   const f=engine.step(frameSeconds,true)
   assert.ok(f.weights.joy<=previousJoy+1e-9)
   assert.ok(f.weights.joy>=0)
-  assert.ok(f.weights.sorrow>=0 && f.weights.sorrow<=.20)
+  assert.ok(f.weights.sorrow>=0 && f.weights.sorrow<=.48)
   previousJoy=f.weights.joy
 }
 assert.equal(engine.step(0,true).dominant,'sorrow')
@@ -71,7 +71,7 @@ engine.onPhraseAudible('Vaya sorpresa.')
 for(let i=0;i<90;i++)engine.step(frameSeconds,true,true)
 assert.ok(engine.step(0,true,true).weights.fun<.002)
 for(let i=0;i<90;i++)engine.step(frameSeconds,true)
-assert.ok(engine.step(0,true).weights.fun>.20)
+assert.ok(engine.step(0,true).weights.fun>.47)
 
 // Interrupted audio fades out without leaving the last face frozen.
 engine.onSpeechEnd()
@@ -86,7 +86,7 @@ const weird=new SpeechExpressionVQ05()
 weird.onPhraseAudible('Me alegra que estés aquí.')
 assert.deepEqual(weird.step(Number.NaN,true).weights,{joy:0,sorrow:0,fun:0})
 const huge=weird.step(120,true)
-assert.ok(huge.weights.joy<=.28)
+assert.ok(huge.weights.joy<=.48)
 const read=(p:string)=>readFileSync(new URL('../'+p,import.meta.url),'utf8')
 const renderer=read('src/scene/LumiaPortalHead.tsx')
 const qaLauncher=read('INICIAR_LUMIA_ASUS_VQ03_VRM_QA.cmd')
