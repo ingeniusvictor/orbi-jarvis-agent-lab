@@ -27,6 +27,9 @@ on:
       - 'scripts/certify-lumia-va022-cpu-ab.mjs'
       - 'scripts/lumia-kokoro-cpu-stability-va023.mjs'
       - 'scripts/certify-lumia-va023-cpu-stability.mjs'
+      - 'scripts/lumia-host-health-va024.ps1'
+      - 'scripts/certify-lumia-va024-host-health.mjs'
+      - 'docs/lumia-convergence/51-VA024-SISTEMA-ENERGIA-CPU-ASUS-20261114.md'
       - 'docs/lumia-convergence/50-VA023-CPU-REPETIBILIDAD-ASUS-20261114.md'
       - 'docs/lumia-convergence/49-VA022-CPU-AB-ASUS-20261114.md'
       - 'docs/lumia-convergence/48-VA021-KOKORO-PERFIL-ASUS-20261114.md'
@@ -59,6 +62,15 @@ jobs:
       - run: node scripts/certify-lumia-va021-kokoro-breakdown.mjs
       - run: node scripts/certify-lumia-va022-cpu-ab.mjs
       - run: node scripts/certify-lumia-va023-cpu-stability.mjs
+      - run: node scripts/certify-lumia-va024-host-health.mjs
+      - name: Parse VA-02.4 PowerShell syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'scripts/lumia-host-health-va024.ps1').Path, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) { throw ($errors | Out-String) }
       - run: python -c "import ast,pathlib; ast.parse(pathlib.Path('bridge/runtime/kokoro/resident.py').read_text(encoding='utf-8'))"
       - run: npx tsx scripts/certify-lumia-vq03-vrm-clarity.ts
       - run: npx tsx scripts/certify-lumia-avatar-presence-ph04.ts
