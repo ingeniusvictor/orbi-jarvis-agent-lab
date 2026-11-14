@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs'
 import {parseLumiaAvatarAction} from '../src/scene/lumia-motion-r8/avatar-presence-ph04'
 import {parseModelControl} from '../bridge/orbia/model-manager.mjs'
 import {isSkillRegistryInquiry,skillRegistryReply,buildLumiaSkillRegistry} from '../bridge/orbia/skill-registry-skill01.mjs'
-import {isTechnicalVrmQuestion,technicalVrmSystemHint,VRM_TECH_SYSTEM_HINT_VQ03,clarifyVq03AmbiguousTechnicalSpeech,isConversationalAvatarAnimationQuestion} from '../bridge/orbia/vrm-tech-grounding-vq03.mjs'
+import {isTechnicalVrmQuestion,technicalVrmSystemHint,VRM_TECH_SYSTEM_HINT_VQ03,clarifyVq03AmbiguousTechnicalSpeech,isConversationalAvatarAnimationQuestion,avatarAnimationAdviceFocus,isVq03UnreliableAvatarAdvice} from '../bridge/orbia/vrm-tech-grounding-vq03.mjs'
 
 const actualAsusWritten=[
   '¿Cómo puedo conseguir que un avatar VRM tenga animaciones fluidas?',
@@ -70,6 +70,44 @@ for(const said of [
   'Lumi, ¿qué animaciones tienes?',
 ])assert.equal(clarifyVq03AmbiguousTechnicalSpeech(said),null,said)
 
+// ASUS 14 Nov 2026 01:55-01:57 — VQ-03.5 newly observed voice regressions.
+const newAsusVoice=[
+  'Lumi, explícame en dos frases que es un avatar BRM.',
+  'Lumi como podrías mejorar tus animaciones para que se vea más natural.',
+  'Lumi como podrías controlar mejor tus animaciones mientras conversamos.',
+]
+assert.equal(isSkillRegistryInquiry(newAsusVoice[0]),false)
+assert.equal(parseLumiaAvatarAction(newAsusVoice[0]),null)
+assert.equal(parseModelControl(newAsusVoice[0]),null)
+assert.match(clarifyVq03AmbiguousTechnicalSpeech(newAsusVoice[0])??'',/Whisper entendió BRM/)
+assert.match(clarifyVq03AmbiguousTechnicalSpeech(newAsusVoice[0])??'',/VRM, el formato/)
+assert.equal(clarifyVq03AmbiguousTechnicalSpeech('¿Qué es BRM en gestión empresarial?'),null)
+assert.equal(clarifyVq03AmbiguousTechnicalSpeech('Define una base de recursos meteorológicos BRM'),null)
+assert.equal(clarifyVq03AmbiguousTechnicalSpeech('¿Qué es un avatar VRM?'),null)
+assert.equal(avatarAnimationAdviceFocus(newAsusVoice[1]),'motion-naturalness')
+assert.equal(avatarAnimationAdviceFocus(newAsusVoice[2]),'conversation-control')
+assert.equal(clarifyVq03AmbiguousTechnicalSpeech(newAsusVoice[1]),null)
+assert.equal(clarifyVq03AmbiguousTechnicalSpeech(newAsusVoice[2]),null)
+assert.match(technicalVrmSystemHint(newAsusVoice[1]),/pregunta ACTUAL sobre NATURALIDAD/)
+assert.match(technicalVrmSystemHint(newAsusVoice[2]),/pregunta ACTUAL sobre CONTROL/)
+for(const phrase of newAsusVoice.slice(1)){
+  assert.equal(parseLumiaAvatarAction(phrase),null)
+  assert.equal(parseModelControl(phrase),null)
+}
+const prevReply='Para mejorar las animaciones, puedo ajustar los tiempos de transición entre movimientos, suavizar la interpolación de los huesos y sincronizar mejor los cambios de visor con el flujo del diálogo. ¿Te gustaría probar una simulación de esos ajustes ahora mismo?'
+const repeatReply='Para mejorar la naturalidad, puedo ajustar los tiempos de transición entre movimientos y sincronizar mejor los cambios de visor con el flujo del diálogo. ¿Te gustaría probar una simulación de esos ajustes ahora mismo?'
+const history=[{role:'user',content:newAsusVoice[1]},{role:'assistant',content:prevReply}]
+assert.equal(isVq03UnreliableAvatarAdvice({prompt:newAsusVoice[1],answer:prevReply,history:[]}),true)
+assert.equal(isVq03UnreliableAvatarAdvice({prompt:newAsusVoice[2],answer:repeatReply,history}),true)
+assert.equal(isVq03UnreliableAvatarAdvice({prompt:newAsusVoice[2],answer:'Bastaría ajustar los tiempos de transición entre movimientos.',history}),true)
+assert.equal(isVq03UnreliableAvatarAdvice({prompt:newAsusVoice[2],answer:'Para controlar el avatar durante la conversación, un controlador de estados escucha, pensamiento, habla y reposo seleccionaría gestos Motion R8 en función de eventos y sincronizaría visemas con Kokoro. Esto sería una mejora por implementar.',history}),false)
+assert.equal(isVq03UnreliableAvatarAdvice({prompt:'¿Cuánta VRAM necesita mi GPU?',answer:prevReply,history}),false)
+assert.equal(isVq03UnreliableAvatarAdvice({prompt:'Lumi, salúdame con la mano',answer:prevReply,history}),false)
+// Command-mode vocabulary can bias Whisper toward VRM while leaving VRAM intact.
+const vocab=readFileSync(new URL('../bridge/orbia/speech-vocabulary.mjs',import.meta.url),'utf8')
+assert.match(vocab,/'VRM'/)
+assert.match(vocab,/'VRAM'/)
+
 // Proof of the reported regression: the OLD UI implementation appended
 // a hint containing "memoria" to the user's question; SKILL-01 then treated
 // the question as an unrelated request about persistent session memory.
@@ -123,6 +161,8 @@ assert.match(app,/const avatarAction = AVATAR_PH04_ENABLED && !visualImage && !c
 assert.match(bridge,/\? technicalVrmSystemHint\(prompt\) : ''/)
 assert.match(bridge,/isSkillRegistryInquiry\(prompt\)/)
 assert.match(bridge,/clarifyVq03AmbiguousTechnicalSpeech\(prompt\)/)
+assert.match(bridge,/isVq03UnreliableAvatarAdvice\(\{prompt,answer,history\}\)/)
+assert.match(bridge,/!unreliableVq035\(retryText\)/)
 assert.match(bridge,/translationCapability \|\| vq034Clarify/)
 assert.match(bridge,/appendConversationExchange\(conversationId, prompt, answer\)/)
 assert.match(qaLaunch,/ORBIA_LUMIA_VRM_GROUNDING_VQ03=1/)
@@ -133,4 +173,4 @@ assert.match(base,/VITE_LUMIA_AVATAR_PH04=1/)
 assert.match(base,/ORBIA_LUMIA_TTS_MODE=local/)
 assert.match(base,/ORBIA_LUMIA_STT_MODE=local/)
 assert.match(base,/JARVIS_ALLOW_WRITES=0/)
-console.log('VQ-03.4 PASS: ASUS voice ambiguities clarified; avatar-motion advice grounded; VRAM GPU preserved; VQ-03.1 PH-04/SKILL-01 regressions intact')
+console.log('VQ-03.5 PASS: avatar BRM STT asks clarification; naturalness vs conversation control isolated; unsupported simulation offers and repeated replies guarded; VRM/VRAM, PH-04, SKILL-01 unchanged')
