@@ -1,0 +1,5 @@
+# OPTIONAL. NOT INSTALLED BY CI OR BY NORMAL LUMIA.
+# Use only a separate private venv after the owner authorizes a lab experiment.
+# sherpa-onnx 2.0.1 published 2026-10-26; Windows CPython 3.11 wheel exists.
+sherpa-onnx==2.0.1
+numpy>=1.26,<3

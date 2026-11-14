@@ -1,0 +1,109 @@
+name: LUMIA VOICE-00/01 offline CPU lab
+
+on:
+  push:
+    branches:
+      - feature/lumia-voice01-offline-diarization-lab-20261109
+  pull_request:
+    branches:
+      - feature/lumia-vi04c1-open-set-calibration-cpu-20261109
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-voice-lab:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile isolated scripts
+        run: python -m compileall -q labs/voice-01
+      - name: Synthetic PCM and speaker RTTM regressions
+        run: python -m unittest discover -s labs/voice-01/tests -p "test_*.py" -v
+      - name: Offline doctor without any models installed
+        run: python labs/voice-01/offline_diarization.py --doctor
+      - name: VOICE-01J review tool doctor without GUI or audio
+        run: python labs/voice-01/voice01_review_gui.py --doctor
+      - name: Windows Tkinter import without launching GUI
+        if: runner.os == 'Windows'
+        run: python -c "import tkinter; print('VOICE-01J Tkinter import OK')"
+      - name: ASUS PowerShell script syntax without installation or downloads
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'labs/voice-01/prepare-models-asus.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Out-String | Write-Error
+            exit 1
+          }
+          Write-Host 'VOICE-01 ASUS bootstrap syntax OK; no downloads run.'
+      - name: Windows PowerShell 5.1 native import quoting regression
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $needle = '& $python -c ''import sherpa_onnx; import numpy'''
+          $matching = @(Get-Content -LiteralPath 'labs/voice-01/prepare-models-asus.ps1' | Where-Object { $_.Trim() -eq $needle })
+          if ($matching.Count -ne 1) { throw 'Safe Python import expression was modified or missing.' }
+          $stub = Join-Path $env:RUNNER_TEMP 'voice01-python-import-stubs'
+          New-Item -ItemType Directory -Force -Path $stub | Out-Null
+          Set-Content -LiteralPath (Join-Path $stub 'sherpa_onnx.py') -Value '# CI test stub' -Encoding ASCII
+          Set-Content -LiteralPath (Join-Path $stub 'numpy.py') -Value '# CI test stub' -Encoding ASCII
+          $env:PYTHONPATH = $stub
+          & python -c 'import sherpa_onnx; import numpy'
+          if ($LASTEXITCODE -ne 0) { throw 'Native Python import expression failed under Windows PowerShell 5.1.' }
+          Write-Host 'Windows PowerShell 5.1 Python import quoting PASS (stub modules only).'
+      - name: Windows PowerShell syntax for CAM++ A/B (no downloads)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'labs/voice-01/compare-embeddings-asus.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Out-String | Write-Error
+            exit 1
+          }
+          Write-Host 'VOICE-01G CAM++ A/B script syntax OK; no models or audio accessed.'
+      - name: Windows PowerShell syntax for VOICE-01H holdout (no downloads)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'labs/voice-01/validate-embeddings-holdout-asus.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Out-String | Write-Error
+            exit 1
+          }
+          Write-Host 'VOICE-01H holdout script syntax OK; no model or WAV downloads.'
+      - name: Reject private voice and model files in lab
+        shell: bash
+        run: |
+          if git ls-files labs/voice-01 | grep -Ei '\.(wav|mp3|flac|ogg|opus|onnx|pt|pth|ckpt|bin|rttm)$'; then
+            echo 'ERROR: private audio or model assets tracked'
+            exit 1
+          fi
