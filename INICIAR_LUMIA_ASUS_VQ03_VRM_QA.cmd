@@ -41,6 +41,8 @@ rem Legacy facial animation remains active if disabled. No webcam or audio analy
 set "VITE_LUMIA_NATURAL_FACE_VQ04=1"
 rem VQ-05: event-driven facial expressions during LUMIA audible TTS only.
 set "VITE_LUMIA_SPEECH_EXPRESSIONS_VQ05=1"
+rem VQ-05.1: face preview voice commands, strong but reversible.
+set "VITE_LUMIA_FACE_DIRECT_VQ051=1"
 echo.
 call "%~dp0INICIAR_LUMIA_ASUS_2B_DIARIA_AMR030.cmd"
 exit /b %ERRORLEVEL%
