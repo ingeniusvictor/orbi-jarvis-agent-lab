@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import * as THREE from 'three'
 import { useStore } from '../store'
 import { R8BodyCompanion } from './lumia-motion-r8/portal-body-companion'
+import { reportVq03AvatarQA } from './lumia-motion-r8/avatar-runtime-audit-vq03'
 import { currentGuidedFaceExpression, guidedDemoSnapshot } from './lumia-motion-r8/avatar-demo-ph045'
 import { avatarPresenceSnapshot, subscribeAvatarPresence, type LumiaAvatarView } from './lumia-motion-r8/avatar-presence-ph04'
 import type { Drive } from './Scene'
@@ -44,6 +45,7 @@ export function LumiaPortalHead({ drive, avatarView }: {
   const root = useRef<THREE.Group>(null)
   const pivot = useRef<THREE.Group>(null)
   const walkStageGroup = useRef<THREE.Group>(null)
+  const qaFirstFrameReported=useRef(false)
   const ph02 = isPh02Presentation(window.location.search)
   const showNeck = isNeckPreviewEnabled(window.location.search)
   const showBody = avatarView === 'bust-vrm' || avatarView === 'body-vrm' || showNeck
@@ -197,6 +199,13 @@ export function LumiaPortalHead({ drive, avatarView }: {
     const py = pointer.current.y
     const motion = calculateHeadMotion({ x: px, y: py, phase, seconds: t })
     const semantic = body?.step(dt, phase, speakingAudio)
+    if(!qaFirstFrameReported.current){
+      qaFirstFrameReported.current=true
+      reportVq03AvatarQA({
+        event:'vrm-first-frame',view:avatarView,
+        clipEnabled,bodyBones:body?.boneCount??0,
+      })
+    }
     if (walkStageGroup.current) {
       const path = body?.walkStagePose
       walkStageGroup.current.position.set(path?.x??0,0,path?.z??0)

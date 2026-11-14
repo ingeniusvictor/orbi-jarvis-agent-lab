@@ -1,0 +1,80 @@
+name: LUMIA VQ-03 - VRM Intent vs VRAM and PH04 Regression
+on:
+  pull_request:
+    paths:
+      - 'src/App.tsx'
+      - 'bridge/ollama.mjs'
+      - 'bridge/orbia/vrm-tech-grounding-vq03.mjs'
+      - 'bridge/orbia/speech-vocabulary.mjs'
+      - 'docs/lumia-convergence/46-VQ035-BRM-REPETICION-ASUS-20261114.md'
+      - 'src/lib/vrm-tech-grounding-vq03.ts'
+      - 'src/scene/lumia-motion-r8/avatar-presence-ph04.ts'
+      - 'src/scene/lumia-motion-r8/portal-body-companion.ts'
+      - 'src/scene/lumia-motion-r8/avatar-runtime-audit-vq03.ts'
+      - 'src/scene/LumiaPortalHead.tsx'
+      - 'scripts/certify-lumia-vq032-avatar-runtime.ts'
+      - 'scripts/lumia-vq03-local-voice-qa.mjs'
+      - 'scripts/certify-lumia-vq033-voice-reuse.mjs'
+      - 'docs/lumia-convergence/44-VQ03-VOICE-REUSE-ASUS-20261114.md'
+      - 'scripts/certify-lumia-vq03-vrm-clarity.ts'
+      - 'scripts/lumia-kokoro-latency-baseline-va02.mjs'
+      - 'scripts/certify-lumia-va02-kokoro-baseline.mjs'
+      - 'bridge/runtime/kokoro/resident.py'
+      - 'bridge/orbia/resident-tts.mjs'
+      - 'scripts/lumia-kokoro-latency-breakdown-va021.mjs'
+      - 'scripts/certify-lumia-va021-kokoro-breakdown.mjs'
+      - 'scripts/lumia-kokoro-cpu-ab-va022.mjs'
+      - 'scripts/certify-lumia-va022-cpu-ab.mjs'
+      - 'scripts/lumia-kokoro-cpu-stability-va023.mjs'
+      - 'scripts/certify-lumia-va023-cpu-stability.mjs'
+      - 'scripts/lumia-host-health-va024.ps1'
+      - 'scripts/certify-lumia-va024-host-health.mjs'
+      - 'docs/lumia-convergence/51-VA024-SISTEMA-ENERGIA-CPU-ASUS-20261114.md'
+      - 'docs/lumia-convergence/50-VA023-CPU-REPETIBILIDAD-ASUS-20261114.md'
+      - 'docs/lumia-convergence/49-VA022-CPU-AB-ASUS-20261114.md'
+      - 'docs/lumia-convergence/48-VA021-KOKORO-PERFIL-ASUS-20261114.md'
+      - 'docs/lumia-convergence/47-VA02-KOKORO-BASELINE-ASUS-20261114.md'
+      - 'scripts/lumia-private-avatar-assets-vq03.mjs'
+      - 'scripts/certify-lumia-vq03-private-avatar-assets.mjs'
+      - 'INICIAR_LUMIA_ASUS_VQ03_VRM_QA.cmd'
+      - 'docs/lumia-convergence/42-VQ03-ASUS-ISOLATED-QA-20261113.md'
+      - 'docs/lumia-convergence/41-VQ03-VRM-CLARITY-ASUS-20261113.md'
+      - '.github/workflows/lumia-vq03-vrm-clarity.yml'
+  workflow_dispatch:
+jobs:
+  vq03:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/certify-lumia-vq03-private-avatar-assets.mjs
+      - run: npx tsx scripts/certify-lumia-vq032-avatar-runtime.ts
+      - run: node scripts/certify-lumia-vq033-voice-reuse.mjs
+      - run: node scripts/certify-lumia-va02-kokoro-baseline.mjs
+      - run: node scripts/certify-lumia-va021-kokoro-breakdown.mjs
+      - run: node scripts/certify-lumia-va022-cpu-ab.mjs
+      - run: node scripts/certify-lumia-va023-cpu-stability.mjs
+      - run: node scripts/certify-lumia-va024-host-health.mjs
+      - name: Parse VA-02.4 PowerShell syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'scripts/lumia-host-health-va024.ps1').Path, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) { throw ($errors | Out-String) }
+      - run: python -c "import ast,pathlib; ast.parse(pathlib.Path('bridge/runtime/kokoro/resident.py').read_text(encoding='utf-8'))"
+      - run: npx tsx scripts/certify-lumia-vq03-vrm-clarity.ts
+      - run: npx tsx scripts/certify-lumia-avatar-presence-ph04.ts
+      - run: npx tsx scripts/certify-lumia-avatar-ph042.ts
+      - run: node scripts/certify-amr-model-runtime.mjs
+      - run: npm run lint
+      - run: npm run build

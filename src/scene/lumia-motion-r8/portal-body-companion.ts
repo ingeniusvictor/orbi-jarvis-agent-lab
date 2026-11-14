@@ -21,6 +21,10 @@ import { PoseTransition } from './pose-transition.js'
 import { retargetMixamoUpperBody } from './mixamo-retarget.js'
 import { animationLibrary } from './motion-library-catalog.js'
 import { boundR8BodyPose } from './pose-guard-ph042'
+import {
+  VQ03_AVATAR_QA_ENABLED, Vq03MotionEvidence,
+  angleBetweenQuaternionsDegrees, reportVq03AvatarQA,
+} from './avatar-runtime-audit-vq03'
 import { guidedDemoSnapshot, reportGuidedDemoClip } from './avatar-demo-ph045'
 import { WalkStage } from './walk-stage-ph048'
 
@@ -92,6 +96,7 @@ export class R8BodyCompanion {
   private readonly fullBodySafe:boolean
   private readonly walkStageEnabled:boolean
   private readonly rig:HeadRig
+  private qaMotion:{id:string;evidence:Vq03MotionEvidence}|null=null
 
   constructor(rig:HeadRig,{allowClips=false,safePose=true,fullBodySafe=false,walkStageEnabled=true}:{allowClips?:boolean;safePose?:boolean;fullBodySafe?:boolean;walkStageEnabled?:boolean}={}) {
     this.rig=rig
@@ -110,6 +115,7 @@ export class R8BodyCompanion {
     this.applyProcedural(this.core.step(.001,this.config('idle')),
       this.presence.step(.001,this.presenceConfig('idle')))
     this.activeMixer.addEventListener('finished',()=>{
+      this.finishQa('motion-completed')
       if(this.explicitClipId && this.explicitClipId===this.activeId){
         if(this.demoClipId) reportGuidedDemoClip(this.demoClipId,'finished')
         this.explicitClipId=null
@@ -125,6 +131,7 @@ export class R8BodyCompanion {
           this.explicitClipId!==this.activeId) return
       this.explicitLoops++
       if(this.explicitLoops>=this.explicitLoopTarget){
+        this.finishQa('motion-completed')
         if(this.demoClipId) reportGuidedDemoClip(this.demoClipId,'finished')
         this.demoClipId=null
         this.explicitClipId=null
@@ -182,7 +189,15 @@ export class R8BodyCompanion {
     }
   }
 
+  private finishQa(event:'motion-completed'|'motion-interrupted'):void {
+    const qa=this.qaMotion
+    if(!qa)return
+    this.qaMotion=null
+    reportVq03AvatarQA({event,id:qa.id,...qa.evidence.snapshot()})
+  }
+
   private stopClip():void {
+    this.finishQa('motion-interrupted')
     if (this.demoClipId) reportGuidedDemoClip(this.demoClipId,'cancelled')
     if(this.activeId==='clapping' && Number.isFinite(this.minClapHandDistance)){
       console.info('[lumia:ph047] QA clapping minimum wrist-center distance (VRM world units):',
@@ -283,6 +298,10 @@ export class R8BodyCompanion {
     this.action=action
     this.activeId=clip.id
     this.activeLoop=clip.loop
+    if(explicit && VQ03_AVATAR_QA_ENABLED){
+      this.qaMotion={id:clip.id,evidence:new Vq03MotionEvidence()}
+      reportVq03AvatarQA({event:'motion-started',id:clip.id})
+    }
   }
 
   requestClip(id:string,manual=false):void {
@@ -309,6 +328,7 @@ export class R8BodyCompanion {
       console.info('[lumia:ph03] R8 animation:',id)
     }).catch((err:unknown)=>{
       if(manual && this.explicitClipId===id){
+        reportVq03AvatarQA({event:'motion-unavailable',id,reason:'fbx-load-or-retarget-failed'})
         if(this.demoClipId===id) reportGuidedDemoClip(id,'failed')
         this.demoClipId=null
         this.explicitClipId=null
@@ -325,9 +345,11 @@ export class R8BodyCompanion {
   /** Owner-authorized one-shot request; temporary priority over automatic R8. */
   requestManualClip(id:string, guided=false):boolean {
     if (!this.allowClips || !animationLibrary[id] || this.failed.has(id)) {
+      reportVq03AvatarQA({event:'motion-unavailable',id,reason:'clips-disabled-or-previously-failed'})
       if (guided) reportGuidedDemoClip(id,'failed')
       return false
     }
+    reportVq03AvatarQA({event:'motion-requested',id})
     this.pending=null // invalidate older asynchronous auto/gesture loading
     this.stopClip()
     // PH-04.7: every explicitly requested clip (voice/button/demo) runs to
@@ -424,6 +446,26 @@ export class R8BodyCompanion {
       boundR8BodyPose(this.rig.bodyBones, this.proceduralBase,
         this.manualUntil > this.elapsed, this.fullBodySafe,
         this.manualUntil>this.elapsed ? this.activeId : null)
+    }
+    // VQ-03.2: bounded QA evidence from POST-GUARD arm-bone poses.
+    // Playback advances AND at least one arm bone moves away from the
+    // procedural pose. Spoken acknowledgement alone does not pass.
+    if(this.qaMotion && this.action && this.activeId===this.qaMotion.id){
+      const names=['leftUpperArm','rightUpperArm','leftLowerArm','rightLowerArm']
+      const armAngles:number[]=[]
+      for(const name of names){
+        const bone=this.rig.bodyBones.get(name)
+        const procedural=this.proceduralBase.get(name)
+        if(bone && procedural){
+          armAngles.push(angleBetweenQuaternionsDegrees(bone.quaternion,procedural))
+        }
+      }
+      if(this.qaMotion.evidence.addFrame(this.action.time,armAngles,this.action.isRunning())){
+        reportVq03AvatarQA({
+          event:'motion-pose-progress',id:this.qaMotion.id,
+          ...this.qaMotion.evidence.snapshot(),
+        })
+      }
     }
     // Measure the VISIBLE post-guard wrist distance, not the unbounded FBX
     // pose. This is diagnostic only: finger tips/palm contact require the

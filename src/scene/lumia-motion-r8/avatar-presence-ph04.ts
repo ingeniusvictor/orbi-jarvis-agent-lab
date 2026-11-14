@@ -89,16 +89,30 @@ export function parseLumiaAvatarAction(prompt: string): LumiaAvatarAction | null
 
   // Read-only questions are allowed and never cause a view or gesture change.
   if (/^(?:que|cuales|cuantas|como|dime|cuentame|comentame|explicame)\b/.test(said)) {
-    if (/\b(?:animaciones|movimientos|gestos)\b/.test(said) &&
-      /\b(?:tienes|disponibles|puedes|haces|sabes|catalogo)\b/.test(said)) {
+    // VQ-03: catalog intent needs an explicit possessive or a direct request
+    // for WHAT motions LUMIA has. Merely containing "sabes" + "animaciones"
+    // once hijacked the owner's VRM-fluidity question into a 17-item list.
+    const requestsOwnMotionCatalog =
+      /\b(?:tus|mis)\s+(?:(?:17|diecisiete)\s+)?(?:animaciones|movimientos|gestos)\b/.test(said) ||
+      /\b(?:que|cuales|cuantas)\s+(?:animaciones|movimientos|gestos)\s+(?:tienes|haces|puedes|sabes|hay)\b/.test(said) ||
+      /\b(?:animaciones|movimientos|gestos)\s+(?:que\s+)?(?:tienes|disponibles)\b/.test(said)
+    const asksTechnicalExplanation =
+      /\b(?:como|por que|para que|construir|disenar|desarrollar|programar|funcionan|funciona|fluida|fluidas|sistema nervioso)\b/.test(said)
+    if (requestsOwnMotionCatalog && !asksTechnicalExplanation) {
       return { kind: 'list-motions' }
     }
     if (/\b(?:vistas|modos de vista|apariencias|presentaciones)\b/.test(said)) {
       return { kind: 'list-views' }
     }
-    if (/\b(?:cuerpo virtual|avatar|cuerpo animado|presencia virtual)\b/.test(said)) {
-      return { kind: 'describe' }
-    }
+    // VQ-03.1: describe ONLY LUMIA's own avatar when explicitly requested.
+    // "¿Cómo conseguir que un avatar VRM tenga animaciones fluidas?" is a
+    // technical HOW question, not a request to list our character's features.
+    const aboutOurAvatar =
+      /\b(?:cuerpo virtual|avatar|cuerpo animado|presencia virtual)\b/.test(said) &&
+      /^(?:que|cual|cuales|dime|cuentame|comentame|explicame)\b/.test(said) &&
+      /\b(?:tu|tus|tienes|usas|utilizas|propio)\b/.test(said) &&
+      !asksTechnicalExplanation
+    if (aboutOurAvatar) return { kind: 'describe' }
     return null
   }
 

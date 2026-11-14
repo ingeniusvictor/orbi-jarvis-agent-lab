@@ -18,6 +18,9 @@ export const ORBI_SPEECH_VOCABULARY = Object.freeze([
   'inteligencia artificial local',
   'Whisper',
   'Kokoro',
+  // VRM is the 3D avatar format. Keep VRAM (GPU memory) as a distinct term.
+  // Command-mode ASR hint only; never replace the user's transcript.
+  'VRM',
   'VRAM',
   'memoria de video',
   'GPU',

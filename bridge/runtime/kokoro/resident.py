@@ -9,6 +9,7 @@ The original synthesize.py one-shot adapter remains unchanged.
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import soundfile as sf
@@ -24,6 +25,11 @@ ROOT = Path(__file__).resolve().parents[3] / ".local-runtime" / "kokoro"
 MODEL = Path(os.environ.get("ORBI_LOCAL_TTS_MODEL") or ROOT / "models" / "kokoro-v1.0.onnx")
 VOICES = Path(os.environ.get("ORBI_LOCAL_TTS_VOICES") or ROOT / "models" / "voices-v1.0.bin")
 MAX_TEXT = 4000
+# VA-02.1: opt-in diagnostic, disabled in ordinary LUMIA runs.
+PROFILE_VA021 = os.environ.get('ORBIA_VA021_KOKORO_PROFILE') == '1'
+# VA-02.2: opt-in CPU threading A/B in this isolated QA worker ONLY.
+CPU_AB_VA022 = os.environ.get('ORBIA_VA022_CPU_AB') == '1'
+THREAD_MODE_VA022 = os.environ.get('ORBIA_VA022_INTRA_THREADS', 'auto')
 
 
 def emit(payload):
@@ -35,12 +41,37 @@ def main():
     try:
         espeak.EspeakFallback(british=False)
         g2p = EspeakG2P(language="es")
-        tts = Kokoro(str(MODEL), str(VOICES))
+        if CPU_AB_VA022 and THREAD_MODE_VA022 in ("2", "4"):
+            # Use the documented session constructor; do not change model,
+            # voices, ONNX graph or user's installed Python dependencies.
+            import onnxruntime as ort
+            if not callable(getattr(Kokoro, "from_session", None)):
+                raise RuntimeError("VA022_KOKORO_FROM_SESSION_UNAVAILABLE")
+            opts = ort.SessionOptions()
+            opts.intra_op_num_threads = int(THREAD_MODE_VA022)
+            opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            session = ort.InferenceSession(
+                str(MODEL), sess_options=opts,
+                providers=["CPUExecutionProvider"],
+            )
+            tts = Kokoro.from_session(session, str(VOICES))
+        elif not CPU_AB_VA022 or THREAD_MODE_VA022 == "auto":
+            tts = Kokoro(str(MODEL), str(VOICES))
+        else:
+            raise ValueError("VA022_UNSUPPORTED_THREADS")
     except Exception:
         emit({"ready": False, "errorCode": "VOICE_TTS_UNAVAILABLE"})
         return 1
 
-    emit({"ready": True})
+    ready_packet = {"ready": True}
+    if CPU_AB_VA022:
+        session = getattr(tts, "sess", None)
+        providers = session.get_providers() if session else []
+        ready_packet["va022"] = {
+            "threads": THREAD_MODE_VA022,
+            "providers": providers,
+        }
+    emit(ready_packet)
 
     for raw in sys.stdin:
         try:
@@ -62,12 +93,25 @@ def main():
             if target.suffix.lower() != ".wav":
                 raise ValueError("VOICE_TTS_INVALID_TEXT")
 
+            # No transcript/phonemes, waveform or personal data in telemetry.
+            # All durations are local, bounded, and opt-in on the QA child.
+            t0 = time.perf_counter()
             phonemes, _ = g2p(text.strip())
+            t1 = time.perf_counter()
             if not phonemes or not phonemes.strip():
                 raise ValueError("VOICE_TTS_INVALID_TEXT")
             audio, sample_rate = tts.create(phonemes, speaker, is_phonemes=True)
+            t2 = time.perf_counter()
             sf.write(target, audio, sample_rate, subtype="PCM_16")
-            emit({"id": job_id, "ok": True})
+            t3 = time.perf_counter()
+            packet = {"id": job_id, "ok": True}
+            if PROFILE_VA021:
+                packet["timingsMs"] = {
+                    "g2pMs": round(1000 * (t1 - t0), 1),
+                    "inferenceMs": round(1000 * (t2 - t1), 1),
+                    "wavWriteMs": round(1000 * (t3 - t2), 1),
+                }
+            emit(packet)
         except Exception as exc:
             code = str(exc)
             if not code.startswith("VOICE_TTS_"):
