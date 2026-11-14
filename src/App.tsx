@@ -35,6 +35,7 @@ import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { portalSpeechStart, portalSpeechPhrase, portalSpeechEnd, portalSpeechInterrupt } from './scene/lumia-head/portal-speech-events'
 import { parseLumiaAvatarAction, respondToLumiaAvatarAction } from './scene/lumia-motion-r8/avatar-presence-ph04'
+import {withVrmTechnicalContext} from './lib/vrm-tech-grounding-vq03'
 import { LUMIA_GUIDED_DEMO_STEPS, beginGuidedDemo, cancelGuidedDemo, cueGuidedDemoPhrase, cueGuidedDemoStage, endGuidedDemo, checkGuidedDemoAssets, guidedDemoScript, guidedDemoSnapshot, waitForGuidedDemoClip } from './scene/lumia-motion-r8/avatar-demo-ph045'
 import { LumiaDemoIndicator } from './ui/LumiaDemoIndicator'
 
@@ -570,7 +571,7 @@ export default function App() {
               visualModeInstruction(visionReplyMode)+visionSpeechBudget(visionReplyMode,VISION_AUTO_AMR024_ENABLED)+
               (VISION_CONTEXT_AMR025_ENABLED?calibratedVisionInstruction():'')+
               (visionTracingEnabled()?visualPrecisionInstruction(cameraIntent?.question ?? said):'')
-          : said,
+          : withVrmTechnicalContext(said),
           history.current, {
         onText: (delta) => {
           if (stale()) return
