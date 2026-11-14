@@ -104,9 +104,11 @@ if not exist "node_modules\vite\bin\vite.js" (
   pause
   exit /b 1
 )
-rem Protect against concurrent LUMIA instances: frontend 5173 and bridge 8787.
-rem No processes are killed automatically; inspect PIDs before terminating anything.
-powershell.exe -NoProfile -NonInteractive -Command "$ports = @(5173, 8787); $busy = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $ports -contains $_.LocalPort }); if ($busy.Count -gt 0) { Write-Host 'ERROR: An earlier LUMIA session or another app occupies a required port:' -ForegroundColor Yellow; $busy | Select-Object LocalPort, OwningProcess -Unique | Format-Table -AutoSize; Write-Host 'Stop the old LUMIA terminal with Ctrl+C, inspect PIDs, and retry. Keep Ollama running.'; exit 2 }"
+rem A QA launcher can select its own frontend and bridge without editing the stable ASUS checkout.
+rem Normal ASUS defaults remain frontend 5173 / bridge 8787. Never kill other apps.
+if not defined PORT set "PORT=5173"
+if not defined JARVIS_BRIDGE_PORT set "JARVIS_BRIDGE_PORT=8787"
+powershell.exe -NoProfile -NonInteractive -Command "$ports = @([int]$env:PORT, [int]$env:JARVIS_BRIDGE_PORT); $busy = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $ports -contains $_.LocalPort }); if ($busy.Count -gt 0) { Write-Host 'ERROR: A required port for this LUMIA session is occupied:' -ForegroundColor Yellow; $busy | Select-Object LocalPort, OwningProcess -Unique | Format-Table -AutoSize; Write-Host 'Select another free QA port or inspect the owning process. No automatic termination.'; exit 2 }"
 if errorlevel 1 (
   echo LUMIA was NOT started. Resolve the port conflict above.
   pause

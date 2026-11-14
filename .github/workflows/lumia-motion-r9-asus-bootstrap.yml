@@ -1,0 +1,32 @@
+name: LUMIA Motion R9 - Windows isolated ASUS QA bootstrap
+
+on:
+  push:
+    branches:
+      - feature/lumia-motion-r9-intent-contract-20261114
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumia-motion-r9-win-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout R9 branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify non-destructive ASUS install with FAKE assets
+        shell: pwsh
+        run: ./scripts/certify-lumia-motion-r9-asus-qa.ps1

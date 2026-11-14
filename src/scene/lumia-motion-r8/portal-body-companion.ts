@@ -23,6 +23,9 @@ import { animationLibrary } from './motion-library-catalog.js'
 import { boundR8BodyPose } from './pose-guard-ph042'
 import { guidedDemoSnapshot, reportGuidedDemoClip } from './avatar-demo-ph045'
 import { WalkStage } from './walk-stage-ph048'
+import { R9IntentController } from '../lumia-motion-r9/intent-contract.js'
+import { inferR9CueFromSpokenPhrase } from '../lumia-motion-r9/spoken-director.js'
+import { R9ExpressiveBlend } from '../lumia-motion-r9/expressive-blend.js'
 
 type MotionState = 'idle' | 'listening' | 'thinking' | 'speaking'
 const LOWER_BODY_BONES = [
@@ -31,7 +34,7 @@ const LOWER_BODY_BONES = [
 ] as const
 type ClipInfo = { clip: THREE.AnimationClip; id: string; loop: boolean; repetitions: number; headAuthored: boolean }
 type BodyPose = Record<string, number>
-type SemanticPose = { head: {pitch:number;yaw:number;roll:number}; body:BodyPose; kind:string|null }
+type SemanticPose = { head: {pitch:number;yaw:number;roll:number}; body:BodyPose; kind:string|null; expression?: {name:string;weight:number}|null }
 const PROCEDURAL_BONES = [
   'leftShoulder','rightShoulder','leftUpperArm','rightUpperArm',
   'leftLowerArm','rightLowerArm','leftHand','rightHand','chest','spine','hips',
@@ -65,6 +68,10 @@ export class R8BodyCompanion {
   private readonly semantic = new SemanticMotionCore({enabled:true,intensity:48})
   private readonly blend = new PoseTransition(.44)
   private readonly walkStage = new WalkStage()
+  private readonly r9Intent = new R9IntentController()
+  private readonly r9Blend = new R9ExpressiveBlend()
+  private r9TurnId:string|null=null
+  private readonly r9SessionId='lumia-r9-body'
   private readonly rest = new Map<string,THREE.Quaternion>()
   private readonly proceduralBase = new Map<string,THREE.Quaternion>()
   private readonly euler = new THREE.Euler(0,0,0,'XYZ')
@@ -91,14 +98,16 @@ export class R8BodyCompanion {
   private readonly safePose:boolean
   private readonly fullBodySafe:boolean
   private readonly walkStageEnabled:boolean
+  private readonly r9Enabled:boolean
   private readonly rig:HeadRig
 
-  constructor(rig:HeadRig,{allowClips=false,safePose=true,fullBodySafe=false,walkStageEnabled=true}:{allowClips?:boolean;safePose?:boolean;fullBodySafe?:boolean;walkStageEnabled?:boolean}={}) {
+  constructor(rig:HeadRig,{allowClips=false,safePose=true,fullBodySafe=false,walkStageEnabled=true,r9Enabled=false}:{allowClips?:boolean;safePose?:boolean;fullBodySafe?:boolean;walkStageEnabled?:boolean;r9Enabled?:boolean}={}) {
     this.rig=rig
     this.allowClips=allowClips
     this.safePose=safePose
     this.fullBodySafe=fullBodySafe
     this.walkStageEnabled=walkStageEnabled && fullBodySafe
+    this.r9Enabled=r9Enabled
     this.activeMixer=new THREE.AnimationMixer(rig.scene)
     for(const [name,bone] of rig.bodyBones) this.rest.set(name,bone.quaternion.clone())
     // The full R8 viewer also performs a short warm-up BEFORE the first frame
@@ -338,6 +347,7 @@ export class R8BodyCompanion {
     this.explicitLoops=0
     this.explicitLoopTarget=0
     this.minClapHandDistance=Number.POSITIVE_INFINITY
+    this.r9Intent.reset() // The owner-selected authored FBX always wins.
     this.requestClip(id,true)
     return true
   }
@@ -349,11 +359,44 @@ export class R8BodyCompanion {
     this.director.postpone(this.elapsed,.2)
   }
 
+  /** The existing Portal event is emitted from Kokoro's real onplaying. */
+  onAudioStart(turnId:string):void {
+    if(!this.r9Enabled)return
+    this.r9TurnId=turnId
+    this.r9Intent.reset()
+    this.r9Blend.reset()
+  }
+
+  /** Phrase events are dispatched only for audio actually being played. */
   onSpokenPhrase(text:string):void {
-    this.semantic.begin(text)
+    if(this.r9Enabled && this.r9TurnId &&
+       this.manualUntil<=this.elapsed && !guidedDemoSnapshot().active){
+      const turnId=this.r9TurnId
+      const cue=inferR9CueFromSpokenPhrase(text)
+      if(cue){
+        const now=performance.now()
+        // First audible ONSET occurred in onAudioStart; the spoken phrase
+        // supplies a new conservative cue after that authorization. Calling
+        // onFirstAudio here starts the cue at the actual phrase boundary,
+        // never at speculative Qwen text or store phase='speaking'.
+        if(this.r9Intent.queue(cue,{sessionId:this.r9SessionId,turnId,now}) &&
+           this.r9Intent.onFirstAudio({sessionId:this.r9SessionId,turnId,now})){
+          this.semantic.end() // Avoid R8 and R9 issuing duplicate gestures.
+          this.semanticGestureUsed=null
+          // QA-only, semantic labels rather than private spoken text or audio.
+          console.info('[lumia:r9] gesto audible:', cue.gesture,
+            'expresion:', cue.emotion, 'intensidad:', cue.intensity)
+          return
+        }
+      }
+    }
+    this.r9Intent.reset()
+    this.semantic.begin(text) // Existing R8 fallback for unknown/no cues.
     this.semanticGestureUsed=null
   }
   onSpeechEnd():void {
+    this.r9TurnId=null
+    this.r9Intent.reset()
     this.semantic.end()
     // During the owner-guided tour, "Talking.fbx" must complete its actual
     // authored cycle even after the short narration has finished.
@@ -392,7 +435,21 @@ export class R8BodyCompanion {
     this.blend.step(dt)
 
 
-    const semantic=this.semantic.step(dt,{speaking:speechAudible}) as SemanticPose
+    const r9Cue = this.r9Enabled && this.r9TurnId
+      ? this.r9Intent.snapshot({
+          sessionId:this.r9SessionId,turnId:this.r9TurnId,
+          now:performance.now(),audible:speechAudible,
+          manualClip:Boolean(this.explicitClipId || this.pending && this.manualUntil>this.elapsed),
+          guidedDemo:guidedDemoSnapshot().active,
+        })
+      : null
+    const expressive=this.r9Blend.step(dt,r9Cue)
+    const r9Driving=Boolean(r9Cue && !this.explicitClipId && !this.pending &&
+      this.manualUntil<=this.elapsed && !guidedDemoSnapshot().active &&
+      (!this.activeId || this.activeId==='talking') && speechAudible)
+    const semantic=this.semantic.step(dt,{
+      speaking:speechAudible,manual:r9Driving,dancing:guidedDemoSnapshot().active,
+    }) as SemanticPose
     // The owner-requested FBX pose owns its joints until the clip ends.
     // Semantic voice overlays on the SAME arms previously pulled hands
     // apart during Clapping and distorted the authored No gesture.
@@ -425,6 +482,19 @@ export class R8BodyCompanion {
         this.manualUntil > this.elapsed, this.fullBodySafe,
         this.manualUntil>this.elapsed ? this.activeId : null)
     }
+    // R9 additive owner: AFTER existing R8 retarget + pose guard; bounded,
+    // tiny angles, only for genuinely audible non-manual conversation.
+    // No novel joints or gait/root motion. Safe rollback: ?lumiaR9=0.
+    if(r9Driving){
+      for(const [name,value] of Object.entries(expressive.body)){
+        const axis=name.at(-1)?.toUpperCase()
+        const bone=this.rig.bodyBones.get(name.slice(0,-1))
+        if(!bone || !axis || !Number.isFinite(value) || Math.abs(value)<1e-7)continue
+        this.euler.set(axis==='X'?value:0,axis==='Y'?value:0,axis==='Z'?value:0)
+        this.q.setFromEuler(this.euler)
+        bone.quaternion.multiply(this.q).normalize()
+      }
+    }
     // Measure the VISIBLE post-guard wrist distance, not the unbounded FBX
     // pose. This is diagnostic only: finger tips/palm contact require the
     // owner's original skinned VRM for a definitive visual conclusion.
@@ -452,10 +522,15 @@ export class R8BodyCompanion {
         this.requestClip(intent.id)
       }
     }
-    return semantic
+    return r9Driving
+      ? {...semantic,head:expressive.head,kind:expressive.kind,
+          expression:expressive.expression}
+      : semantic
   }
 
   dispose():void {
+    this.r9Intent.reset()
+    this.r9Blend.reset()
     this.stopClip()
     this.pending=null
     this.activeMixer.stopAllAction()
