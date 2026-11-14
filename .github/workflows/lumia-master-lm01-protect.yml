@@ -1,0 +1,30 @@
+name: LUMIA MASTER LM-01 - Non-destructive Recovery Guard
+on:
+  pull_request:
+    paths:
+      - 'scripts/lumia-master-protect.mjs'
+      - 'scripts/certify-lumia-master-protect.mjs'
+      - 'docs/lumia-master/**'
+      - '.github/workflows/lumia-master-lm01-protect.yml'
+  workflow_dispatch:
+jobs:
+  protect:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify recovery policy using synthetic assets only
+        run: node scripts/certify-lumia-master-protect.mjs
+      - name: Prohibit accidental private asset copies
+        shell: bash
+        run: |
+          if git ls-files 'public/models/lumia-motion/*.vrm' 'public/models/lumia-motion/clips/*.fbx' | grep .; then
+            echo 'ERROR: Private avatar asset tracked by Git'
+            exit 1
+          fi
