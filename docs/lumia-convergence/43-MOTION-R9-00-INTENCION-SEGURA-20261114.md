@@ -46,3 +46,27 @@ Ejecutar: node scripts/certify-lumia-motion-r9-contract.mjs
 Siguiente paso R9-01: consumir intenciones de manera opt-in y solo con telemetría, correlacionando el evento REAL de audio y las prioridades actuales de PH-04.8. R9-02: traducir a SemanticMotionCore/BodyPresenceCore con compositor aditivo y protección de articulaciones. R9-03: calibrar mirada/manos/IK en asset real. R9-04: memoria local con controles de privacidad y benchmarks separados.
 
 No fusionar automáticamente a main. Mantener la rama como experimento hasta QA física.
+
+
+## R9-01 / R9-02 — avance experimental PR #84
+
+Implementado en rama, no validado visualmente en ASUS:
+
+- spoken-director.js: clasifica frases realmente pronunciadas por Kokoro, de forma local y determinista, sin segunda inferencia.
+- expressive-blend.js: suma pequeñas rotaciones a cabeza, brazos, manos y pecho. No permite huesos arbitrarios; amplitudes maximas de 0.055 rad en los brazos y 0.050 rad en la cabeza.
+- portal-body-companion.ts: usa los módulos existentes de R8, aplica R9 después de las guardas R8 y cede prioridad a manuales, tutoriales y demás FBX.
+- LumiaPortalHead.tsx: reusa eventos de audio real del Portal; conserva visemas, parpadeo, demo y preset facial si existe.
+- scripts/certify-lumia-motion-r9-director.mjs: pruebas sintéticas.
+- .github/workflows/lumia-motion-r9-spoken-expressivity.yml: regresiones R9, R8, build y lint.
+
+CONTROL REVERSIBLE: R9 apagado por defecto. En el visor con parámetros de URL, agregar lumiaR9=1. Ejemplo: ?lumiaAvatar=bust-vrm&lumiaR9=1. Rollback: ?lumiaAvatar=bust-vrm&lumiaR9=0. R9 sólo se representa en busto/cuerpo completo. No altera lanzadores, Ollama, Whisper ni Kokoro.
+
+QA física ASUS requerida:
+1. Comprobar R8 con lumiaR9=0, voz/labios/ojos, tres vistas, 17 FBX y caminata PH-04.8.
+2. Activar busto y lumiaR9=1. Pedir: «Primero, explica qué es un string fotovoltaico» o «Por ejemplo, cómo funciona un inversor». Observar microgestos sin deformar.
+3. Pedir felicitar, negar y explicar; inspeccionar el retarget, ojos, mandíbula y voz.
+4. Activar el gesto manual de aplauso y la demostración: R9 no debe superponer movimientos.
+5. Interrumpir con voz, cambiar de vista, reanudar: ningún gesto de conversación anterior debe persistir.
+6. Medir estabilidad GPU y ausencia de pausas extra de Kokoro.
+
+IMPORTANTE: esta versión aún no conecta respuestas JSON de Qwen al controlador ni implementa IK. No incluye memoria Lacuna/Amygdala. Las pruebas de código no certifican la apariencia real del VRM; este gate se mantiene pendiente.
