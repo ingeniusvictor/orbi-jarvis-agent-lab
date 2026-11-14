@@ -352,12 +352,25 @@ export function LumiaPortalHead({ drive, avatarView }: {
         }
       }
       if(faceCmd && directFaceReported.current!==faceCmd.sequence){
-        directFaceReported.current=faceCmd.sequence
-        reportVq03AvatarQA({
-          event:'face-preview-observed',
-          expression:faceCmd.preset,
-          weight:Number(preview.weights[faceCmd.preset==='neutral'?'joy':faceCmd.preset].toFixed(3)),
-        })
+        const hasBind=faceCmd.preset==='neutral' ||
+          (rig.expressions.get(faceCmd.preset)?.length??0)>0
+        const weight=faceCmd.preset==='neutral' ? 0 :
+          preview.weights[faceCmd.preset]
+        // Log actual applied morph after ramp-up, not the requested state.
+        if(!hasBind){
+          directFaceReported.current=faceCmd.sequence
+          reportVq03AvatarQA({
+            event:'face-preview-unavailable',
+            expression:faceCmd.preset,
+          })
+        }else if(faceCmd.preset==='neutral'||weight>=.55){
+          directFaceReported.current=faceCmd.sequence
+          reportVq03AvatarQA({
+            event:'face-preview-observed',
+            expression:faceCmd.preset,
+            weight:Number(weight.toFixed(3)),
+          })
+        }
       }
     }
     // VRM0 standard facial presets are previewed only during the explicit
