@@ -8,6 +8,8 @@ on:
       - 'src/App.tsx'
       - 'scripts/certify-lumia-vision041-audit.ts'
       - 'INICIAR_LUMIA_ASUS_VISION_AUDITORIA_VI041.cmd'
+      - 'scripts/lumia-private-avatar-assets.mjs'
+      - 'scripts/certify-lumia-private-avatar-assets-vi041.mjs'
       - 'docs/LUMIA_VISION_041_FRESH_FRAME_FACE_QA.md'
       - '.github/workflows/lumia-vision041-audit.yml'
   workflow_dispatch:
@@ -25,6 +27,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: node scripts/certify-lumia-private-avatar-assets-vi041.mjs
       - run: npx tsx scripts/certify-lumia-vision041-audit.ts
       - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
       - run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
