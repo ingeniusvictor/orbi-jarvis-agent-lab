@@ -9,6 +9,7 @@ The original synthesize.py one-shot adapter remains unchanged.
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import soundfile as sf
@@ -24,6 +25,8 @@ ROOT = Path(__file__).resolve().parents[3] / ".local-runtime" / "kokoro"
 MODEL = Path(os.environ.get("ORBI_LOCAL_TTS_MODEL") or ROOT / "models" / "kokoro-v1.0.onnx")
 VOICES = Path(os.environ.get("ORBI_LOCAL_TTS_VOICES") or ROOT / "models" / "voices-v1.0.bin")
 MAX_TEXT = 4000
+# VA-02.1: opt-in diagnostic, disabled in ordinary LUMIA runs.
+PROFILE_VA021 = os.environ.get('ORBIA_VA021_KOKORO_PROFILE') == '1'
 
 
 def emit(payload):
@@ -62,12 +65,25 @@ def main():
             if target.suffix.lower() != ".wav":
                 raise ValueError("VOICE_TTS_INVALID_TEXT")
 
+            # No transcript/phonemes, waveform or personal data in telemetry.
+            # All durations are local, bounded, and opt-in on the QA child.
+            t0 = time.perf_counter()
             phonemes, _ = g2p(text.strip())
+            t1 = time.perf_counter()
             if not phonemes or not phonemes.strip():
                 raise ValueError("VOICE_TTS_INVALID_TEXT")
             audio, sample_rate = tts.create(phonemes, speaker, is_phonemes=True)
+            t2 = time.perf_counter()
             sf.write(target, audio, sample_rate, subtype="PCM_16")
-            emit({"id": job_id, "ok": True})
+            t3 = time.perf_counter()
+            packet = {"id": job_id, "ok": True}
+            if PROFILE_VA021:
+                packet["timingsMs"] = {
+                    "g2pMs": round(1000 * (t1 - t0), 1),
+                    "inferenceMs": round(1000 * (t2 - t1), 1),
+                    "wavWriteMs": round(1000 * (t3 - t2), 1),
+                }
+            emit(packet)
         except Exception as exc:
             code = str(exc)
             if not code.startswith("VOICE_TTS_"):
