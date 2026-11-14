@@ -8,7 +8,7 @@
  */
 import {createHash} from 'node:crypto'
 import {createReadStream} from 'node:fs'
-import {copyFile,mkdir,lstat,realpath,stat} from 'node:fs/promises'
+import {copyFile,mkdir,lstat,realpath} from 'node:fs/promises'
 import {constants as fsConstants,existsSync} from 'node:fs'
 import {resolve,join,dirname,isAbsolute,basename} from 'node:path'
 import {fileURLToPath} from 'node:url'
