@@ -18,6 +18,10 @@
 - [x] PR #68–#77 y #79 revisados: abiertos, draft, no fusionados a main al 13-11-2026; PR #69 es rama hermana de visión, #79 es laboratorio hijo de #77.
 - [x] Riesgos pendientes explicitados: VQ-02 sin confirmación ASUS posterior; pausas Kokoro; avatar/visión; detector facial sin QA; bóveda sin registro; diarización sin integración.
 - [ ] **Validar localmente** estado limpio (o registrar cambios si los hay) y ejecutar el inventario *solo lectura* del equipo con consentimiento del propietario.
+- [x] **Rama de recuperación de GitHub creada**: `recovery/lumia-asus-1580a51-20261113` apunta al commit físico reportado, sin publicar los activos privados.
+- [x] **LM-01 implementado y probado sintéticamente en Windows/Linux**: `scripts/lumia-master-protect.mjs` verifica 18 recursos privados, bloquea un backup de checkout distinto/sucio y guarda bundle + hashes solo con ejecución explícita. [Evidencia CI](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43545261253).
+- [ ] **Backup real en ASUS** y verificación SHA, usando destino local fuera de `LUMIA-ASUS`; [protocolo](LM01-RESPALDO-SEGURO-ASUS.md). Este backup **todavía no incluye pesos Ollama ni runtimes externos**, inventariar y proteger por separado.
+
 
 ## Fase 1 — Gate de seguridad y prueba diaria (P0, primera en ASUS)
 
