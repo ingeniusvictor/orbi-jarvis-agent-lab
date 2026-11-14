@@ -34,8 +34,8 @@ $original = Join-Path $env:USERPROFILE 'LUMIA-ASUS'
 $herramientas = Join-Path $env:USERPROFILE 'LUMIA-MASTER-TOOLS'
 New-Item -ItemType Directory -Force -Path $herramientas | Out-Null
 
-# Cambiar <SHA-CERTIFICADO> por SHA final verificado en GitHub Actions.
-$url = 'https://raw.githubusercontent.com/ingeniusvictor/orbi-jarvis-agent-lab/<SHA-CERTIFICADO>/scripts/lumia-master-protect.mjs'
+# Versión de código LM-01 verificada en Windows y Ubuntu en GitHub Actions, commit 8f7163a.
+$url = 'https://raw.githubusercontent.com/ingeniusvictor/orbi-jarvis-agent-lab/8f7163a8e0b05e297922191e61ac631ef09deb0d/scripts/lumia-master-protect.mjs'
 $script = Join-Path $herramientas 'lumia-master-protect.mjs'
 Invoke-WebRequest -Uri $url -OutFile $script
 node $script --audit --source $original
@@ -91,4 +91,4 @@ Un respaldo con 18 hashes PASS **no certifica audio, visión ni movimiento**. Un
 
 El respaldo guarda `lumia-git-HEAD.bundle` (historia Git autocontenida) y `private-assets/` (lista de archivos verificados). En una recuperación futura, **nunca extraer directamente encima de `LUMIA-ASUS`**: verificar hashes, crear carpeta nueva, restaurar el commit desde bundle, colocar activos privados en rutas indicadas, instalar dependencias conocidas, verificar Ollama/Whisper/Kokoro y ejecutar QA física. No borrar la instalación actual hasta comprobar la restauración completa.
 
-**Estado actual:** código de protección en PR #81; respaldo en ASUS y pruebas PH-04/voz **aún pendientes**.
+**Estado actual:** [CI Windows y Ubuntu PASS](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43545261253) para el código LM-01 (commit `8f7163a`), tests sintéticos de 18 activos y no modificación; respaldo en ASUS y pruebas PH-04/voz **aún pendientes**.
