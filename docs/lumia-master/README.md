@@ -50,7 +50,7 @@ No llamar «LUMIA v3.1» a una sesión AMR-03.1 ni «reconocimiento facial funci
 
 **LUMIA-BASE-ASUS-20261109** = commit `1580a5182eba540893e35e37065be77da4ed014c` de la rama VI-04C.1, **sin promoverlo ni modificarlo**. Es un **punto de recuperación comprobado**, no una release estable certificada.
 
-**Puntero de rescate del código:** rama [`recovery/lumia-asus-1580a51-20261113`](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/tree/recovery/lumia-asus-1580a51-20261113), fijada al mismo commit; no incluye archivos locales ignorados por Git. El respaldo LM-01 en la ASUS **no se ha ejecutado ni certificado aún**.
+**Puntero de rescate del código:** rama [`recovery/lumia-asus-1580a51-20261113`](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/tree/recovery/lumia-asus-1580a51-20261113), fijada al mismo commit; no incluye archivos locales ignorados por Git. **LM-01: respaldo físico local verificado en ASUS (13-11-2026)**: SHA `1580a5182eba540893e35e37065be77da4ed014c`, 19 activos (18 obligatorios), paquete Git SHA-256 verificado, `ok=true`, instalación original no alterada según herramienta. **Parcial**: no están incluidos pesos Ollama, entornos externos Whisper/Kokoro ni una copia desconectada comprobada.
 
 Preservar:
 - `qwen3.5:2b-q4_K_M` por defecto, selector Ollama local y opción manual 4B.
@@ -97,5 +97,6 @@ Al aprobar el plan: emitir un **tag inmutable del commit exacto**, manifest con 
 | 2026-11-13 | Se abrió **inventario/documentación MASTER separado**, sin editar el código vivo | Rama `docs/lumia-master-audit-20261113` |
 | 2026-11-13 | Visión **VI-04.1** para auditar captura reciente vs detección CPU, **aislada, sin identidad y sin QA ASUS** | [PR #82](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/82) |
 | 2026-11-13 | Voz **VOICE-01Q**: estudio de instrumentación interna antes de atribuir causas; **solo diseño**, laboratorio separado | [Protocolo Q](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/blob/feature/lumia-voice01-offline-diarization-lab-20261109/labs/voice-01/QA-ASUS-VOICE01Q-PROPOSAL-20261113.md) |
+| 2026-11-13 | **LM-01 respaldo físico parcial PASS**, 19/19 archivos del paquete, 18/18 obligatorios, Git bundle SHA-256 OK, sin alteración del original según salida ASUS; pesos/runtimes externos no respaldados | [Protocolo LM-01](LM01-RESPALDO-SEGURO-ASUS.md) |
 
 **Responsable de promoción:** revisión humana con resultados reales en ASUS y decisión explícita del propietario. Esta documentación no autoriza merges, reconocimiento de identidades ni despliegue.
