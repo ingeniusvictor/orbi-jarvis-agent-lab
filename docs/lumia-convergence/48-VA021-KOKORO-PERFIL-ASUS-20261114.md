@@ -32,7 +32,7 @@ En la ASUS, con Kokoro **residente precalentado** y cuatro frases fijas en espa�
 1. Cerrar la ventana del laboratorio VQ-03 con Ctrl+C antes de ejecutar el benchmark; mantener Ollama como esté, no lo necesita para esta medición. No ejecutar simultáneamente más de un Kokoro residente.
 2. Verificar `LUMIA-ASUS` en el SHA `1580a5182eba540893e35e37065be77da4ed014c`, y `LUMIA-VQ03-QA` en rama `feature/lumia-vq03-vrm-intent-clarity-20261113`, Git limpio, sin procesos en 5173/8787. No hacer checkout, reset ni clean del original.
 3. Actualizar **solo el clon** con `git fetch origin refs/heads/feature/lumia-vq03-vrm-intent-clarity-20261113` seguido de `git merge --ff-only FETCH_HEAD`. Confirmar SHA exacto del run CI aprobado antes de ejecutar.
-4. En PowerShell, dentro del clon: `node scripts/certify-lumia-va021-kokoro-breakdown.mjs`; luego `node scripts/lumia-kokoro-latency-breakdown-va021.mjs`. Ambos deben devolver exit 0.
+4. En PowerShell, dentro del clon: `node scripts/certify-lumia-va021-kokoro-breakdown.mjs`; luego `node scripts/lumia-kokoro-latency-breakdown-va021.mjs`. Ambos deben devolver exit 0. Al terminar, el perfil **cierra exclusivamente su propio worker Kokoro** y devuelve el control a PowerShell; no se detiene ningún servicio de la LUMIA original.
 5. Compartir las líneas `[VA-02.1]` únicamente (no archivos privados ni voz).
 6. Comparar con p50 1221.9 ms y p95 1599.7 ms **solo como referencia entre ejecuciones en el mismo equipo**, sin afirmar mejora: todavía no existe una variante TTS nueva.
 
