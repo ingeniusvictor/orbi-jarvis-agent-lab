@@ -1,6 +1,6 @@
 # LUMIA MASTER LM-01 — Protección real de la ASUS, sin cambiar el sistema
 
-**Estado:** nueva herramienta preparada en GitHub; **respaldo físico del ASUS aún NO realizado**.
+**Estado:** **respaldo físico PARCIAL en ASUS verificado por salida real del propietario (13-11-2026)**. Faltan copia externa, pesos de Ollama y runtimes externos; no es una imagen completa de LUMIA.
 **Fecha:** 13-11-2026. **Código de referencia conocido:** `1580a5182eba540893e35e37065be77da4ed014c`.
 **Rama de desarrollo documental:** `docs/lumia-master-audit-20261113` · PR #81 (borrador).
 **Rama adicional de recuperación del código:** `recovery/lumia-asus-1580a51-20261113` apunta al SHA exacto. **NO contiene los activos privados.**
@@ -91,4 +91,4 @@ Un respaldo con 18 hashes PASS **no certifica audio, visión ni movimiento**. Un
 
 El respaldo guarda `lumia-git-HEAD.bundle` (historia Git autocontenida) y `private-assets/` (lista de archivos verificados). En una recuperación futura, **nunca extraer directamente encima de `LUMIA-ASUS`**: verificar hashes, crear carpeta nueva, restaurar el commit desde bundle, colocar activos privados en rutas indicadas, instalar dependencias conocidas, verificar Ollama/Whisper/Kokoro y ejecutar QA física. No borrar la instalación actual hasta comprobar la restauración completa.
 
-**Estado actual:** [CI final Windows y Ubuntu PASS](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43545422135) para LM-01 (SHA de código anclado `8f7163a`, suite final `7306873`). Las pruebas sintéticas verifican 18 activos, integridad SHA-256, ausencia de modificaciones a la fuente y **restauración efectiva del bundle Git en otra carpeta**. El respaldo físico ASUS y las pruebas PH-04/voz **siguen pendientes**.
+**Estado actual:** [CI final Windows y Ubuntu PASS](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/actions/runs/43545422135) para LM-01 (SHA de código anclado `8f7163a`, suite final `7306873`). **ASUS LM-01: respaldo físico parcial PASS** (salida del propietario: `ok=true`, `assets_verified=19`, `required_verified=18`, `git_bundle_sha256_match=true`, commit `1580a5182eba540893e35e37065be77da4ed014c`, `original_modified=false`, `ollama_weights_backed_up=false`, `external_runtime_backed_up=false`, `is_full_system_backup=false`). La ruta privada del backup no fue compartida y no debe inventarse. Las pruebas PH-04/voz integradas y copia externa independiente **siguen pendientes**.
