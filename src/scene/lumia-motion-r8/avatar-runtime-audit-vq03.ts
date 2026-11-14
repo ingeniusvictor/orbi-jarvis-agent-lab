@@ -13,7 +13,7 @@ export const VQ03_AVATAR_QA_ENABLED = typeof import.meta.env !== 'undefined' &&
 export type Vq03AvatarAuditEvent = {
   event: 'vrm-first-frame' | 'motion-requested' | 'motion-started' |
     'motion-pose-progress' | 'motion-completed' | 'motion-interrupted' |
-    'motion-unavailable' | 'natural-face-observed' | 'natural-expression-observed'
+    'motion-unavailable' | 'natural-face-observed' | 'natural-expression-observed' | 'face-preview-observed' | 'face-preview-unavailable'
   view?: 'head-vrm' | 'bust-vrm' | 'body-vrm' | 'legacy'
   id?: string
   fbxFrames?: number
@@ -26,7 +26,7 @@ export type Vq03AvatarAuditEvent = {
   bodyBones?: number
   blink?: number
   eyeYaw?: number
-  expression?: 'joy' | 'sorrow' | 'fun'
+  expression?: 'joy' | 'sorrow' | 'fun' | 'angry' | 'neutral'
   weight?: number
 }
 
