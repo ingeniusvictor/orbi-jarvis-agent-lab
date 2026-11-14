@@ -18,7 +18,8 @@
     "stt": "original local Whisper",
     "tts": "original local Kokoro",
     "camera_auto_open": false,
-    "facial_identity_enabled": false
+    "facial_identity_enabled": false,
+    "vision_same_jpeg_pilot": "NEXT only, VITE_LUMIA_VISION_SAME_FRAME_VI042A=1"
   },
   "carried_forward": [
     {
@@ -51,8 +52,14 @@
     {
       "module": "VI-04.1",
       "capability": "correlate authorized JPEG timestamps with stable face count",
-      "qa": "CI certified in source; owner physical validation pending",
+      "qa": "owner physically confirmed live-fresh JPEG plus 1-face/2-face recent CPU evidence on ASUS; full OFF/expiry QA pending",
       "source_pr": 82
+    },
+    {
+      "module": "VI-04.2A",
+      "capability": "single camera JPEG shared with Qwen and on-demand CPU face detector (metadata only, no reply changes)",
+      "qa": "new experimental implementation, CI pending and actual ASUS physical QA pending",
+      "source_issue": 87
     }
   ],
   "excluded_from_production": [
@@ -62,7 +69,7 @@
     "CPU thread tuning or reinstallation of original Kokoro",
     "automatic merge to main/ASUS"
   ],
-  "next_gate": "VI-04.1: collect nonimage console telemetry for fresh JPEG and near-time face samples on contradictory 1 vs 3 and correct 2 vs 2 cases; VI-04.2 design same-JPEG CPU+VLM evidence, explicitly distinguish faces from persons; detector OFF/180s fail-closed",
+  "next_gate": "VI-04.2A: verify [lumia:vision-vi042a] status=matched on the same photo ID sent to Qwen, 0/1/2 faces, motion, detector OFF, 180s expiry and cancellation; no facial identity",
   "promotion_policy": "Change NEXT only after review/CI/owner QA; promote to protected production only with separate explicit owner approval and rollback evidence",
   "qa_observations_20261114": [
     {
