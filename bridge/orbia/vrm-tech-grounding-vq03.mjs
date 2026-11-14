@@ -40,6 +40,11 @@ export function clarifyVq03AmbiguousTechnicalSpeech(prompt){
   if(asMasculineVram && bareDefinition && !hardware && !avatar){
     return '¿Te refieres a VRM, el formato de avatares 3D, o a VRAM, la memoria gráfica de una GPU?'
   }
+  // 14-Nov ASUS: Whisper heard "avatar BRM". The avatar context is strong
+  // but not sufficient to silently rewrite a named acronym in the transcript.
+  if(/\bavatar\s+brm\b/.test(said) && bareDefinition && !hardware){
+    return 'Whisper entendió BRM. ¿Querías decir VRM, el formato de avatar humanoide 3D?'
+  }
   const mangledNaturalMotion=/\banimaciones\b/.test(said) &&
     /\bpara\s+que\s+esperan\b/.test(said) &&
     /\b(?:natural|naturales)\b/.test(said)
@@ -54,6 +59,51 @@ export function isConversationalAvatarAnimationQuestion(prompt){
   return /\b(?:tus|mis)\s+(?:animaciones|gestos|movimientos)\b/.test(said) &&
     /\b(?:mejorar|natural|naturales|conversamos|conversacion|controlar|sincronizar|fluida|fluidas)\b/.test(said) &&
     !/\b(?:gpu|memoria grafica|vram dedicada)\b/.test(said)
+}
+
+/**
+ * Keep grounded advice distinct: WHAT TO IMPROVE (smooth animation) is not
+ * HOW TO CONTROL it WHILE CONVERSING (state/event orchestration). These
+ * are hints only; the model still answers the owner's original user text.
+ */
+export function avatarAnimationAdviceFocus(prompt){
+  if(!isConversationalAvatarAnimationQuestion(prompt))return null
+  const said=fold(prompt)
+  if(/\b(?:controlar|sincronizar|coordinar)\b/.test(said) &&
+      /\b(?:conversamos|conversacion|hablamos|dialogo)\b/.test(said)){
+    return 'conversation-control'
+  }
+  return 'motion-naturalness'
+}
+
+export function isVq03UnreliableAvatarAdvice({prompt,answer,history=[]}={}){
+  const focus=avatarAnimationAdviceFocus(prompt)
+  if(!focus)return false
+  const text=fold(answer)
+  // The app has no verified function to simulate/edit its blend graphs
+  // merely because Qwen says "want to try it now?".
+  if(/\b(?:quieres|gustaria|podemos)\b.{0,90}\b(?:probar|simular|simulacion|ajustar)\b.{0,90}\b(?:ahora|mismo|en vivo)\b/.test(text))return true
+  if(focus==='conversation-control'){
+    const hasStateController=/\b(?:estado|estados|escucha|escuchando|pienso|pensamiento|habla|hablando|reposo|gesto|gestos|evento|eventos|visema|visemas|sincronizar|sincronizacion|reaccionar|reaccion)\b/.test(text)
+    if(!hasStateController && /\b(?:tiempos|transicion|transiciones|interpolacion|suavizar)\b/.test(text))return true
+    // Detect a near-repeat of an older answer when the user deliberately
+    // changed from "naturalidad" to "control mientras conversamos".
+    const prev=history.filter(e=>e?.role==='assistant').slice(-2).map(e=>fold(e.content))
+    const recurring=/\b(?:ajustar los tiempos de transicion|sincronizar mejor los cambios de visor)\b/.test(text)
+    if(recurring && prev.some(p=>p.includes('ajustar los tiempos de transicion')&&
+         p.includes('sincronizar mejor los cambios de visor')))return true
+  }
+  return false
+}
+
+export function vq03AdviceSystemHint(prompt){
+  const focus=avatarAnimationAdviceFocus(prompt)
+  if(!focus)return ''
+  const base='\\n[VQ-03.5 / hechos verificados: Motor Motion R8 y vistas VRM disponibles; no existe evidencia de controles de simulación de ajustes automáticos en esta sesión. '+
+    'No ofrezcas probar una simulación inmediata ni afirmes haber modificado interpolación, tiempos o rig. Indica las mejoras como propuestas técnicas.]'
+  return focus==='conversation-control'
+    ? base+'\\n[VQ-03.5 / pregunta ACTUAL sobre CONTROL mientras conversa: explica un controlador por eventos que cambie estado escucha → pensamiento → habla → reposo, selección acotada de Motion R8, prioridad de gesto, mezcla con visemas y sincronización TTS. No repitas consejos genéricos de suavizado de la pregunta anterior.]'
+    : base+'\\n[VQ-03.5 / pregunta ACTUAL sobre NATURALIDAD: explica mezclado de clips, interpolación, gestos pequeños, mirada y respiración, sin prometer funciones actualmente no implementadas.]'
 }
 
 export const VRM_CONVERSATION_SYSTEM_HINT_VQ034=
@@ -75,6 +125,6 @@ export const VRM_TECH_SYSTEM_HINT_VQ03=
 
 export function technicalVrmSystemHint(prompt){
   if(isTechnicalVrmQuestion(prompt))return VRM_TECH_SYSTEM_HINT_VQ03
-  if(isConversationalAvatarAnimationQuestion(prompt))return VRM_CONVERSATION_SYSTEM_HINT_VQ034
+  if(isConversationalAvatarAnimationQuestion(prompt))return VRM_CONVERSATION_SYSTEM_HINT_VQ034+vq03AdviceSystemHint(prompt)
   return ''
 }
