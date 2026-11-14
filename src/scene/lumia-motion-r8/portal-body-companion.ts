@@ -383,6 +383,9 @@ export class R8BodyCompanion {
            this.r9Intent.onFirstAudio({sessionId:this.r9SessionId,turnId,now})){
           this.semantic.end() // Avoid R8 and R9 issuing duplicate gestures.
           this.semanticGestureUsed=null
+          // QA-only, semantic labels rather than private spoken text or audio.
+          console.info('[lumia:r9] gesto audible:', cue.gesture,
+            'expresion:', cue.emotion, 'intensidad:', cue.intensity)
           return
         }
       }
