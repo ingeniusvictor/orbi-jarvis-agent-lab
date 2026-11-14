@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {fileURLToPath} from 'node:url'
 import {
-  validateVa021WorkerTimings,lastResidentKokoroVa021Timing,
+  validateVa021WorkerTimings,lastResidentKokoroVa021Timing,stopResidentKokoroVa021,
 } from '../bridge/orbia/resident-tts.mjs'
 import {
   validateVa021Observation,summarizeVa021,
@@ -14,6 +14,8 @@ const w=validateVa021WorkerTimings({
 assert.deepEqual(w,{g2pMs:29.3,inferenceMs:1187.7,wavWriteMs:2})
 assert.ok(Object.isFrozen(w))
 assert.equal(lastResidentKokoroVa021Timing(),null,'No resident created by import')
+assert.equal(stopResidentKokoroVa021({}),false,'Cannot stop ordinary LUMIA')
+assert.equal(stopResidentKokoroVa021({ORBIA_VA021_KOKORO_PROFILE:'1'}),false,'No worker started by import')
 for(const fake of [
   null,{}, {g2pMs:NaN,inferenceMs:2,wavWriteMs:2},
   {g2pMs:1,inferenceMs:-1,wavWriteMs:2},
@@ -56,6 +58,8 @@ assert.match(benchmark,/prewarmResidentKokoro\(env\)/)
 assert.match(benchmark,/measureVa02\(\{/)
 assert.match(benchmark,/phrases:VA02_TEST_PHRASES/)
 assert.match(benchmark,/rounds:2/)
+assert.match(benchmark,/stopResidentKokoroVa021\(env\)/)
+assert.match(node,/if \(env\.ORBIA_VA021_KOKORO_PROFILE !== '1'\) return false/)
 assert.match(benchmark,/VA021_WRONG_QA_ROOT/)
 assert.doesNotMatch(production,/ORBIA_VA021_KOKORO_PROFILE/)
 assert.doesNotMatch(qa,/ORBIA_VA021_KOKORO_PROFILE/)
