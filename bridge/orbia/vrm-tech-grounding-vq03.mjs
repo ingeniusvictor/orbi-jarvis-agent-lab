@@ -99,11 +99,11 @@ export function isVq03UnreliableAvatarAdvice({prompt,answer,history=[]}={}){
 export function vq03AdviceSystemHint(prompt){
   const focus=avatarAnimationAdviceFocus(prompt)
   if(!focus)return ''
-  const base='\\n[VQ-03.5 / hechos verificados: Motor Motion R8 y vistas VRM disponibles; no existe evidencia de controles de simulación de ajustes automáticos en esta sesión. '+
+  const base='\n[VQ-03.5 / hechos verificados: Motor Motion R8 y vistas VRM disponibles; no existe evidencia de controles de simulación de ajustes automáticos en esta sesión. '+
     'No ofrezcas probar una simulación inmediata ni afirmes haber modificado interpolación, tiempos o rig. Indica las mejoras como propuestas técnicas.]'
   return focus==='conversation-control'
-    ? base+'\\n[VQ-03.5 / pregunta ACTUAL sobre CONTROL mientras conversa: explica un controlador por eventos que cambie estado escucha → pensamiento → habla → reposo, selección acotada de Motion R8, prioridad de gesto, mezcla con visemas y sincronización TTS. No repitas consejos genéricos de suavizado de la pregunta anterior.]'
-    : base+'\\n[VQ-03.5 / pregunta ACTUAL sobre NATURALIDAD: explica mezclado de clips, interpolación, gestos pequeños, mirada y respiración, sin prometer funciones actualmente no implementadas.]'
+    ? base+'\n[VQ-03.5 / pregunta ACTUAL sobre CONTROL mientras conversa: explica un controlador por eventos que cambie estado escucha → pensamiento → habla → reposo, selección acotada de Motion R8, prioridad de gesto, mezcla con visemas y sincronización TTS. No repitas consejos genéricos de suavizado de la pregunta anterior.]'
+    : base+'\n[VQ-03.5 / pregunta ACTUAL sobre NATURALIDAD: explica mezclado de clips, interpolación, gestos pequeños, mirada y respiración, sin prometer funciones actualmente no implementadas.]'
 }
 
 export const VRM_CONVERSATION_SYSTEM_HINT_VQ034=
