@@ -13,6 +13,9 @@ on:
       - 'src/scene/lumia-motion-r8/avatar-runtime-audit-vq03.ts'
       - 'src/scene/LumiaPortalHead.tsx'
       - 'scripts/certify-lumia-vq032-avatar-runtime.ts'
+      - 'src/scene/lumia-head/natural-face-vq04.ts'
+      - 'scripts/certify-lumia-vq04-natural-face.ts'
+      - 'docs/lumia-convergence/52-VQ04-ROSTRO-NATURAL-ASUS-20261114.md'
       - 'scripts/lumia-vq03-local-voice-qa.mjs'
       - 'scripts/certify-lumia-vq033-voice-reuse.mjs'
       - 'docs/lumia-convergence/44-VQ03-VOICE-REUSE-ASUS-20261114.md'
@@ -57,6 +60,7 @@ jobs:
       - run: npm ci
       - run: node scripts/certify-lumia-vq03-private-avatar-assets.mjs
       - run: npx tsx scripts/certify-lumia-vq032-avatar-runtime.ts
+      - run: npx tsx scripts/certify-lumia-vq04-natural-face.ts
       - run: node scripts/certify-lumia-vq033-voice-reuse.mjs
       - run: node scripts/certify-lumia-va02-kokoro-baseline.mjs
       - run: node scripts/certify-lumia-va021-kokoro-breakdown.mjs
