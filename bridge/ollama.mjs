@@ -39,7 +39,7 @@ import { isComplexVoicePrompt, COMPLEX_VOICE_INSTRUCTION } from './orbia/complex
 import { rc03GroundedReply, RC03_VOICE_GROUNDING_INSTRUCTION } from './orbia/grounded-claims-rc03.mjs'
 import { rc04TranslationCapabilityReply, RC04_TRANSLATION_FACTS } from './orbia/translation-capabilities-rc04.mjs'
 import { buildLumiaSkillRegistry, isSkillRegistryInquiry, skillRegistryReply } from './orbia/skill-registry-skill01.mjs'
-import { technicalVrmSystemHint } from './orbia/vrm-tech-grounding-vq03.mjs'
+import { technicalVrmSystemHint, clarifyVq03AmbiguousTechnicalSpeech } from './orbia/vrm-tech-grounding-vq03.mjs'
 import { parseLocalVisualImage } from './orbia/visual-input.mjs'
 import { safeVisionTrace,createVisionCountLedger } from './orbia/vision-trace-amr026.mjs'
 import { formatVisionCacheMetrics } from './orbia/vision-cache-metrics-amr027.mjs'
@@ -327,7 +327,11 @@ export async function streamOllama({
     ? skillRegistryReply({ prompt, registry: buildLumiaSkillRegistry() }) : null
   const translationCapability = registryReply || (rc04Pilot && !image
     ? rc04TranslationCapabilityReply({ prompt }) : null)
-  const grounded = translationCapability ||
+  // An ambiguous transcript is better resolved by a brief question than
+  // confidently answering the wrong VRM/VRAM topic. Keep raw STT/history intact.
+  const vq034Clarify = process.env.ORBIA_LUMIA_VRM_GROUNDING_VQ03==='1' && !image
+    ? clarifyVq03AmbiguousTechnicalSpeech(prompt) : null
+  const grounded = translationCapability || vq034Clarify ||
     (rc03Pilot && !image ? rc03GroundedReply({ prompt, history }) : null)
   if (grounded) {
     if (signal?.aborted) throw new Error('LUMIA request aborted')
