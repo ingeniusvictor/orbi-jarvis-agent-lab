@@ -1,0 +1,41 @@
+name: LUMIA NEXT - cumulative avatar and vision gate
+on:
+  pull_request:
+    paths:
+      - 'LUMIA_NEXT_MANIFEST.json'
+      - 'INICIAR_LUMIA_ASUS_NEXT_QA.cmd'
+      - 'scripts/lumia-next-local-voice-qa.mjs'
+      - 'scripts/certify-lumia-next-integration.mjs'
+      - 'src/App.tsx'
+      - 'src/scene/LumiaPortalHead.tsx'
+      - 'src/scene/lumia-head/**'
+      - 'src/scene/lumia-motion-r8/avatar-presence-ph04.ts'
+      - 'src/lib/vision-audit-vi041.ts'
+      - 'src/lib/vision-active-vi031.ts'
+      - 'src/ui/LumiaCameraViewfinder.tsx'
+      - '.github/workflows/lumia-next-integration.yml'
+  workflow_dispatch:
+jobs:
+  cumulative:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/certify-lumia-next-integration.mjs
+      - run: npx tsx scripts/certify-lumia-vq04-natural-face.ts
+      - run: npx tsx scripts/certify-lumia-vq05-speech-expressions.ts
+      - run: npx tsx scripts/certify-lumia-vq051-facial-contrast.ts
+      - run: npx tsx scripts/certify-lumia-vision041-audit.ts
+      - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
+      - run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
+      - run: npx tsx scripts/certify-lumia-vision032-sentinel-cpu.ts
+      - run: npm run lint
+      - run: npm run build
