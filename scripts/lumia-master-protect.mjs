@@ -183,8 +183,11 @@ export async function backupProject(source,dest,{expectedCommit=BASELINE_SHA}={}
   if(isContained(a.source,proposed)||isContained(proposed,a.source)){
     throw Error('BACKUP_TARGET_MUST_BE_OUTSIDE_SOURCE_TREE')
   }
-  await mkdir(dest,{recursive:true})
-  const target=await realpath(dest)
+  // Destination must ALREADY exist, ensuring no path through unexpected
+  // parent symlinks is created before containment is verified.
+  let target
+  try {target=await realpath(dest)}
+  catch {throw Error('BACKUP_DESTINATION_MUST_ALREADY_EXIST')}
   if(isContained(a.source,target)||isContained(target,a.source)){
     throw Error('BACKUP_TARGET_MUST_BE_OUTSIDE_SOURCE_TREE')
   }
@@ -285,7 +288,7 @@ async function main(args){
 if(process.argv[1]&&resolve(process.argv[1])===resolve(fileURLToPath(import.meta.url))){
   main(process.argv.slice(2)).catch(err=>{
     const msg=String(err?.message||'UNKNOWN')
-    const known=/^(SOURCE_MUST_BE_EXACT_GIT_ROOT|BASELINE_COMMIT_CHANGED_ABORT|UNCLEAN_SOURCE_WORKTREE_ABORT|MISSING_PRIVATE_ASSETS|MISSING_DAILY_LAUNCHER|ABSOLUTE_DESTINATION_REQUIRED|BACKUP_TARGET_MUST_BE_OUTSIDE_SOURCE_TREE|BACKUP_NOT_COMPLETED|BACKUP_DIR_REQUIRED|SOURCE_AND_DEST_REQUIRED|SELECT_ONE_MODE_AUDIT_BACKUP_VERIFY|INVALID_BACKUP_MANIFEST|INVALID_BACKUP_ALLOWLIST|BACKUP_HASH_MISMATCH|MISSING_REQUIRED_BACKUP_ASSET|GIT_BUNDLE_HASH_MISMATCH)/.test(msg)
+    const known=/^(SOURCE_MUST_BE_EXACT_GIT_ROOT|BASELINE_COMMIT_CHANGED_ABORT|UNCLEAN_SOURCE_WORKTREE_ABORT|MISSING_PRIVATE_ASSETS|MISSING_DAILY_LAUNCHER|ABSOLUTE_DESTINATION_REQUIRED|BACKUP_DESTINATION_MUST_ALREADY_EXIST|BACKUP_TARGET_MUST_BE_OUTSIDE_SOURCE_TREE|BACKUP_NOT_COMPLETED|BACKUP_DIR_REQUIRED|SOURCE_AND_DEST_REQUIRED|SELECT_ONE_MODE_AUDIT_BACKUP_VERIFY|INVALID_BACKUP_MANIFEST|INVALID_BACKUP_ALLOWLIST|BACKUP_HASH_MISMATCH|MISSING_REQUIRED_BACKUP_ASSET|GIT_BUNDLE_HASH_MISMATCH)/.test(msg)
     console.error('[LUMIA MASTER] '+(known?msg:'LOCAL_AUDIT_OR_BACKUP_ERROR'))
     process.exitCode=1
   })
