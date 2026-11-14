@@ -64,7 +64,7 @@ export async function prepareAvatarAssets(source,target){
     throw Error('SOURCE_NOT_LUMIA_CHECKOUT')
   }
   // The action is deliberately scoped to this experimental branch's launcher.
-  if(!existsSync(join(destination,'INICIAR_LUMIA_ASUS_VISION_AUDITORIA_VQ03.cmd'))){
+  if(!existsSync(join(destination,'INICIAR_LUMIA_ASUS_VQ03_VRM_QA.cmd'))){
     throw Error('DESTINATION_NOT_VQ03_WORKTREE')
   }
   const from=await inspectAvatarAssets(original)
