@@ -46,7 +46,7 @@
     {
       "module": "VI-04A",
       "capability": "CPU detector of faces, never identity",
-      "qa": "owner physical validation pending"
+      "qa": "owner observed live face bounding box tracking in ASUS 2026-11-14; 0/1/2 count and lifecycle QA pending"
     },
     {
       "module": "VI-04.1",
@@ -62,6 +62,20 @@
     "CPU thread tuning or reinstallation of original Kokoro",
     "automatic merge to main/ASUS"
   ],
-  "next_gate": "VI-04.1 camera test with 0/1 consented adults, fresh-frame timestamps and detector OFF/expiration",
-  "promotion_policy": "Change NEXT only after review/CI/owner QA; promote to protected production only with separate explicit owner approval and rollback evidence"
+  "next_gate": "VI-03.2B typed/voice current-scene QA on ASUS: live-fresh attachedJPEG, VI-04.1 face-presence-available; detector OFF and 180s session expiration; no auto camera",
+  "promotion_policy": "Change NEXT only after review/CI/owner QA; promote to protected production only with separate explicit owner approval and rollback evidence",
+  "qa_observations_20261114": [
+    {
+      "module": "VI-04A",
+      "observation": "Owner confirmed that the face bounding box visibly follows the face on actual ASUS webcam",
+      "evidence": "owner visual report",
+      "scope": "one live face box; not biometric identity or multi-face accuracy"
+    },
+    {
+      "module": "VI-03.2B",
+      "observation": "General text composer question about current camera scene reached Qwen without JPEG due to unmatched phrase",
+      "evidence": "owner transcript 16:39:34 local",
+      "status": "classifier fix in PR #86, awaiting physical retest"
+    }
+  ]
 }
