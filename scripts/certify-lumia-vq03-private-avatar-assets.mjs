@@ -18,7 +18,7 @@ try{
   await mkdir(original,{recursive:true})
   await mkdir(qa,{recursive:true})
   await writeFile(join(original,'INICIAR_LUMIA_ASUS_RAPIDA.cmd'),'mock launcher only')
-  await writeFile(join(qa,'INICIAR_LUMIA_ASUS_VISION_AUDITORIA_VQ03.cmd'),'mock launcher only')
+  await writeFile(join(qa,'INICIAR_LUMIA_ASUS_VQ03_VRM_QA.cmd'),'mock launcher only')
   for(const [i,rel] of ASSETS.entries()){
     const path=join(original,rel)
     await mkdir(dirname(path),{recursive:true})
