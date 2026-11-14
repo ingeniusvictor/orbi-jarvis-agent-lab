@@ -4,6 +4,7 @@
  * The only active frame is the most recent in-memory JPEG, replaced in place.
  */
 import type {LocalVisualImage,VisionResolution} from './visual-input'
+import type {VisionFaceSample} from './vision-audit-vi041'
 
 export const ACTIVE_VISION_SAMPLE_MS=12_000
 export const ACTIVE_VISION_MAX_SESSION_MS=180_000
@@ -13,6 +14,9 @@ export type ActiveVisionFrame={
   image:LocalVisualImage
   resolution:VisionResolution
   capturedAt:number
+  /** VI-04.1 opt-in diagnostic metadata; no image, name, embeddings or ID. */
+  faceAuditEnabled?:boolean
+  faceAudit?:VisionFaceSample|null
 }
 
 const normalize=(value:string):string=>String(value??'')
