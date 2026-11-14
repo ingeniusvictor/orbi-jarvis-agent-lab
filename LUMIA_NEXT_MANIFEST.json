@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "name": "LUMIA NEXT ASUS cumulative QA",
+  "purpose": "Keep owner-approved improvements and the next feature under one reproducible code line",
+  "protected_original": {
+    "local_folder": "LUMIA-ASUS",
+    "expected_commit": "1580a5182eba540893e35e37065be77da4ed014c",
+    "modified_by_integration": false
+  },
+  "canonical_integration_branch": "integration/lumia-asus-next-20261114",
+  "local_next_folder": "LUMIA-NEXT-QA",
+  "entrypoints": {
+    "with_local_voice": "node scripts/lumia-next-local-voice-qa.mjs",
+    "without_voice": "INICIAR_LUMIA_ASUS_NEXT_QA.cmd"
+  },
+  "runtime": {
+    "brain": "qwen3.5:2b-q4_K_M",
+    "stt": "original local Whisper",
+    "tts": "original local Kokoro",
+    "camera_auto_open": false,
+    "facial_identity_enabled": false
+  },
+  "carried_forward": [
+    {
+      "module": "VQ-04",
+      "capability": "variable blink and micro-gaze on Vita VRM",
+      "qa": "owner visually approved",
+      "source_pr": 83
+    },
+    {
+      "module": "VQ-05.1",
+      "capability": "direct discernible facial presets and smoother speech reactions",
+      "qa": "owner visually approved",
+      "source_pr": 83
+    },
+    {
+      "module": "PH-04/R8",
+      "capability": "existing 3 views and 17 private body animation clips",
+      "qa": "preserved; do not claim all individually field-tested here"
+    },
+    {
+      "module": "VI-03.2B",
+      "capability": "fresh camera snapshot for authorized vision question",
+      "qa": "inherited; opt-in"
+    },
+    {
+      "module": "VI-04A",
+      "capability": "CPU detector of faces, never identity",
+      "qa": "owner physical validation pending"
+    },
+    {
+      "module": "VI-04.1",
+      "capability": "correlate authorized JPEG timestamps with stable face count",
+      "qa": "CI certified in source; owner physical validation pending",
+      "source_pr": 82
+    }
+  ],
+  "excluded_from_production": [
+    "adult identity recognition",
+    "unvalidated vision model auto-switch to 4B",
+    "automatic camera activation",
+    "CPU thread tuning or reinstallation of original Kokoro",
+    "automatic merge to main/ASUS"
+  ],
+  "next_gate": "VI-04.1 camera test with 0/1 consented adults, fresh-frame timestamps and detector OFF/expiration",
+  "promotion_policy": "Change NEXT only after review/CI/owner QA; promote to protected production only with separate explicit owner approval and rollback evidence"
+}
