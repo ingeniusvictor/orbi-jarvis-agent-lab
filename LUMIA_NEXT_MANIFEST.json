@@ -64,7 +64,13 @@
     {
       "module": "VI-04.2B.1",
       "capability": "single-JPEG CPU facial evidence as advisory prompt and less suggestive visual counting instructions",
-      "qa": "pilot only; CI and physical ASUS 1-vs-3 false person count retest pending",
+      "qa": "CI Windows/Ubuntu approved; owner reported 3 consecutive correct 1-face replies when shifting front/side/side (2026-11-15 02:08–02:09); sameJpeg trace and robustness pending",
+      "source_issue": 87
+    },
+    {
+      "module": "VI-04.2B.2",
+      "capability": "natural live-scene reply guidance: visible actions only, spatial position from current JPEG, 1–2 short sentences; same CPU face-count hint unchanged",
+      "qa": "CI pending; actual ASUS QA pending; no change to detectors or Qwen/voice/avatar",
       "source_issue": 87
     }
   ],
@@ -75,7 +81,7 @@
     "CPU thread tuning or reinstallation of original Kokoro",
     "automatic merge to main/ASUS"
   ],
-  "next_gate": "VI-04.2B.1: retest one person moving and two visible people, compare Qwen wording with VI-04.2A matched faceCount and same JPEG; assess false 3-person claims, without forcing face count equal to people",
+  "next_gate": "VI-04.2B.2 ASUS: preserve correct 1-face front/side/side count; answer visible action/posture when supported, avoid invented 'center'; 2 visible people, detector OFF, timeout; request VI-04.2A sameJpeg log per turn",
   "promotion_policy": "Change NEXT only after review/CI/owner QA; promote to protected production only with separate explicit owner approval and rollback evidence",
   "qa_observations_20261114": [
     {
@@ -113,6 +119,20 @@
       "evidence": "user-supplied transcript 17:36:07 local",
       "observation": "With two people stationary, Qwen described two people, positions and clothing; owner judged description accurate",
       "scope": "one owner-approved scene; does not prove general accuracy"
+    }
+  ],
+  "qa_observations_20261115": [
+    {
+      "module": "VI-04.2B.1",
+      "source": "owner conversation diagnostic",
+      "observation": "Three consecutive answers reported 1 visible face during owner shift front/side/side instead of previous false 3 people; owner accepted count",
+      "scope": "transcript only, no VI-04.2A sameJpeg telemetry provided"
+    },
+    {
+      "module": "VI-04.2B.2",
+      "source": "developer QA plan",
+      "observation": "Owner-approved count must not regress; improve action and spatial naturalness without altering CPU evidence pipeline",
+      "scope": "experimental guidance; not physical acceptance"
     }
   ]
 }
