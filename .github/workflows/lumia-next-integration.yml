@@ -14,6 +14,7 @@ on:
       - 'src/lib/vision-same-frame-vi042a.ts'
       - 'src/lib/vision-count-grounding-vi042b.ts'
       - 'scripts/certify-lumia-vision042b-count-grounding.ts'
+      - 'scripts/certify-lumia-vision042b2-natural-scene.ts'
       - 'src/lib/vision-face-worker-vi04.ts'
       - 'scripts/certify-lumia-vision042a-same-frame.ts'
       - 'src/lib/vision-active-vi031.ts'
@@ -46,6 +47,7 @@ jobs:
       - run: npx tsx scripts/certify-lumia-vision041-audit.ts
       - run: npx tsx scripts/certify-lumia-vision042a-same-frame.ts
       - run: npx tsx scripts/certify-lumia-vision042b-count-grounding.ts
+      - run: npx tsx scripts/certify-lumia-vision042b2-natural-scene.ts
       - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
       - run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
       - run: npx tsx scripts/certify-lumia-vision032-sentinel-cpu.ts

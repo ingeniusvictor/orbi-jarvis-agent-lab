@@ -38,6 +38,18 @@ export function groundedFreshScenePrompt(
     'No fuerces un número: si el conteo es ambiguo, explica el límite con brevedad. '+
     'Describe posiciones, vestimenta y texto de prendas solo si se ven con claridad; '+
     'no inventes nombres de marcas, palabras impresas ni detalles que no puedes leer. '+
+    // VI-04.2B.2: keep the already-approved face evidence/count guidance
+    // unchanged. Improve wording, observable actions and current position only.
+    'Responde primero cuántas personas puedes distinguir con fundamento visual; '+
+    'si solo se aprecia un rostro y no el cuerpo, informa el rostro visible sin inventar más personas. '+
+    'Después responde qué están haciendo SOLO si la postura o actividad se ve en este fotograma: '+
+    'por ejemplo sentado, de pie, mirando la cámara o sosteniendo algo, cuando sea comprobable. '+
+    'Un rostro aislado no demuestra si la persona está sentada, caminando, hablando o moviéndose. '+
+    'Si no puedes determinar la acción, di brevemente que no se distingue qué hace. '+
+    'Usa izquierda, centro, derecha, delante o detrás únicamente si corresponden a la imagen ACTUAL; '+
+    'no supongas que está al centro ni recuerdes posiciones anteriores. '+
+    'Contesta en una o dos frases naturales y claras. Evita explicaciones repetitivas como '+
+    '"certeza absoluta", "no puedo contar más" o "no hay otros objetos", salvo si son esenciales. '+
     caution+groundedFaceCountHint(evidence)+
     'Pregunta del usuario: '+question.trim()
 }
