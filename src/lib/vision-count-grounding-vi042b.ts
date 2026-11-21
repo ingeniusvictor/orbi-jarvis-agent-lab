@@ -8,6 +8,28 @@
  */
 import type {SameFrameFaceEvidence} from './vision-same-frame-vi042a'
 
+// VI-04.2B.3: protect owner-validated person counting while allowing body
+// questions to use the same broader visual capability as "Analizar ahora".
+// Classification reads ONLY the explicit user question (never a JPEG).
+const normalizeFocusQuestion=(value:string):string=>String(value??'')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ')
+  .replace(/\s+/g,' ').trim()
+
+export type VisualQuestionFocus='people-count'|'body-posture'|'general'
+
+export function classifyVisualQuestionFocus(question:string):VisualQuestionFocus{
+  const q=normalizeFocusQuestion(question)
+  // Explicit person-count requests always retain the already-tested B.1/B.2
+  // same-JPEG CPU evidence, even if the question also mentions actions.
+  if(/\b(?:cuant[oa]s?|numero de|cantidad de|total de)\s+(?:personas?|gente|rostros?|caras?|figuras?\s+humanas?)\b/.test(q)||
+    /\b(?:cuenta|contar|cuentas)\s+(?:(?:las|los)\s+)?(?:personas?|rostros?|caras?)\b/.test(q))
+    return 'people-count'
+  if(/\b(?:brazos?|manos?|dedos?|hombros?|torso|cuerpo|piernas?|rodillas?|postura|pose|gesto|gestos|levantad[oa]s?|sentad[oa]s?|agachad[oa]s?|sosteniendo|sostengo)\b/.test(q))
+    return 'body-posture'
+  return 'general'
+}
+
 export function groundedFaceCountHint(evidence:SameFrameFaceEvidence|undefined|null):string{
   if(!evidence || evidence.status!=='matched' || !evidence.sameJpeg ||
     evidence.faceCount===null || !Number.isInteger(evidence.faceCount) ||
@@ -31,6 +53,22 @@ export function groundedFreshScenePrompt(
   const caution=correction
     ? 'El usuario cuestionó una descripción anterior: reconsidera la imagen actual sin adoptar su afirmación como evidencia. '
     : ''
+  // A/B ASUS 2026-11-21: Qwen 2B saw the raised arm via "Analizar ahora",
+  // but answered "1 rostro" on the general chat. For explicit arm/torso
+  // questions, suppress face-count priming, NOT the same-JPEG CPU audit.
+  // The count/general branches below retain the accepted prompt byte-for-byte.
+  if(classifyVisualQuestionFocus(question)==='body-posture'){
+    return 'Observa solamente el JPEG NUEVO adjunto y examina TODO el encuadre, no solo el rostro. '+
+      'La pregunta trata de cuerpo o postura: revisa cabeza, hombros, torso, brazos y manos, '+
+      'pero describe únicamente las partes que realmente aparecen. '+
+      'Si se pregunta si hay un brazo levantado, responde sí, no o no se distingue según la imagen; '+
+      'no des por supuesto que lo hay ni que no lo hay. '+
+      'Si se ve, explica brevemente la posición; no confundas una foto inmóvil con evidencia de movimiento. '+
+      'No conviertas el número de rostros detectados en respuesta a una pregunta sobre brazos o cuerpo. '+
+      'No inventes objetos, posiciones, prendas ni acciones. '+
+      'Responde directamente en una o dos frases naturales; si algo no se ve, indica solo esa limitación. '+
+      caution+'Pregunta del usuario: '+question.trim()
+  }
   return 'Observa solo el JPEG NUEVO adjunto, no recuerdos de otra imagen. '+
     'Es un único instante, no un vídeo: no deduzcas movimientos ni acumules posiciones anteriores de alguien. '+
     'Cuenta únicamente figuras humanas que se distingan individualmente por evidencia visible en ESTE encuadre. '+

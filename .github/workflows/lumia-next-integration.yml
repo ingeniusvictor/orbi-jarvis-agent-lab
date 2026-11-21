@@ -15,6 +15,7 @@ on:
       - 'src/lib/vision-count-grounding-vi042b.ts'
       - 'scripts/certify-lumia-vision042b-count-grounding.ts'
       - 'scripts/certify-lumia-vision042b2-natural-scene.ts'
+      - 'scripts/certify-lumia-vision042b3-body-focus.ts'
       - 'src/lib/vision-face-worker-vi04.ts'
       - 'scripts/certify-lumia-vision042a-same-frame.ts'
       - 'src/lib/vision-active-vi031.ts'
@@ -38,7 +39,10 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci
+      # CI runners have no CUDA GPU. onnxruntime-node upstream v1.21.0
+      # CUDA tarball returned 404 on Ubuntu, so follow installer-advertised
+      # no-CUDA path ONLY here. ASUS / original runtime remain untouched.
+      - run: npm ci --onnxruntime-node-install-cuda=skip
       - run: node scripts/certify-lumia-next-integration.mjs
       - run: node scripts/certify-lumia-vision040a-wasm-route.mjs
       - run: npx tsx scripts/certify-lumia-vq04-natural-face.ts
@@ -48,6 +52,7 @@ jobs:
       - run: npx tsx scripts/certify-lumia-vision042a-same-frame.ts
       - run: npx tsx scripts/certify-lumia-vision042b-count-grounding.ts
       - run: npx tsx scripts/certify-lumia-vision042b2-natural-scene.ts
+      - run: npx tsx scripts/certify-lumia-vision042b3-body-focus.ts
       - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
       - run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
       - run: npx tsx scripts/certify-lumia-vision032-sentinel-cpu.ts

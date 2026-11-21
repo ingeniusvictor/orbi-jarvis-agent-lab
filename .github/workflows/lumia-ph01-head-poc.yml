@@ -18,8 +18,9 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Locked dependencies
-        run: npm ci
+      - name: Locked dependencies (CI CPU: upstream CUDA asset unavailable)
+        # GitHub Ubuntu runners have no CUDA GPU; do NOT change ASUS runtime.
+        run: npm ci --onnxruntime-node-install-cuda=skip
       - name: Compile portal
         run: npm run build
       - name: Lint certificado RC-03 + integracion PH-01
