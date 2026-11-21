@@ -39,7 +39,10 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci
+      # CI runners have no CUDA GPU. onnxruntime-node upstream v1.21.0
+      # CUDA tarball returned 404 on Ubuntu, so follow installer-advertised
+      # no-CUDA path ONLY here. ASUS / original runtime remain untouched.
+      - run: npm ci --onnxruntime-node-install-cuda=skip
       - run: node scripts/certify-lumia-next-integration.mjs
       - run: node scripts/certify-lumia-vision040a-wasm-route.mjs
       - run: npx tsx scripts/certify-lumia-vq04-natural-face.ts
