@@ -19,7 +19,8 @@
     "tts": "original local Kokoro",
     "camera_auto_open": false,
     "facial_identity_enabled": false,
-    "vision_same_jpeg_pilot": "NEXT only, VITE_LUMIA_VISION_SAME_FRAME_VI042A=1"
+    "vision_same_jpeg_pilot": "NEXT only, VITE_LUMIA_VISION_SAME_FRAME_VI042A=1",
+    "vision_pose_vi05a": "Experimental NEXT only. VITE_LUMIA_VISION_POSE_VI05A=1; separate opt-in button, local pinned model with verified SHA256, no automatic camera or Qwen"
   },
   "carried_forward": [
     {
@@ -78,6 +79,12 @@
       "capability": "body/arm/torso intent routed to concise unbiased full-frame prompt, while explicit people-count requests retain B.1 face-count evidence",
       "qa": "A/B ASUS 2026-11-21 showed generic analysis recognized raised arm but facial chat did not; candidate change CI and physical QA pending; no model/worker changes",
       "source_issue": 87
+    },
+    {
+      "module": "VI-05A",
+      "capability": "Explicit opt-in, independent CPU PoseLandmarker Lite worker on authorized camera; 2.5 s cadence; raised/down/unclear arms; two-sample confirmation; no Qwen automation, identities or image persistence",
+      "qa": "Static+unit CI pending; physical ASUS QA pending; local task model installed separately and verified SHA256",
+      "source_issue": 80
     }
   ],
   "excluded_from_production": [
@@ -85,9 +92,10 @@
     "unvalidated vision model auto-switch to 4B",
     "automatic camera activation",
     "CPU thread tuning or reinstallation of original Kokoro",
-    "automatic merge to main/ASUS"
+    "automatic merge to main/ASUS",
+    "VI-05A live pose until CPU/accuracy/privacy QA on ASUS and separate owner approval"
   ],
-  "next_gate": "VI-04.2B.3 ASUS: with arm visibly raised compare chat vs Analizar ahora, repeat with arm down; verify count-person request still counts 1/2 and vi042a sameJpeg matched; collect bridge timing if 29s first-text recurs",
+  "next_gate": "VI-05A ASUS physical QA: install pinned pose_landmarker_lite.task ONLY in NEXT; enable camera and new 'Activar postura CPU' button; raise one arm / lower / occlude wrist / stop vision; measure CPU inference and keep existing VI-04.2B.3 exact-JPEG 1-vs-2 face tests unmodified",
   "promotion_policy": "Change NEXT only after review/CI/owner QA; promote to protected production only with separate explicit owner approval and rollback evidence",
   "qa_observations_20261114": [
     {
@@ -159,6 +167,12 @@
       "evidence": "code proposal",
       "observation": "Selective arm/body focus bypasses face-count priming and retains the exact approved people-count prompt",
       "scope": "CI and actual ASUS QA required"
+    },
+    {
+      "module": "VI-04.2B.3",
+      "evidence": "owner F12 20:43 and 20:45",
+      "observation": "Exact-JPEG CPU faceCount 2 then 1, status matched, sameJpeg true and Qwen responses count 2 then 1; actual 768x432 stills and active camera",
+      "scope": "face count in prompt is advisory not independent people count; arm/torso detection physical QA positive earlier; model latency first text 11.30s then 5.71s"
     }
   ]
 }
