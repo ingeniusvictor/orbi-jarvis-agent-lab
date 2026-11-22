@@ -30,6 +30,8 @@ rem No extra camera access, no identity, no automatic LLM retakes.
 set "VITE_LUMIA_VISION_SAME_FRAME_VI042A=1"
 rem VI-04.2B pilot: prompt calibration only, no forced person count.
 set "VITE_LUMIA_VISION_COUNT_GROUNDING_VI042B=1"
+rem VI-05A experimental body sentinel: manual switch, CPU-only, no Qwen loop.
+set "VITE_LUMIA_VISION_POSE_VI05A=1"
 
 echo.
 echo ===============================================================

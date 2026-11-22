@@ -16,6 +16,11 @@ on:
       - 'scripts/certify-lumia-vision042b-count-grounding.ts'
       - 'scripts/certify-lumia-vision042b2-natural-scene.ts'
       - 'scripts/certify-lumia-vision042b3-body-focus.ts'
+      - 'scripts/certify-lumia-vision05a-pose.ts'
+      - 'scripts/instalar-modelo-pose-vi05.ps1'
+      - 'src/lib/vision-pose-vi05.ts'
+      - 'src/lib/vision-pose-worker-vi05.ts'
+      - '.gitignore'
       - 'src/lib/vision-face-worker-vi04.ts'
       - 'scripts/certify-lumia-vision042a-same-frame.ts'
       - 'src/lib/vision-active-vi031.ts'
@@ -53,6 +58,7 @@ jobs:
       - run: npx tsx scripts/certify-lumia-vision042b-count-grounding.ts
       - run: npx tsx scripts/certify-lumia-vision042b2-natural-scene.ts
       - run: npx tsx scripts/certify-lumia-vision042b3-body-focus.ts
+      - run: npx tsx scripts/certify-lumia-vision05a-pose.ts
       - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
       - run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
       - run: npx tsx scripts/certify-lumia-vision032-sentinel-cpu.ts

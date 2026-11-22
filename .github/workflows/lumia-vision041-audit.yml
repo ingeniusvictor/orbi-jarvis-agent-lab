@@ -26,7 +26,9 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci
+      # CI Ubuntu has no CUDA GPU; upstream ONNX Runtime GPU archive returned 404.
+      # Skips CUDA artifact download only in Actions (never in local ASUS).
+      - run: npm ci --onnxruntime-node-install-cuda=skip
       - run: node scripts/certify-lumia-private-avatar-assets-vi041.mjs
       - run: npx tsx scripts/certify-lumia-vision041-audit.ts
       - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
