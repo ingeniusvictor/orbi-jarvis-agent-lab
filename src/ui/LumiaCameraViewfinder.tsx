@@ -20,6 +20,11 @@ import {OpticalSentinel,SENTINEL_WIDTH,SENTINEL_HEIGHT,SENTINEL_INTERVAL_MS,toSe
 import {FaceCountGate,FACE_DETECTOR_INTERVAL_MS,FACE_DETECTOR_MAX_WIDTH,FACE_DETECTOR_MAX_HEIGHT,type FaceBox} from '../lib/vision-faces-vi04'
 import type {VisionFaceSample} from '../lib/vision-audit-vi041'
 import {makeSameFrameFaceEvidence,SAME_FRAME_AUDIT_TIMEOUT_MS,type SameFrameFaceEvidence} from '../lib/vision-same-frame-vi042a'
+import {BodyPoseGate,POSE_VI05_INTERVAL_MS,POSE_VI05_MAX_WIDTH,POSE_VI05_MAX_HEIGHT,
+  POSE_VI05_RESPONSE_TIMEOUT_MS,type BodyPoseSummary} from '../lib/vision-pose-vi05'
+
+// Pilot is explicit NEXT-only, and also requires pressing a separate control.
+const VI05A_POSE_AVAILABLE=import.meta.env.VITE_LUMIA_VISION_POSE_VI05A==='1'
 
 type Props={
   live:boolean
@@ -105,6 +110,10 @@ export function LumiaCameraViewfinder({
   const [faceCount,setFaceCount]=useState<number|null>(null)
   const [faceLatency,setFaceLatency]=useState<number|null>(null)
   const [faceVideoSize,setFaceVideoSize]=useState({width:1280,height:720})
+  const [poseEnabled,setPoseEnabled]=useState(false)
+  const [poseStatus,setPoseStatus]=useState<'off'|'loading'|'ready'|'error'>('off')
+  const [poseSummary,setPoseSummary]=useState<BodyPoseSummary|null>(null)
+  const [poseError,setPoseError]=useState('')
   const [ready,setReady]=useState(false)
   const [error,setError]=useState('')
   const [devices,setDevices]=useState<Array<{deviceId:string;label:string}>>([])
@@ -131,6 +140,10 @@ export function LumiaCameraViewfinder({
     faceGateRef.current.reset()
     setFaceBoxes([])
     setFaceCount(null)
+    setPoseEnabled(false)
+    setPoseStatus('off')
+    setPoseSummary(null)
+    setPoseError('')
     const wasActive=activeRef.current
     activeRef.current=false
     if(wasActive){onActiveRef.current(false);setVisionActive(false)}
@@ -428,6 +441,98 @@ export function LumiaCameraViewfinder({
     }
   },[faceDetectorAvailable,faceEnabled,live,visionActive,ready])
 
+  // VI-05A: separate, opt-in CPU worker. Lower rate than the face worker;
+  // reads ONLY the same already-authorized webcam, never the LLM pipeline.
+  useEffect(()=>{
+    if(!VI05A_POSE_AVAILABLE||!poseEnabled||!live||!visionActive||!ready)return
+    let cancelled=false
+    let workerReady=false
+    let busy=false
+    let sequence=0
+    let sampleTimer:number|null=null
+    let responseTimer:number|null=null
+    const gate=new BodyPoseGate()
+    let previousLog=''
+    const worker=new Worker(new URL('../lib/vision-pose-worker-vi05.ts',import.meta.url),{type:'module'})
+    setPoseStatus('loading')
+    setPoseSummary(null)
+    setPoseError('')
+    const clearTimers=()=>{
+      if(sampleTimer!==null){window.clearInterval(sampleTimer);sampleTimer=null}
+      if(responseTimer!==null){window.clearTimeout(responseTimer);responseTimer=null}
+    }
+    const fail=(reason:string)=>{
+      if(cancelled)return
+      workerReady=false
+      busy=false
+      clearTimers()
+      gate.reset()
+      setPoseStatus('error')
+      setPoseSummary(null)
+      setPoseError(reason.slice(0,140))
+      worker.terminate()
+    }
+    const sample=async()=>{
+      if(cancelled||!workerReady||busy||document.visibilityState!=='visible')return
+      const video=videoRef.current
+      if(!activeRef.current||!video||video.readyState<2||!video.videoWidth||!video.videoHeight)return
+      busy=true
+      try{
+        const scale=Math.min(1,POSE_VI05_MAX_WIDTH/video.videoWidth,
+          POSE_VI05_MAX_HEIGHT/video.videoHeight)
+        const bitmap=await createImageBitmap(video,{
+          resizeWidth:Math.max(1,Math.round(video.videoWidth*scale)),
+          resizeHeight:Math.max(1,Math.round(video.videoHeight*scale)),
+          resizeQuality:'medium',
+        })
+        if(cancelled||!workerReady||!activeRef.current){bitmap.close();busy=false;return}
+        worker.postMessage({type:'FRAME',bitmap,timestampMs:performance.now(),sequence:++sequence},[bitmap])
+        responseTimer=window.setTimeout(()=>
+          fail('El centinela corporal tardó demasiado y se detuvo.'),POSE_VI05_RESPONSE_TIMEOUT_MS)
+      }catch{
+        busy=false
+        fail('No se pudo preparar la imagen corporal para la CPU.')
+      }
+    }
+    worker.onmessage=(event:MessageEvent<{
+      type:string;sequence?:number;pose?:BodyPoseSummary;message?:string
+    }>)=>{
+      if(cancelled)return
+      const message=event.data
+      if(message.type==='READY'){
+        workerReady=true
+        setPoseStatus('ready')
+        void sample()
+        sampleTimer=window.setInterval(()=>{void sample()},POSE_VI05_INTERVAL_MS)
+      }else if(message.type==='RESULT'){
+        if(responseTimer!==null){window.clearTimeout(responseTimer);responseTimer=null}
+        busy=false
+        if(message.sequence!==sequence||!message.pose)return
+        const stable=gate.observe(message.pose)
+        setPoseSummary(stable)
+        const fingerprint=[stable.found,stable.leftArm,stable.rightArm,stable.shouldersVisible].join(':')
+        if(fingerprint!==previousLog){
+          previousLog=fingerprint
+          console.info('[lumia:vision-vi05a]',JSON.stringify({
+            poseFound:stable.found,leftArm:stable.leftArm,rightArm:stable.rightArm,
+            shouldersVisible:stable.shouldersVisible,
+            inferenceMs:stable.inferenceMs,processor:'cpu',identity:false,
+          }))
+        }
+      }else if(message.type==='ERROR'){
+        fail(message.message??'Error del centinela corporal.')
+      }
+    }
+    worker.onerror=()=>fail('Falló el worker de postura en CPU.')
+    worker.postMessage({type:'INIT'})
+    return ()=>{
+      cancelled=true
+      clearTimers()
+      gate.reset()
+      worker.terminate()
+    }
+  },[poseEnabled,live,visionActive,ready])
+
   const close=()=>{
     endActive()
     releaseRef.current?.()
@@ -636,6 +741,36 @@ export function LumiaCameraViewfinder({
           )}
           {faceError&&<p role="alert" className="lumia-face-detector-error">{faceError}</p>}
           <small>Solo detecta rostros presentes; todavía no reconoce nombres.</small>
+        </div>
+      )}
+      {live&&VI05A_POSE_AVAILABLE&&visionActive&&(
+        <div className="lumia-face-detector-panel" role="group" aria-label="Centinela corporal experimental CPU">
+          <div className="lumia-face-detector-head">
+            <button type="button" aria-pressed={poseEnabled}
+              onClick={()=>{
+                if(poseEnabled){
+                  setPoseEnabled(false)
+                  setPoseStatus('off')
+                  setPoseSummary(null)
+                  setPoseError('')
+                }else{setPoseEnabled(true)}
+              }}>{poseEnabled?'Detener centinela corporal':'Activar postura · CPU (piloto)'}</button>
+            <span role="status">
+              {!poseEnabled?'Apagado · activar por separado'
+                :poseStatus==='loading'?'Cargando Pose Lite local…'
+                :poseStatus==='error'?'Error de modelo corporal'
+                :!poseSummary?'Analizando postura…'
+                :!poseSummary.found?'No hay postura corporal fiable'
+                :'Izquierdo: '+(poseSummary.leftArm==='raised'?'levantado':poseSummary.leftArm==='down'?'abajo':'indeterminado')+
+                  ' · Derecho: '+(poseSummary.rightArm==='raised'?'levantado':poseSummary.rightArm==='down'?'abajo':'indeterminado')}
+            </span>
+          </div>
+          {poseEnabled&&poseStatus==='ready'&&poseSummary?.inferenceMs!==null&&
+            poseSummary?.inferenceMs!==undefined&&(
+              <small>Pose Landmarker Lite CPU · {poseSummary.inferenceMs} ms · máximo 1 postura</small>
+            )}
+          {poseError&&<p role="alert" className="lumia-face-detector-error">{poseError}</p>}
+          <small>Sin identidad ni grabación · no envía poses a Qwen · se detiene al cerrar la cámara o expirar la sesión.</small>
         </div>
       )}
       <div className="lumia-camera-source">
