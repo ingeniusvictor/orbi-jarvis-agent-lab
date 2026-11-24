@@ -531,7 +531,7 @@
       "title": "RC01: actualización visual selectiva de LUMIA original ASUS",
       "area": "release",
       "implementation": "implemented_draft",
-      "ci": "pending",
+      "ci": "passed",
       "field_qa": {
         "asus-gpu4": "not_tested",
         "hp-gpu6": "not_tested",
@@ -562,9 +562,14 @@
           "date": "2026-11-24",
           "type": "code_ci",
           "detail": "Workflow específico RC01 Windows/Ubuntu aprobó sintéticos y build en run #45475964981; otras regresiones heredadas exigieron ajustes CI CPU sin CUDA y actualización de test de captura async; revalidación acumulativa pendiente."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "code_ci",
+          "detail": "RC01 final SHA 17e20366616cf55ec07d5d0d6800b159b91859c2: Windows+Ubuntu CI específico y seis regresiones heredadas aprobadas; GHA 45476809167, 45476809193, 45476810096, 45476809194, 45476809174, 45476809209 y 45476809620. Falta QA física."
         }
       ],
-      "next": "Concluir todos los workflows de PR #96, ejecutar QA física en checkout aislado ASUS de RC01 con Qwen 2B, voz y avatar, confirmar cámara 180 s y prueba de 1/2 rostros/gestos; preparar backup y rollback; solicitar autorización específica antes de actualizar LUMIA-ASUS."
+      "next": "Realizar QA física de PR #96 en LUMIA-RC01-QA aislada (1/2 rostros mismo JPEG, brazos levantados, rostro OFF, 180s, Whisper/Kokoro, avatar), evidenciar resultados, preparar copia/rollback y obtener autorización específica antes de actualizar ASUS original. HP/CPU continúan sin validación."
     }
   ]
 }
