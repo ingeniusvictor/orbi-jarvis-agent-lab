@@ -17,8 +17,11 @@ import {cameraVisionPrompt,captureLumiaAuthorizedStill,parseLumiaCameraIntent} f
 import {classifyLumiaVisualFailure,lumiaVisualFailureReply} from './lib/vision-failure-amr021'
 import {EphemeralVisualContext,VISION_CONTEXT_TTL_MS,followupVisionPrompt,visualModeInstruction,visualReliabilityInstruction,type VisionReplyMode,type VisualFrameSource} from './lib/vision-context-vi023'
 import {requiresFreshVisualObservation,frozenVisualTruthReply} from './lib/vision-temporal-vi030'
-import {isActiveVisionQuestion,asksActiveVisionChange,recentActiveVisionFrame,type ActiveVisionFrame} from './lib/vision-active-vi031'
+import {isActiveVisionQuestion,asksActiveVisionChange,recentActiveVisionFrame,type ActiveVisionFrame,type ActiveVisionCapture} from './lib/vision-active-vi031'
 import {classifyFreshCameraSpeech,freshCameraScenePrompt} from './lib/vision-voice-grounding-vi032b'
+import {auditFreshSceneAtTurn} from './lib/vision-audit-vi041'
+import {sameFrameLog} from './lib/vision-same-frame-vi042a'
+import {groundedFreshScenePrompt} from './lib/vision-count-grounding-vi042b'
 import {classifyExistingPhotoFollowup,visualDetailOfferMessage,visualReferenceClarification,calibratedVisionInstruction,isVisualReferenceAnswer,resolvedVisualReferencePrompt} from './lib/vision-context-amr025'
 import { isRealtimePilotUiEnabled } from './lib/realtime-voice'
 import { useStore } from './store'
@@ -121,6 +124,16 @@ const VISION_FRESH_VOICE_VI032B_ENABLED = import.meta.env.VITE_LUMIA_VISION_FRES
 /** VI-04A: explicit facial presence detector; not a biometric identity recognizer. */
 const VISION_FACE_DETECTOR_VI04A_ENABLED = VISION_ACTIVE_VI031_ENABLED &&
   import.meta.env.VITE_LUMIA_VISION_FACES_VI04A === '1'
+/** VI-04.1 audit: diagnostic ONLY, does not modify replies or inference. */
+const VISION_SCENE_AUDIT_VI041_ENABLED = VISION_FRESH_VOICE_VI032B_ENABLED &&
+  VISION_FACE_DETECTOR_VI04A_ENABLED &&
+  import.meta.env.VITE_LUMIA_VISION_QA_VI041 === '1'
+/** VI-04.2A experimental: CPU diagnostics on the exact user-authorized Qwen JPEG. */
+const VISION_SAME_FRAME_VI042A_ENABLED = VISION_SCENE_AUDIT_VI041_ENABLED &&
+  import.meta.env.VITE_LUMIA_VISION_SAME_FRAME_VI042A === '1'
+/** VI-04.2B pilot: optional same-JPEG facial evidence in visual prompt, NOT a hard count. */
+const VISION_COUNT_GROUNDING_VI042B_ENABLED = VISION_SAME_FRAME_VI042A_ENABLED &&
+  import.meta.env.VITE_LUMIA_VISION_COUNT_GROUNDING_VI042B === '1'
 const CAMERA_VISION_VI02_ENABLED = usingBridge &&
   import.meta.env.VITE_LUMIA_VISUAL_INPUT_VI01 === '1' &&
   import.meta.env.VITE_LUMIA_VISION_CAMERA_VI02 === '1'
@@ -179,8 +192,8 @@ export default function App() {
   const visualSession = useRef(new EphemeralVisualContext())
   const activeVisionAuthorized = useRef(false)
   const activeVisionLatest = useRef<ActiveVisionFrame|null>(null)
-  const activeVisionCapture = useRef<(()=>ActiveVisionFrame|null)|null>(null)
-  const registerActiveVisionCapture = useCallback((fn:(()=>ActiveVisionFrame|null)|null)=>{
+  const activeVisionCapture = useRef<ActiveVisionCapture|null>(null)
+  const registerActiveVisionCapture = useCallback((fn:ActiveVisionCapture|null)=>{
     activeVisionCapture.current=fn
   },[])
   const activeVisualReply = useRef<string|null>(null)
@@ -370,15 +383,24 @@ export default function App() {
       const activeVisionQuestion=VISION_ACTIVE_VI031_ENABLED &&
         activeVisionAuthorized.current && !image && !cameraRequested &&
         (freshSceneRequested || isActiveVisionQuestion(said))
-      // VI-03.2B: take the current webcam frame at the question, NOT the
-      // cached frame from 12 seconds earlier. No secondary camera lease.
+      // VI-04.2A: the authorized capture may await a bounded CPU audit of
+      // the JPEG that Qwen will receive. Mark this visual turn now so closing
+      // the camera cancels it during that await, not after inference begins.
+      if(activeVisionQuestion)activeVisualReply.current=turnId
+      // VI-03.2B: a NEW JPEG at the question; no second camera lease.
       const rawLiveFrame=activeVisionQuestion
         ? VISION_FRESH_VOICE_VI032B_ENABLED
-          ? activeVisionCapture.current?.() ?? null
+          ? await activeVisionCapture.current?.() ?? null
           : activeVisionLatest.current
         : null
-      const liveFrame=activeVisionQuestion
+      if(stale())return
+      const liveFrame=activeVisionQuestion && activeVisionAuthorized.current
         ? recentActiveVisionFrame(true,rawLiveFrame) : null
+      if(VISION_SAME_FRAME_VI042A_ENABLED && liveFrame?.sameFrameFace){
+        // Evidence only: face count is NOT person count, never sent to Qwen.
+        console.info('[lumia:vision-vi042a]',JSON.stringify(
+          sameFrameLog(liveFrame.sameFrameFace,Date.now()-liveFrame.capturedAt)))
+      }
       const activeFrameMissing=(activeVisionQuestion || freshSceneRequested) && !liveFrame
       if(VISION_FRESH_VOICE_VI032B_ENABLED && (freshSceneRequested || activeVisionQuestion)){
         console.info('[lumia:vision-vi032b]',JSON.stringify({
@@ -388,6 +410,18 @@ export default function App() {
           attachedJPEG:Boolean(liveFrame),
           visionActive:activeVisionAuthorized.current,
         }))
+      }
+      if(VISION_SCENE_AUDIT_VI041_ENABLED && (freshSceneRequested || activeVisionQuestion)){
+        // Coarse metadata from the SAME owner-authorized camera stream;
+        // face count is not people count or personal identification.
+        const audit=auditFreshSceneAtTurn({
+          cameraAuthorized:activeVisionAuthorized.current,
+          capturedAt:liveFrame?.capturedAt??null,
+          detectorEnabled:rawLiveFrame?.faceAuditEnabled??false,
+          faceSample:rawLiveFrame?.faceAudit??null,
+          now:Date.now(),
+        })
+        console.info('[lumia:vision-vi041]',JSON.stringify(audit))
       }
       const pendingReference=pendingReferenceQuestion.current
       const resolvingReference=Boolean(VISION_CONTEXT_AMR025_ENABLED && pendingReference &&
@@ -562,7 +596,9 @@ export default function App() {
             (visionTracingEnabled()?visualPrecisionInstruction(visualQuestion):'')
           : visualImage
           ? (liveFrame && VISION_FRESH_VOICE_VI032B_ENABLED
-              ? cameraVisionPrompt(freshCameraScenePrompt(said,voiceIntent==='visual-correction'))
+              ? cameraVisionPrompt(VISION_COUNT_GROUNDING_VI042B_ENABLED
+                ? groundedFreshScenePrompt(said,voiceIntent==='visual-correction',liveFrame.sameFrameFace)
+                : freshCameraScenePrompt(said,voiceIntent==='visual-correction'))
               : cameraIntent || cameraRequested || fromCameraPreview || liveFrame
               ? cameraVisionPrompt(cameraIntent?.question ?? said) : said) +
               (liveFrame ? ' Es un único fotograma actual, no vídeo. No atribuyas movimiento ni cambios entre instantes sin comparar dos imágenes. ' : '') +
@@ -1851,6 +1887,8 @@ export default function App() {
           visionActiveAvailable={VISION_ACTIVE_VI031_ENABLED}
           sentinelAvailable={VISION_SENTINEL_VI032_ENABLED}
           faceDetectorAvailable={VISION_FACE_DETECTOR_VI04A_ENABLED}
+          auditEnabled={VISION_SCENE_AUDIT_VI041_ENABLED}
+          sameFrameEnabled={VISION_SAME_FRAME_VI042A_ENABLED}
           onActiveVisionChange={changeActiveVision}
           onActiveVisionFrame={receiveActiveVisionFrame}
           onRegisterActiveCapture={registerActiveVisionCapture}

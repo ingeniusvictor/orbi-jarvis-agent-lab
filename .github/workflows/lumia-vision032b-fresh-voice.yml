@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci
+      - run: npm ci --onnxruntime-node-install-cuda=skip
       # VI-04A stacked feature: enforce face-count regression on the proven voice pipeline.
       - run: npx tsx scripts/certify-lumia-vision040a-faces.ts
       - run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts

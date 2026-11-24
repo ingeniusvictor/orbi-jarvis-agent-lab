@@ -34,7 +34,12 @@ function vendorWasm() {
   const from = 'node_modules/@mediapipe/tasks-vision/wasm'
   const to = 'public/mediapipe'
   if (!existsSync(from)) return // gesture control is optional; carry on without it
-  if (existsSync(`${to}/vision_wasm_internal.wasm`)) return
+  // A previous run may have copied only the classic WASM runtime. VI-04A
+  // runs in a module worker and needs the matching ES-module JS + WASM pair.
+  // Recopy the pinned package assets locally if either variant is missing.
+  if (existsSync(`${to}/vision_wasm_internal.wasm`) &&
+      existsSync(`${to}/vision_wasm_module_internal.js`) &&
+      existsSync(`${to}/vision_wasm_module_internal.wasm`)) return
   try {
     mkdirSync(to, { recursive: true })
     cpSync(from, to, { recursive: true })

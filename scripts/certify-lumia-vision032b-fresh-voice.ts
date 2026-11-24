@@ -14,6 +14,26 @@ for (const q of [
 ]) {
   assert.equal(classifyFreshCameraSpeech(q),'fresh-scene','fresh: '+q)
 }
+// Real ASUS QA 14-11-2026: the general text composer and voice both call
+// respond(). Explicit scene commands must capture the authorized current JPEG.
+for (const q of [
+  'Lumi, observa lo que tienes delante y dime cuántas personas ves y qué están haciendo.',
+  'Lumi, observa lo que tienes delante.',
+  'Lumi, mira lo que tienes delante y dime qué aparece.',
+  'Lumia, describe la escena actual.',
+  'Lumi, analiza lo que ves en la cámara.',
+]) {
+  assert.equal(classifyFreshCameraSpeech(q),'fresh-scene','typed visual intent: '+q)
+}
+for (const q of [
+  'Lumi, observa cómo funciona el proyecto.',
+  'Lumi, observa lo que tienes delante en GitHub.',
+  'Lumi, dime cuántas personas viven en Chile.',
+  'Lumi, analiza la foto anterior.',
+]) {
+  assert.equal(classifyFreshCameraSpeech(q),'none','no implicit webcam: '+q)
+}
+
 for (const q of [
   'Lumi, está, está es mi hijo el frente de la imagen, ¿por qué no logras verlo?',
   'Y me revisar nuevamente, porque la cámara está viendo a mí y a mi hijo.',
@@ -47,15 +67,19 @@ const launcher=read('INICIAR_LUMIA_ASUS_VISION_REVISAR_VI032B.cmd')
 assert.match(launcher,/VITE_LUMIA_VISION_FRESH_VOICE_VI032B=1/)
 assert.match(launcher,/INICIAR_LUMIA_ASUS_SENTINEL_CPU_2B_VI032\.cmd/)
 assert.match(ui,/onRegisterActiveCapture/)
-assert.match(ui,/captureForVoiceRef\.current=\(\)=>/)
+assert.match(ui,/captureForVoiceRef\.current=(?:async)?\(\)=>/)
 assert.match(ui,/if\(!activeRef\.current\)return null/)
 assert.match(ui,/const image=takeActiveFrame\(\)/)
 assert.match(ui,/onRegisterActiveCapture\(null\)/)
 assert.match(app,/VISION_FRESH_VOICE_VI032B_ENABLED/)
 assert.match(app,/classifyFreshCameraSpeech\(said\)/)
+assert.ok(app.includes('const submitWritten = (text: string, image?: LocalVisualImage)'))
+assert.ok(app.includes('void respond(text, image)'))
+assert.ok(app.includes('(freshSceneRequested || isActiveVisionQuestion(said))'))
+
 assert.match(app,/activeVisionCapture\.current\?\.\(\)/)
 assert.match(app,/recentActiveVisionFrame\(true,rawLiveFrame\)/)
-assert.match(app,/freshSceneRequested/)
+assert.ok(app.includes('(freshSceneRequested || isActiveVisionQuestion(said))'))
 assert.match(app,/!freshSceneRequested && !image && !cameraRequested/)
 assert.match(app,/attachedJPEG:Boolean\(liveFrame\)/)
 assert.match(app,/frameAgeMs:liveFrame/)

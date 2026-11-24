@@ -15,9 +15,11 @@ import {prepareVisualCameraFrame,prepareVisualImage,VISION_RESOLUTION_CHOICES,ty
 import {inspectCameraSignal,connectedOrVirtualCameraHint} from '../lib/vision-camera-signal-vi022'
 import type {VisionReplyMode} from '../lib/vision-context-vi023'
 import {chooseVisionResolution} from '../lib/vision-routing-amr024'
-import {ACTIVE_VISION_SAMPLE_MS,ACTIVE_VISION_MAX_SESSION_MS,type ActiveVisionFrame} from '../lib/vision-active-vi031'
+import {ACTIVE_VISION_SAMPLE_MS,ACTIVE_VISION_MAX_SESSION_MS,type ActiveVisionFrame,type ActiveVisionCapture} from '../lib/vision-active-vi031'
 import {OpticalSentinel,SENTINEL_WIDTH,SENTINEL_HEIGHT,SENTINEL_INTERVAL_MS,toSentinelLuma,type SentinelZone} from '../lib/vision-sentinel-vi032'
 import {FaceCountGate,FACE_DETECTOR_INTERVAL_MS,FACE_DETECTOR_MAX_WIDTH,FACE_DETECTOR_MAX_HEIGHT,type FaceBox} from '../lib/vision-faces-vi04'
+import type {VisionFaceSample} from '../lib/vision-audit-vi041'
+import {makeSameFrameFaceEvidence,SAME_FRAME_AUDIT_TIMEOUT_MS,type SameFrameFaceEvidence} from '../lib/vision-same-frame-vi042a'
 
 type Props={
   live:boolean
@@ -28,9 +30,11 @@ type Props={
   visionActiveAvailable:boolean
   sentinelAvailable:boolean
   faceDetectorAvailable:boolean
+  auditEnabled:boolean
+  sameFrameEnabled:boolean
   onActiveVisionChange:(active:boolean)=>void
   onActiveVisionFrame:(image:LocalVisualImage,resolution:VisionResolution,at:number)=>void
-  onRegisterActiveCapture:(fn:(()=>ActiveVisionFrame|null)|null)=>void
+  onRegisterActiveCapture:(fn:ActiveVisionCapture|null)=>void
   onAnalyzeLiveFrame:(image:LocalVisualImage,resolution:VisionResolution)=>void
   onFileCaptured:(image:LocalVisualImage,originalFile:File|null,resolution:VisionResolution)=>void
   onSelectFileMode:()=>void
@@ -54,7 +58,7 @@ type Props={
 
 export function LumiaCameraViewfinder({
   live,fileMode,stillSource,still,onCaptured,onFileCaptured,onSelectFileMode,onSelectCameraMode,onClose,onReopen,
-  visionActiveAvailable,sentinelAvailable,faceDetectorAvailable,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,onRegisterActiveCapture,
+  visionActiveAvailable,sentinelAvailable,faceDetectorAvailable,auditEnabled,sameFrameEnabled,onActiveVisionChange,onActiveVisionFrame,onAnalyzeLiveFrame,onRegisterActiveCapture,
   visualContextReady,visualReplyMode,onVisualReplyModeChange,visionResolution,onVisionResolutionChange,
   visionAutoAvailable,visionAutoEnabled,onVisionAutoEnabledChange,onAskAboutStill,
   visualDetailOffer,visualDetailPurpose,visualDetailBusy,onRequestDetailedReanalysis,
@@ -82,12 +86,17 @@ export function LumiaCameraViewfinder({
   const sentinelRef=useRef(new OpticalSentinel())
   const sentinelZoneRef=useRef<SentinelZone>('center')
   const lastActiveShotRef=useRef(0)
-  const captureForVoiceRef=useRef<()=>ActiveVisionFrame|null>(()=>null)
+  const captureForVoiceRef=useRef<ActiveVisionCapture>(()=>null)
+  const sameFrameDetectorRef=useRef<((image:LocalVisualImage,captureId:string)=>Promise<SameFrameFaceEvidence>)|null>(null)
+  const cancelSameFrameRef=useRef<(()=>void)|null>(null)
+  const activeEpochRef=useRef(0)
+  const sameFrameSerialRef=useRef(0)
   const [sentinelZone,setSentinelZone]=useState<SentinelZone>('center')
   const [sentinelEvents,setSentinelEvents]=useState(0)
   const [visionActive,setVisionActive]=useState(false)
   const [visionSamples,setVisionSamples]=useState(0)
   const faceGateRef=useRef(new FaceCountGate())
+  const faceAuditRef=useRef<VisionFaceSample|null>(null)
   const faceLastLoggedRef=useRef<number|null>(null)
   const [faceEnabled,setFaceEnabled]=useState(false)
   const [faceStatus,setFaceStatus]=useState<'off'|'loading'|'ready'|'error'>('off')
@@ -110,12 +119,15 @@ export function LumiaCameraViewfinder({
   const effectiveResolution=sceneRoute.resolution
 
   const endActive=()=>{
+    activeEpochRef.current++
+    cancelSameFrameRef.current?.()
     if(sampleTimerRef.current!==null){window.clearInterval(sampleTimerRef.current);sampleTimerRef.current=null}
     if(sessionTimerRef.current!==null){window.clearTimeout(sessionTimerRef.current);sessionTimerRef.current=null}
     if(sentinelTimerRef.current!==null){window.clearInterval(sentinelTimerRef.current);sentinelTimerRef.current=null}
     sentinelRef.current.reset()
     sentinelCanvasRef.current=null
     setFaceEnabled(false)
+    faceAuditRef.current=null
     faceGateRef.current.reset()
     setFaceBoxes([])
     setFaceCount(null)
@@ -125,6 +137,8 @@ export function LumiaCameraViewfinder({
   }
   // Unmount, source change and tab suspension must not retain image sampling.
   useEffect(()=>()=>{
+    activeEpochRef.current++
+    cancelSameFrameRef.current?.()
     if(sampleTimerRef.current!==null)window.clearInterval(sampleTimerRef.current)
     if(sessionTimerRef.current!==null)window.clearTimeout(sessionTimerRef.current)
     if(sentinelTimerRef.current!==null)window.clearInterval(sentinelTimerRef.current)
@@ -245,18 +259,83 @@ export function LumiaCameraViewfinder({
     let sequence=0
     let sampleTimer:number|null=null
     let responseTimer:number|null=null
+    let auditBusy=false
+    const pendingAudit=new Map<string,{
+      finish:(value:SameFrameFaceEvidence)=>void
+      timer:number
+    }>()
     const worker=new Worker(new URL('../lib/vision-face-worker-vi04.ts',import.meta.url),{type:'module'})
     faceGateRef.current.reset()
+    faceAuditRef.current=null
     faceLastLoggedRef.current=null
     setFaceCount(null)
     setFaceBoxes([])
     setFaceError('')
     setFaceStatus('loading')
 
+    const cancelAudits=()=>{
+      for(const [captureId,request] of pendingAudit){
+        window.clearTimeout(request.timer)
+        request.finish(makeSameFrameFaceEvidence(captureId,'cancelled'))
+      }
+      pendingAudit.clear()
+      auditBusy=false
+    }
+    cancelSameFrameRef.current=cancelAudits
+
+    const auditSameJpeg=async(image:LocalVisualImage,captureId:string):Promise<SameFrameFaceEvidence>=>{
+      if(cancelled||!workerReady||auditBusy||document.visibilityState!=='visible'){
+        return makeSameFrameFaceEvidence(captureId,'detector-unavailable')
+      }
+      auditBusy=true
+      let bitmap:ImageBitmap|null=null
+      try{
+        // Decode the identical encoded JPEG attached to Qwen. The periodic
+        // video detector uses separate frames and is NOT this evidence.
+        const binary=atob(image.data)
+        const bytes=new Uint8Array(binary.length)
+        for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i)
+        const blob=new Blob([bytes],{type:'image/jpeg'})
+        bitmap=await createImageBitmap(blob)
+        if(cancelled||!workerReady||!activeRef.current||document.visibilityState!=='visible'){
+          bitmap.close()
+          auditBusy=false
+          return makeSameFrameFaceEvidence(captureId,'cancelled')
+        }
+        return await new Promise<SameFrameFaceEvidence>(resolve=>{
+          const timer=window.setTimeout(()=>{
+            pendingAudit.delete(captureId)
+            auditBusy=false
+            resolve(makeSameFrameFaceEvidence(captureId,'timeout'))
+          },SAME_FRAME_AUDIT_TIMEOUT_MS)
+          pendingAudit.set(captureId,{finish:resolve,timer})
+          try{
+            worker.postMessage({type:'AUDIT_FRAME',bitmap,timestampMs:performance.now(),captureId},[bitmap!])
+            bitmap=null // transferred: the worker closes the bitmap
+          }catch{
+            window.clearTimeout(timer)
+            pendingAudit.delete(captureId)
+            auditBusy=false
+            bitmap?.close()
+            bitmap=null
+            resolve(makeSameFrameFaceEvidence(captureId,'error'))
+          }
+        })
+      }catch{
+        bitmap?.close()
+        auditBusy=false
+        return makeSameFrameFaceEvidence(captureId,'error')
+      }
+    }
+    sameFrameDetectorRef.current=auditSameJpeg
+
     const fail=(reason:string)=>{
       if(cancelled)return
       workerReady=false
+      cancelAudits()
+      sameFrameDetectorRef.current=null
       setFaceStatus('error')
+      faceAuditRef.current=null
       setFaceError(reason.slice(0,160))
       setFaceBoxes([])
       setFaceCount(null)
@@ -265,7 +344,7 @@ export function LumiaCameraViewfinder({
       worker.terminate()
     }
     const sample=async()=>{
-      if(cancelled||!workerReady||busy||document.visibilityState!=='visible')return
+      if(cancelled||!workerReady||busy||auditBusy||document.visibilityState!=='visible')return
       const video=videoRef.current
       if(!video||video.readyState<2||video.videoWidth===0||video.videoHeight===0)return
       busy=true
@@ -288,7 +367,7 @@ export function LumiaCameraViewfinder({
       }
     }
     worker.onmessage=(event:MessageEvent<{
-      type:string;sequence?:number;faces?:FaceBox[];elapsedMs?:number;message?:string
+      type:string;sequence?:number;captureId?:string;faces?:FaceBox[];elapsedMs?:number;message?:string
     }>)=>{
       if(cancelled)return
       const msg=event.data
@@ -297,12 +376,28 @@ export function LumiaCameraViewfinder({
         setFaceStatus('ready')
         void sample()
         sampleTimer=window.setInterval(()=>{void sample()},FACE_DETECTOR_INTERVAL_MS)
+      }else if(msg.type==='AUDIT_RESULT'||msg.type==='AUDIT_ERROR'){
+        const captureId=msg.captureId
+        if(!captureId)return
+        const request=pendingAudit.get(captureId)
+        if(!request)return // expired or cancelled audit must not become evidence
+        window.clearTimeout(request.timer)
+        pendingAudit.delete(captureId)
+        auditBusy=false
+        request.finish(msg.type==='AUDIT_RESULT'&&Array.isArray(msg.faces)
+          ? makeSameFrameFaceEvidence(captureId,'matched',msg.faces.length,msg.elapsedMs??null)
+          : makeSameFrameFaceEvidence(captureId,'error'))
       }else if(msg.type==='RESULT'){
         if(responseTimer!==null){window.clearTimeout(responseTimer);responseTimer=null}
         busy=false
         if(msg.sequence!==sequence||!Array.isArray(msg.faces))return
         setFaceBoxes(msg.faces)
-        const confirmed=faceGateRef.current.observe(msg.faces.length,Date.now())
+        const now=Date.now()
+        const confirmed=faceGateRef.current.observe(msg.faces.length,now)
+        // A transitional one-off change is NOT fresh confirmation of the old
+        // stable count. Never attach that old count to a new voice frame.
+        faceAuditRef.current=(confirmed!==null && confirmed===msg.faces.length)
+          ? {count:confirmed,observedAt:now} : null
         setFaceCount(confirmed)
         setFaceLatency(Number.isFinite(msg.elapsedMs)?Math.round(msg.elapsedMs!):null)
         if(confirmed!==null && confirmed!==faceLastLoggedRef.current){
@@ -322,10 +417,14 @@ export function LumiaCameraViewfinder({
     worker.postMessage({type:'INIT'})
     return ()=>{
       cancelled=true
+      cancelAudits()
+      if(sameFrameDetectorRef.current===auditSameJpeg)sameFrameDetectorRef.current=null
+      if(cancelSameFrameRef.current===cancelAudits)cancelSameFrameRef.current=null
       if(sampleTimer!==null)window.clearInterval(sampleTimer)
       if(responseTimer!==null)window.clearTimeout(responseTimer)
       worker.terminate()
       faceGateRef.current.reset()
+      faceAuditRef.current=null
     }
   },[faceDetectorAvailable,faceEnabled,live,visionActive,ready])
 
@@ -398,10 +497,30 @@ export function LumiaCameraViewfinder({
   }
   // A user voice request captures the *current* shared webcam frame. No
   // second getUserMedia and no reused 12-second snapshot presented as current.
-  captureForVoiceRef.current=()=>{
+  captureForVoiceRef.current=async()=>{
     if(!activeRef.current)return null
+    const epoch=activeEpochRef.current
     const image=takeActiveFrame()
-    return image ? {image,resolution:effectiveResolution,capturedAt:lastActiveShotRef.current} : null
+    if(!image)return null
+    const capturedAt=lastActiveShotRef.current
+    const frame:ActiveVisionFrame={
+      image,resolution:effectiveResolution,capturedAt,
+      faceAuditEnabled:auditEnabled && faceEnabled,
+      faceAudit:auditEnabled && faceEnabled && faceStatus==='ready'
+        ? faceAuditRef.current : null,
+    }
+    if(!sameFrameEnabled)return frame
+    const captureId=image.trace?.photoId??`vi042a-${++sameFrameSerialRef.current}`
+    const sameFrameFace=!(auditEnabled && faceEnabled)
+      ? makeSameFrameFaceEvidence(captureId,'detector-off')
+      : faceStatus!=='ready'||!sameFrameDetectorRef.current
+        ? makeSameFrameFaceEvidence(captureId,'detector-unavailable')
+        : await sameFrameDetectorRef.current(image,captureId)
+    // The owner may have closed the viewfinder, changed cameras, or reached
+    // the 180-second expiry while the CPU was processing. Never send then.
+    if(epoch!==activeEpochRef.current||!activeRef.current||
+      document.visibilityState!=='visible')return null
+    return {...frame,sameFrameFace}
   }
   useEffect(()=>{
     onRegisterActiveCapture(()=>captureForVoiceRef.current())

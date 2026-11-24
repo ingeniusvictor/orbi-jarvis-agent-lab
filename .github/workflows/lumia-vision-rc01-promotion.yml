@@ -1,0 +1,52 @@
+name: LUMIA - RC01 original vision update candidate
+on:
+  pull_request:
+    paths:
+      - 'src/App.tsx'
+      - 'src/ui/LumiaCameraViewfinder.tsx'
+      - 'src/lib/vision-active-vi031.ts'
+      - 'src/lib/vision-face-worker-vi04.ts'
+      - 'src/lib/vision-voice-grounding-vi032b.ts'
+      - 'src/lib/vision-audit-vi041.ts'
+      - 'src/lib/vision-same-frame-vi042a.ts'
+      - 'src/lib/vision-count-grounding-vi042b.ts'
+      - 'vite.config.ts'
+      - 'scripts/start.mjs'
+      - 'INICIAR_LUMIA_VISION_RC01_ASUS.cmd'
+      - 'scripts/certify-lumia-vision-update-rc01.ts'
+      - 'scripts/certify-lumia-vision032b-fresh-voice.ts'
+      - 'scripts/lumia-private-avatar-assets-rc01.mjs'
+      - 'scripts/certify-lumia-private-assets-rc01.mjs'
+      - '.github/workflows/lumia-vision-rc01-promotion.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Dependencies (CI without CUDA)
+        run: npm ci --onnxruntime-node-install-cuda=skip
+      - name: Scope and behavior
+        run: npx tsx scripts/certify-lumia-vision-update-rc01.ts
+      - name: RC01 private assets copy and rollback safeguards
+        run: node scripts/certify-lumia-private-assets-rc01.mjs
+      - name: Fresh visual voice and typed scene regressions
+        run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
+      - name: MediapPipe ESM WASM route
+        run: node scripts/certify-lumia-vision040a-wasm-route.mjs
+      - name: Existing facial regression
+        run: npx tsx scripts/certify-lumia-vision040a-faces.ts
+      - name: Build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
