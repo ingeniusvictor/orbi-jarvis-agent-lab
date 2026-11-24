@@ -567,9 +567,14 @@
           "date": "2026-11-24",
           "type": "code_ci",
           "detail": "RC01 final SHA 17e20366616cf55ec07d5d0d6800b159b91859c2: Windows+Ubuntu CI específico y seis regresiones heredadas aprobadas; GHA 45476809167, 45476809193, 45476810096, 45476809194, 45476809174, 45476809209 y 45476809620. Falta QA física."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_report",
+          "detail": "RC01 QA ASUS checkout: safe fast-forward 17e2036→d88fd09, 18/18 private VRM+FBX files copied and SHA256 verified, synthetic 18-file copier PASS, require PASS, original_modified:false. Launcher command invoked but no Vite/frontend boot evidence in pasted transcript."
         }
       ],
-      "next": "Realizar QA física de PR #96 en LUMIA-RC01-QA aislada (1/2 rostros mismo JPEG, brazos levantados, rostro OFF, 180s, Whisper/Kokoro, avatar), evidenciar resultados, preparar copia/rollback y obtener autorización específica antes de actualizar ASUS original. HP/CPU continúan sin validación."
+      "next": "Check actual RC01 launcher console Vite/bridge port 5173/8787 and URL with no concurrent NEXT; then run live ASUS QA for same JPEG 1/2 faces, arm/torso response, voice+avatar, 180s session expiry, backup/rollback before separate owner-approved promotion."
     }
   ]
 }
