@@ -1,4 +1,4 @@
-# LUMIA UNIFICADA — arquitectura única, tres entornos de ejecución
+> **TRANSICIÓN A ACTUALIZACIONES INCREMENTALES:** leer [Documento 43 — retirada del nombre NEXT como rama de producto](43-TRANSICION-NEXT-A-ACTUALIZACIONES-20261124.md). «NEXT» representa una fase de QA; el producto tendrá una sola rama estable de versiones con mejoras incorporadas y rollback, después del primer corte explícitamente autorizado.\n\n# LUMIA UNIFICADA — arquitectura única, tres entornos de ejecución
 **Decisión de arquitectura del propietario · 24 de noviembre de 2026 (Chile)**  
 **Estado:** norma de desarrollo y documentación aprobada como objetivo; implementación y QA completa multi-equipo pendientes.  
 **Lección principal:** no volver a perder mejoras porque cada avance quedó en una rama o computador diferente.
