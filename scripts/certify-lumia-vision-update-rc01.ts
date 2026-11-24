@@ -30,7 +30,7 @@ assert.doesNotMatch(body,/se detectaron 1 rostro visible/)
 const people=groundedFreshScenePrompt('¿Cuántas personas ves?',false,e)
 assert.match(people,/se detectaron 1 rostro visible/)
 assert.match(people,/no confirma el total de personas/)
-assert.match(people,/no supongas personas al fondo/)
+assert.match(people,/no supongas personas al fondo/i)
 const raw=auditFreshSceneAtTurn({
  cameraAuthorized:true,capturedAt:1000,detectorEnabled:true,
  faceSample:{count:1,observedAt:995},now:1005,
