@@ -1,0 +1,625 @@
+{
+  "schema_version": 1,
+  "title": "LUMIA — registro auditable de mejoras y pruebas",
+  "updated_at": "2026-11-24",
+  "purpose": "La continuidad del proyecto depende de este registro y los PRs enlazados, no de la memoria de un chat.",
+  "source_of_truth": "docs/lumia-convergence/42-LUMIA-CONTROL-MEJORAS-20261124.md",
+  "repo": "ingeniusvictor/orbi-jarvis-agent-lab",
+  "profiles": [
+    "asus-gpu4",
+    "hp-gpu6",
+    "cpu-only"
+  ],
+  "lifecycle": {
+    "implementation": [
+      "idea",
+      "specified",
+      "implemented_draft",
+      "released"
+    ],
+    "ci": [
+      "not_applicable",
+      "pending",
+      "passed",
+      "failed"
+    ],
+    "field_qa": [
+      "not_tested",
+      "partial",
+      "passed",
+      "failed"
+    ],
+    "release_gate": "A feature that the owner accepts in physical QA must be prepared promptly for a scoped update of the ORIGINAL LUMIA. Release requires CI passed, approved bounded code diff, same Git SHA, backup/rollback, explicit authorization for that update and physical QA passed on deployed profile(s). Other profiles may remain pending with documented staged rollout, NOT falsely marked certified.",
+    "release_transition_policy": "LUMIA NEXT = QA histórica temporal; tras un corte certificado y aprobado, main contiene la línea estable y las mejoras posteriores son actualizaciones incrementales, no ramas paralelas del producto.",
+    "promotion_stages": [
+      "experiment_branch",
+      "scoped_qa_accepted",
+      "bounded_update_candidate",
+      "owner_approved_promotion",
+      "original_updated_and_verified"
+    ],
+    "staged_rollout_policy": "Can release to validated ASUS first without blocking on untested HP/CPU, provided per-profile rollout metadata records validated and pending devices, reason, follow-up QA. Code/version shared; not different product branches."
+  },
+  "protected_baseline": {
+    "asus_local": "LUMIA-ASUS",
+    "commit": "1580a5182eba540893e35e37065be77da4ed014c",
+    "no_auto_merge": true
+  },
+  "release": {
+    "current_shared_release": null,
+    "three_profile_parity_certified": false,
+    "owner_authorization": false,
+    "comment": "Las mejoras y el documento son PRs DRAFT; no existe una versión final certificada en los tres perfiles.",
+    "rollout_status": "no_shared_release_yet",
+    "allowed_first_profile": "asus-gpu4_after_scoped_acceptance_and_safe_owner_authorized_update"
+  },
+  "items": [
+    {
+      "id": "LUM-VQ-04",
+      "title": "Expresiones naturales del avatar (parpadeo y mirada)",
+      "area": "avatar",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "passed",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/83"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-14",
+          "type": "owner_report",
+          "detail": "ASUS: propietario aprobó visualmente expresiones del rostro; no extrapolar a HP/CPU."
+        }
+      ],
+      "next": "Preservar y verificar VRM/mismos assets en los tres perfiles.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-VQ-05.1",
+      "title": "Expresiones más visibles sincronizadas con voz",
+      "area": "avatar",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "passed",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/83"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-14",
+          "type": "owner_report",
+          "detail": "ASUS: aprobación visual; el estado del archivo de clips privados es local."
+        }
+      ],
+      "next": "Conservar sincronización expresiva y validar clips en los demás dispositivos.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-PH-04-R8",
+      "title": "Avatar 3D y 17 clips R8",
+      "area": "avatar",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "partial",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/85"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-21",
+          "type": "source_review",
+          "detail": "Entorno ASUS de QA exige 3 vistas y 17 clips privados; no afirmar que cada clip ha sido probado individualmente en esta revisión."
+        }
+      ],
+      "next": "Validar carga y animaciones individuales en ASUS, HP y CPU; no subir assets privados.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-VI-03.2B",
+      "title": "Pregunta visual con JPEG fresco autorizado",
+      "area": "vision",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "partial",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/86"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-21",
+          "type": "owner_report",
+          "detail": "ASUS: chat visual respondió sobre lo que muestra la cámara; hubo error histórico de conteo antes de calibración."
+        }
+      ],
+      "next": "Conservar cierre de sesión/consentimiento y no afirmar actividad más allá de imagen presente.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-VI-04A",
+      "title": "FaceDetector MediaPipe CPU, sin identidad",
+      "area": "vision",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "passed",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/87",
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/92"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-21",
+          "type": "owner_report",
+          "detail": "ASUS: detectó uno y dos rostros en fotogramas de escena; no implica reconocimiento de identidad."
+        }
+      ],
+      "next": "Preservar worker y apagado con la cámara.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-VI-04.2A",
+      "title": "Auditoría: detector CPU sobre el mismo JPEG de Qwen",
+      "area": "vision",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "passed",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/88"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-21",
+          "type": "owner_f12",
+          "detail": "ASUS: dos rostros y luego uno, status matched, sameJpeg true y captureId correlacionado con envío."
+        }
+      ],
+      "next": "Conservar ruta exact-JPEG sin acoplar el conteo a identidad.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-VI-04.2B.3",
+      "title": "Preguntas de brazos/torso sin sesgo facial",
+      "area": "vision",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "passed",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/91"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-21",
+          "type": "owner_report",
+          "detail": "ASUS Qwen 2B: describió brazo derecho levantado y torso; regresión 2→1 rostros posterior correcta."
+        }
+      ],
+      "next": "Probar mismo comportamiento en HP 4B y CPU 0.8B, evitando prometer igual precisión.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-VI-05A.1",
+      "title": "Centinela corporal Lite CPU y diagnóstico de puntos fuera de encuadre",
+      "area": "vision",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "partial",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/93"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "owner_report",
+          "detail": "ASUS: brazo derecho levantado, izquierdo levantado y ambos levantados reconocidos. Ambos abajo indeterminado porque los brazos/codos/muñecas quedan fuera del encuadre sentado."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_f12",
+          "detail": "Pose CPU ~200 ms en una muestra; leftDiagnostic wrist-outside, rightDiagnostic elbow-outside; no extrapolar velocidad sostenida."
+        }
+      ],
+      "next": "No forzar abajo cuando los puntos quedan fuera de imagen. Mantener QA real con cámara sentada.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-VI-05B",
+      "title": "Perfil Escritorio sentado como contexto predeterminado",
+      "area": "vision",
+      "implementation": "specified",
+      "ci": "not_applicable",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/80"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "owner_decision",
+          "detail": "El escritorio sentado con webcam estándar es el uso base; no inferir visualmente que está sentado sin evidencia."
+        }
+      ],
+      "next": "Implementar UI y distinción fuera de encuadre/no verificable, sobre los aciertos de VI-05A.1.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-CORE-3HW",
+      "title": "LUMIA unificada: ASUS 4GB, HP 6GB y CPU sin VRAM",
+      "area": "platform",
+      "implementation": "specified",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "partial",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/94"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "code_ci",
+          "detail": "Matriz y documento de tres perfiles, CI Windows/Ubuntu aprobada; NO lanzador común funcionando todavía."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_decision",
+          "detail": "Una sola versión, mismo código, mismos módulos; cerebro cambia según perfil."
+        }
+      ],
+      "next": "Crear lanzador universal opt-in y comprobar la misma revisión Git por equipo.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-BRAIN-HP6",
+      "title": "Selección del cerebro HP 6GB por benchmark real",
+      "area": "brain",
+      "implementation": "specified",
+      "ci": "not_applicable",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/94"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "owner_benchmark",
+          "detail": "HP: Qwen 2B y 4B caben; Nemotron E4B cabe cuantizado; 2B fue más rápido que Nemotron en cohorte específica. La app completa en HP no está validada."
+        }
+      ],
+      "next": "Probar Qwen3.5 4B, 2B y Nemotron con tareas idénticas dentro de LUMIA y escoger por resultados.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-BRAIN-CPU0",
+      "title": "Cerebro Qwen3.5 0.8B para equipos sin VRAM",
+      "area": "brain",
+      "implementation": "specified",
+      "ci": "not_applicable",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/94"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "owner_decision",
+          "detail": "El perfil CPU 0.8B es objetivo de producto; no hay prueba de LUMIA completa en un equipo sin VRAM."
+        }
+      ],
+      "next": "Fijar cuantización, medir inferencia CPU y validar voz/visión/avatar o limitaciones explícitas.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-LAUNCHER-UNIFIED",
+      "title": "Lanzador y preflight universales para los tres perfiles",
+      "area": "platform",
+      "implementation": "specified",
+      "ci": "not_applicable",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/94"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "source_review",
+          "detail": "El lanzador QA actual depende de ASUS y de la instalación original 2B; no existe todavía lanzador universal certificado."
+        }
+      ],
+      "next": "Implementar selección de perfil desde mismo SHA, sin tocar instalación ASUS original.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-VI-MULTICAM",
+      "title": "Integración futura de eufy C220 + E220",
+      "area": "vision",
+      "implementation": "idea",
+      "ci": "not_applicable",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/80"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "owner_decision",
+          "detail": "Existen C220 y E220 en sala/dormitorio (sin mapeo modelo-habitación); E220 RTSP documentado, C220 debe verificarse en unidad."
+        }
+      ],
+      "next": "Primero probar RTSP E220 en LAN con permiso y VLC; no permitir vigilancia automática ni afirmar PTZ API.",
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false
+    },
+    {
+      "id": "LUM-RELEASE-TRANSITION",
+      "title": "Promover LUMIA NEXT a actualizaciones de una única LUMIA estable",
+      "area": "release",
+      "implementation": "specified",
+      "ci": "pending",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false,
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/95",
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/80"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "owner_decision",
+          "detail": "LUMIA NEXT debe dejar de ser rama experimental permanente: el usuario ya considera LUMIA funcional y quiere actualizaciones sucesivas sobre el mismo producto."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "source_review",
+          "detail": "GitHub compare main...PR#95: 1483 commits ahead, 0 behind; QA física y seguridad no permiten asumir aprobación implícita de fusionar todo a main."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_decision",
+          "detail": "Propietario confirma ramas para experimentar, pero exige que cada función que cierre pruebas con resultado aceptado se convierta en actualización de LUMIA ORIGINAL, no siga eternamente en NEXT."
+        }
+      ],
+      "next": "Preparar primer paquete mínimo basado en funciones ASUS concretamente aprobadas: inventariar dependencias, CI+QA de regresión, backup y rollback, revisión de diff y aprobación del cambio específico. No fusionar 1483 commits en bloque; permitir despliegue ASUS primero con HP/CPU pendientes claramente registrados."
+    },
+    {
+      "id": "LUM-RELEASE-RC01",
+      "title": "RC01: actualización visual selectiva de LUMIA original ASUS",
+      "area": "release",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false,
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/96"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "source_review",
+          "detail": "RC01 se reconstruyó directamente sobre el SHA original ASUS 1580a518 con código selectivo VI-04.1/VI-04.2A/VI-04.2B.3, no los 165 commits de NEXT; primer PR acotado #96."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_report",
+          "detail": "La funcionalidad fuente de NEXT fue observada correctamente en ASUS (mismo JPEG 1/2 rostros, respuesta sobre brazo levantado); no equivale a QA física de este nuevo parche de promoción."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "code_ci",
+          "detail": "Workflow específico RC01 Windows/Ubuntu aprobó sintéticos y build en run #45475964981; otras regresiones heredadas exigieron ajustes CI CPU sin CUDA y actualización de test de captura async; revalidación acumulativa pendiente."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "code_ci",
+          "detail": "RC01 final SHA 17e20366616cf55ec07d5d0d6800b159b91859c2: Windows+Ubuntu CI específico y seis regresiones heredadas aprobadas; GHA 45476809167, 45476809193, 45476810096, 45476809194, 45476809174, 45476809209 y 45476809620. Falta QA física."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_report",
+          "detail": "RC01 QA ASUS checkout: safe fast-forward 17e2036→d88fd09, 18/18 private VRM+FBX files copied and SHA256 verified, synthetic 18-file copier PASS, require PASS, original_modified:false. Launcher command invoked but no Vite/frontend boot evidence in pasted transcript."
+        }
+      ],
+      "next": "Check actual RC01 launcher console Vite/bridge port 5173/8787 and URL with no concurrent NEXT; then run live ASUS QA for same JPEG 1/2 faces, arm/torso response, voice+avatar, 180s session expiry, backup/rollback before separate owner-approved promotion."
+    },
+    {
+      "id": "LUM-RELEASE-RC02",
+      "title": "RC02: reincorporación del centinela corporal VI-05A.1 en LUMIA RC01 original",
+      "area": "release",
+      "implementation": "implemented_draft",
+      "ci": "passed",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false,
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/97"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "owner_report",
+          "detail": "Captura real RC01 ASUS: video webcam activo, centinela óptico y FaceDetector CPU reconocen 1 rostro; no aparece opción de postura porque VI-05A.1 fue expresamente excluida de RC01."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "source_review",
+          "detail": "Comparación vista UI RC01 vs NEXT PR #93: 148 líneas agregadas y cero eliminadas exclusivamente para Pose Lite opt-in; se portaron worker, umbrales, diagnóstico y postura sentada sin tocar voz/LLM."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_report",
+          "detail": "En rama NEXT el propietario había validado izquierdo/derecho/ambos brazos levantados mientras brazos abajo quedaban fuera de encuadre sentado. Esta evidencia previa no certifica físicamente RC02."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "code_ci",
+          "detail": "RC02 PR #97 head 470d62fff35f942337a113bfd3d9f6a1ff31f861: 7/7 workflows GitHub Actions SUCCESS, including RC02 Pose Lite CPU, RC01 same JPEG, VI-03.1/VI-03.2B, FaceDetector VI-04A, PH-01 avatar and 2B sentinel on Ubuntu/Windows. No real webcam QA yet for RC02."
+        }
+      ],
+      "next": "Exigir CI Windows/Ubuntu de PR #97, luego instalar Pose Lite local verificando SHA y probar RC02 sobre el mismo checkout LUMIA-RC01-QA: activar visión y postura, 3 gestos arriba, brazos relajados fuera de cámara, apagar/sesión 180s, 1/2 rostros y regresión voz-avatar. No cambiar ASUS original sin autorización explícita."
+    }
+  ]
+}
