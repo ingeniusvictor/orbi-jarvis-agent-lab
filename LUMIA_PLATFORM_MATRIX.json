@@ -165,7 +165,9 @@
     "inventory_this_file": "LUMIA_PLATFORM_MATRIX.json",
     "legacy_asus_continuity": "docs/lumia-convergence/39-VISION04-CONTINUIDAD-20261109.md",
     "live_qa_manifest": "LUMIA_NEXT_MANIFEST.json",
-    "issue": "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/80"
+    "issue": "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/80",
+    "feature_register": "LUMIA_IMPROVEMENTS_LEDGER.json",
+    "change_control": "docs/lumia-convergence/42-LUMIA-CONTROL-MEJORAS-20261124.md"
   },
   "release_policy": {
     "one_release_sha_for_all_devices": true,
@@ -182,7 +184,8 @@
       "cpu-only"
     ],
     "no_claim_of_validated_parity_until_all_gates_pass": true,
-    "record_capability_not_supported_instead_of_silent_change": true
+    "record_capability_not_supported_instead_of_silent_change": true,
+    "improvement_tracking_gate": "Every PR updates the change register with CI vs physical QA per profile; release requires owner consent, shared SHA and no false parity"
   },
   "safety_and_privacy": {
     "camera_off_by_default": true,
