@@ -1,4 +1,4 @@
-# LUMIA — Control maestro de mejoras, validaciones y versiones
+> **TRANSICIÓN A ACTUALIZACIONES INCREMENTALES:** leer [Documento 43 — retirada del nombre NEXT como rama de producto](43-TRANSICION-NEXT-A-ACTUALIZACIONES-20261124.md). «NEXT» representa una fase de QA; el producto tendrá una sola rama estable de versiones con mejoras incorporadas y rollback, después del primer corte explícitamente autorizado.\n\n# LUMIA — Control maestro de mejoras, validaciones y versiones
 **24-11-2026 · Política obligatoria para ASUS, HP y CPU**
 
 > **Leer al iniciar cualquier trabajo nuevo** junto con [arquitectura única de tres entornos](41-LUMIA-UNIFICADA-TRES-ENTORNOS-20261124.md), [matriz de hardware](../../LUMIA_PLATFORM_MATRIX.json), [registro legible por máquina](../../LUMIA_IMPROVEMENTS_LEDGER.json), [manifiesto histórico ASUS](../../LUMIA_NEXT_MANIFEST.json) y [seguimiento #80](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/80).
