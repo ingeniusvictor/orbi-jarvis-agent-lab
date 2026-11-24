@@ -3,7 +3,7 @@
 **Estado:** norma de desarrollo y documentación aprobada como objetivo; implementación y QA completa multi-equipo pendientes.  
 **Lección principal:** no volver a perder mejoras porque cada avance quedó en una rama o computador diferente.
 
-> **LEER PRIMERO EN CADA NUEVA CONVERSACIÓN, SESIÓN DE CODEX/CLAUDE O ANTES DE EDITAR EL REPOSITORIO.**
+> **CONTROL DE CAMBIOS OBLIGATORIO:** [Documento 42 — estados, evidencia, QA y promoción](42-LUMIA-CONTROL-MEJORAS-20261124.md) y [Registro auditable](../../LUMIA_IMPROVEMENTS_LEDGER.json). Todo desarrollo debe crear/actualizar un expediente en el registro; CI no equivale a QA física ni release.\n\n> **LEER PRIMERO EN CADA NUEVA CONVERSACIÓN, SESIÓN DE CODEX/CLAUDE O ANTES DE EDITAR EL REPOSITORIO.**
 > El archivo de datos vinculante es [`LUMIA_PLATFORM_MATRIX.json`](../../LUMIA_PLATFORM_MATRIX.json). Este documento define la política; `LUMIA_NEXT_MANIFEST.json` conserva el historial de QA del piloto ASUS. La hoja de ruta y decisiones se reflejan en el [issue maestro #80](https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/80).
 >
 > **NO SON TRES APPS.** Son tres configuraciones del MISMO runtime LUMIA, versionado en un solo repositorio y una sola versión de código. Cambian el modelo de Ollama y límites de recursos; no cambia la identidad funcional del producto.
