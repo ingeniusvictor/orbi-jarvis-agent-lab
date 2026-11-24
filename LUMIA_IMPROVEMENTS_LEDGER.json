@@ -525,6 +525,46 @@
         }
       ],
       "next": "Preparar primer paquete mínimo basado en funciones ASUS concretamente aprobadas: inventariar dependencias, CI+QA de regresión, backup y rollback, revisión de diff y aprobación del cambio específico. No fusionar 1483 commits en bloque; permitir despliegue ASUS primero con HP/CPU pendientes claramente registrados."
+    },
+    {
+      "id": "LUM-RELEASE-RC01",
+      "title": "RC01: actualización visual selectiva de LUMIA original ASUS",
+      "area": "release",
+      "implementation": "implemented_draft",
+      "ci": "pending",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false,
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/96"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "source_review",
+          "detail": "RC01 se reconstruyó directamente sobre el SHA original ASUS 1580a518 con código selectivo VI-04.1/VI-04.2A/VI-04.2B.3, no los 165 commits de NEXT; primer PR acotado #96."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_report",
+          "detail": "La funcionalidad fuente de NEXT fue observada correctamente en ASUS (mismo JPEG 1/2 rostros, respuesta sobre brazo levantado); no equivale a QA física de este nuevo parche de promoción."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "code_ci",
+          "detail": "Workflow específico RC01 Windows/Ubuntu aprobó sintéticos y build en run #45475964981; otras regresiones heredadas exigieron ajustes CI CPU sin CUDA y actualización de test de captura async; revalidación acumulativa pendiente."
+        }
+      ],
+      "next": "Concluir todos los workflows de PR #96, ejecutar QA física en checkout aislado ASUS de RC01 con Qwen 2B, voz y avatar, confirmar cámara 180 s y prueba de 1/2 rostros/gestos; preparar backup y rollback; solicitar autorización específica antes de actualizar LUMIA-ASUS."
     }
   ]
 }
