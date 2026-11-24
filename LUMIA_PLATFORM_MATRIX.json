@@ -174,7 +174,7 @@
     "one_release_sha_for_all_devices": true,
     "allow_model_specific_adapters_only_not_code_forks": true,
     "do_not_merge_experimental_stack_to_main_automatically": true,
-    "do_not_modify_protected_asus": true,
+    "do_not_modify_protected_asus": "Until approved bounded update with backup and rollback; protection is not a permanent ban on upgrades",
     "ci_matrix": [
       "ubuntu-latest",
       "windows-latest"
@@ -188,7 +188,12 @@
     "record_capability_not_supported_instead_of_silent_change": true,
     "improvement_tracking_gate": "Every PR updates the change register with CI vs physical QA per profile; release requires owner consent, shared SHA and no false parity",
     "product_branch_policy": "main is the stable LUMIA line only after a separately owner-approved release cut; NEXT becomes historical QA, not an independent lasting product",
-    "current_release_transition": "planned_no_main_merge_no_daily_asus_changes"
+    "current_release_transition": "planned_no_main_merge_no_daily_asus_changes",
+    "asus_first_rollout_allowed": true,
+    "asus_first_rollout_conditions": "Successful owner-accepted scoped ASUS field QA + cumulative CI + focused change diff and dependencies + backup and rollback + explicit approval for the concrete promotion. Other profiles remain pending (not auto-certified).",
+    "feature_promotion_rule": "A validated individual feature graduates into a candidate update to the original LUMIA; branches are temporary experiments, never permanent product copies",
+    "specific_promotion_approval_required": true,
+    "rollout_metadata_for_untested_profiles": "Explicit validated_profiles, pending_profiles, reason and followup_qa; all on same repository/tag/commit, no per-hardware code forks"
   },
   "safety_and_privacy": {
     "camera_off_by_default": true,
