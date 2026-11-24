@@ -16,6 +16,7 @@ on:
       - 'scripts/certify-lumia-vision-update-rc01.ts'
       - 'scripts/certify-lumia-vision032b-fresh-voice.ts'
       - 'scripts/lumia-private-avatar-assets-rc01.mjs'
+      - 'scripts/certify-lumia-private-assets-rc01.mjs'
       - '.github/workflows/lumia-vision-rc01-promotion.yml'
   workflow_dispatch:
 jobs:
@@ -37,6 +38,8 @@ jobs:
         run: npm ci --onnxruntime-node-install-cuda=skip
       - name: Scope and behavior
         run: npx tsx scripts/certify-lumia-vision-update-rc01.ts
+      - name: RC01 private assets copy and rollback safeguards
+        run: node scripts/certify-lumia-private-assets-rc01.mjs
       - name: Fresh visual voice and typed scene regressions
         run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
       - name: MediapPipe ESM WASM route
