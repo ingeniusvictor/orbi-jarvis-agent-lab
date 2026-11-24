@@ -575,6 +575,46 @@
         }
       ],
       "next": "Check actual RC01 launcher console Vite/bridge port 5173/8787 and URL with no concurrent NEXT; then run live ASUS QA for same JPEG 1/2 faces, arm/torso response, voice+avatar, 180s session expiry, backup/rollback before separate owner-approved promotion."
+    },
+    {
+      "id": "LUM-RELEASE-RC02",
+      "title": "RC02: reincorporación del centinela corporal VI-05A.1 en LUMIA RC01 original",
+      "area": "release",
+      "implementation": "implemented_draft",
+      "ci": "pending",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false,
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/97"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "owner_report",
+          "detail": "Captura real RC01 ASUS: video webcam activo, centinela óptico y FaceDetector CPU reconocen 1 rostro; no aparece opción de postura porque VI-05A.1 fue expresamente excluida de RC01."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "source_review",
+          "detail": "Comparación vista UI RC01 vs NEXT PR #93: 148 líneas agregadas y cero eliminadas exclusivamente para Pose Lite opt-in; se portaron worker, umbrales, diagnóstico y postura sentada sin tocar voz/LLM."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_report",
+          "detail": "En rama NEXT el propietario había validado izquierdo/derecho/ambos brazos levantados mientras brazos abajo quedaban fuera de encuadre sentado. Esta evidencia previa no certifica físicamente RC02."
+        }
+      ],
+      "next": "Exigir CI Windows/Ubuntu de PR #97, luego instalar Pose Lite local verificando SHA y probar RC02 sobre el mismo checkout LUMIA-RC01-QA: activar visión y postura, 3 gestos arriba, brazos relajados fuera de cámara, apagar/sesión 180s, 1/2 rostros y regresión voz-avatar. No cambiar ASUS original sin autorización explícita."
     }
   ]
 }
