@@ -57,11 +57,15 @@ export async function prepareAvatarAssets(source,target){
   const original=await realpath(source)
   const destination=await realpath(target)
   if(original===destination)throw Error('SOURCE_EQUALS_TARGET')
+  if(destination.toLowerCase().startsWith(original.toLowerCase()+'\\') ||
+     destination.toLowerCase().startsWith(original.toLowerCase()+'/')){
+    throw Error('DESTINATION_INSIDE_SOURCE_NOT_ALLOWED')
+  }
   if(!existsSync(join(original,'INICIAR_LUMIA_ASUS_RAPIDA.cmd'))){
     throw Error('SOURCE_NOT_LUMIA_CHECKOUT')
   }
   // The action is deliberately scoped to this experimental branch's launcher.
-  if(!existsSync(join(destination,'INICIAR_LUMIA_ASUS_VISION_AUDITORIA_RC01.cmd'))){
+  if(!existsSync(join(destination,'INICIAR_LUMIA_VISION_RC01_ASUS.cmd'))){
     throw Error('DESTINATION_NOT_RC01_WORKTREE')
   }
   const from=await inspectAvatarAssets(original)
@@ -108,11 +112,11 @@ async function main(argv){
   const current=await inspectAvatarAssets(root)
   if(mode==='require'){
     if(current.missing.length){
-      console.error('[LUMIA LUMIA RC01] Falta VRM/FBX privado en este worktree: '+current.missing.join(', '))
+      console.error('[LUMIA RC01] Falta VRM/FBX privado en este worktree: '+current.missing.join(', '))
       console.error('No se arrancara el avatar GLB antiguo. Copia local voluntaria: node scripts/lumia-private-avatar-assets-rc01.mjs --copy --from "C:\\Users\\...\\LUMIA-ASUS"')
       return 2
     }
-    console.log('[LUMIA LUMIA RC01] PH-04 PRE-FLIGHT OK: VRM + 17 FBX locales presentes.')
+    console.log('[LUMIA RC01] PH-04 PRE-FLIGHT OK: VRM + 17 FBX locales presentes.')
     return 0
   }
   if(mode==='doctor'){
@@ -138,8 +142,8 @@ if(process.argv[1] && resolve(process.argv[1])===fileURLToPath(import.meta.url))
   main(process.argv.slice(2)).then(code=>process.exitCode=code).catch(err=>{
     // no stacks or private paths: only predefined codes, filenames.
     const message=String(err?.message||'UNKNOWN')
-    const safe=/^(SOURCE_MISSING_PRIVATE_ASSETS:|DESTINATION_DIFFERENT_ASSET:|DESTINATION_COLLISION:|COPY_INTEGRITY_FAILED:)/.test(message)
-    console.error('[LUMIA LUMIA RC01] '+(safe?message:'PRIVATE_ASSET_SETUP_FAILED'))
+    const safe=/^(DESTINATION_NOT_RC01_WORKTREE|SOURCE_NOT_LUMIA_CHECKOUT|DESTINATION_INSIDE_SOURCE_NOT_ALLOWED|SOURCE_EQUALS_TARGET|SOURCE_MISSING_PRIVATE_ASSETS:|DESTINATION_DIFFERENT_ASSET:|DESTINATION_COLLISION:|COPY_INTEGRITY_FAILED:)/.test(message)
+    console.error('[LUMIA RC01] '+(safe?message:'PRIVATE_ASSET_SETUP_FAILED'))
     process.exitCode=1
   })
 }
