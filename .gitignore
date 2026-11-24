@@ -47,3 +47,6 @@ public/models/vision/*.partial-*
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# RC02: local CPU MediaPipe Pose Lite bundle is copied by verified installer only.
+public/models/vision/*.task
