@@ -581,7 +581,7 @@
       "title": "RC02: reincorporación del centinela corporal VI-05A.1 en LUMIA RC01 original",
       "area": "release",
       "implementation": "implemented_draft",
-      "ci": "pending",
+      "ci": "passed",
       "field_qa": {
         "asus-gpu4": "not_tested",
         "hp-gpu6": "not_tested",
@@ -612,6 +612,11 @@
           "date": "2026-11-24",
           "type": "owner_report",
           "detail": "En rama NEXT el propietario había validado izquierdo/derecho/ambos brazos levantados mientras brazos abajo quedaban fuera de encuadre sentado. Esta evidencia previa no certifica físicamente RC02."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "code_ci",
+          "detail": "RC02 PR #97 head 470d62fff35f942337a113bfd3d9f6a1ff31f861: 7/7 workflows GitHub Actions SUCCESS, including RC02 Pose Lite CPU, RC01 same JPEG, VI-03.1/VI-03.2B, FaceDetector VI-04A, PH-01 avatar and 2B sentinel on Ubuntu/Windows. No real webcam QA yet for RC02."
         }
       ],
       "next": "Exigir CI Windows/Ubuntu de PR #97, luego instalar Pose Lite local verificando SHA y probar RC02 sobre el mismo checkout LUMIA-RC01-QA: activar visión y postura, 3 gestos arriba, brazos relajados fuera de cámara, apagar/sesión 180s, 1/2 rostros y regresión voz-avatar. No cambiar ASUS original sin autorización explícita."
