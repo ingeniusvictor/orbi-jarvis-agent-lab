@@ -33,6 +33,10 @@ assert.equal(ledger.release.owner_authorization,false)
 assert.equal(ledger.protected_baseline.commit,manifest.protected_original.expected_commit)
 assert.equal(ledger.protected_baseline.commit,matrix.protected_asus_production.expected_sha)
 assert.equal(ledger.protected_baseline.no_auto_merge,true)
+assert.equal(matrix.release_policy.asus_first_rollout_allowed,true)
+assert.equal(matrix.release_policy.specific_promotion_approval_required,true)
+assert.ok(ledger.lifecycle.promotion_stages.includes('original_updated_and_verified'))
+assert.match(ledger.lifecycle.staged_rollout_policy,/ASUS first/)
 assert.ok(Array.isArray(ledger.items)&&ledger.items.length>=10)
 
 const ids=new Set()
@@ -70,7 +74,23 @@ for(const row of ledger.items){
   if(row.release_status==='released'){
     assert.equal(row.ci,'passed',row.id+' release must pass CI')
     assert.equal(row.owner_production_approved,true,row.id+' release needs authorization')
-    for(const p of row.profiles)assert.equal(row.field_qa[p],'passed',row.id+' release missing hardware QA on '+p)
+    // A product can be updated on ASUS first if HP/CPU are explicitly marked pending.
+    // All hardware profiles are tracked, but only DEPLOYED profiles require passed field QA.
+    // No silent or invented cross-device parity.
+    const rollout=row.rollout
+    assert.ok(rollout&&typeof rollout==='object',row.id+' missing rollout manifest')
+    const validated=new Set(rollout.validated_profiles??[])
+    const pending=new Set(rollout.pending_profiles??[])
+    assert.ok(validated.size>=1,row.id+' must have at least one validated deployed profile')
+    assert.equal(validated.size,(rollout.validated_profiles??[]).length,row.id+' duplicate rollout profile')
+    assert.equal(pending.size,(rollout.pending_profiles??[]).length,row.id+' duplicate pending profile')
+    assert.ok(sameSet(new Set([...validated,...pending]),expected),row.id+' rollout must account for all hardware')
+    assert.ok([...validated].every(p=>!pending.has(p)),row.id+' deployment/pending overlap')
+    for(const profile of validated)assert.equal(row.field_qa[profile],'passed',row.id+' deployed without physical QA on '+profile)
+    if(pending.size){
+      assert.ok(typeof rollout.reason==='string'&&rollout.reason.trim().length>20,row.id+' missing staged rollout reason')
+      assert.ok(typeof rollout.followup_qa==='string'&&rollout.followup_qa.trim().length>20,row.id+' missing HP/CPU QA follow-up')
+    }
     assert.equal(ledger.release.owner_authorization,true,'Release header must have owner authorization')
     assert.ok(typeof ledger.release.current_shared_release==='string'&&/^[0-9a-f]{40}$/.test(ledger.release.current_shared_release),'Release must pin a single SHA')
   }
@@ -84,6 +104,9 @@ const transition=read('docs/lumia-convergence/43-TRANSICION-NEXT-A-ACTUALIZACION
 assert.match(transition,/1\.483 commits/)
 assert.match(transition,/NO.*promover|no se promueve/i)
 assert.match(transition,/aprobaci[oó]n expresa/i)
+assert.match(transition,/funci[oó]n.*promoci[oó]n continua|promoci[oó]n continua/i)
+assert.match(transition,/despliegue escalonado/i)
+assert.match(doc,/funci[oó]n validada.*actualizaci[oó]n de LUMIA ORIGINAL/i)
 assert.match(matrix.release_policy.current_release_transition,/no_main_merge/)
 assert.equal(ledger.items.find(x=>x.id==='LUM-RELEASE-TRANSITION')?.implementation,'specified')
 
