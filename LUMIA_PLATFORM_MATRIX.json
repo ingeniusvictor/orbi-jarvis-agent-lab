@@ -174,7 +174,7 @@
     "one_release_sha_for_all_devices": true,
     "allow_model_specific_adapters_only_not_code_forks": true,
     "do_not_merge_experimental_stack_to_main_automatically": true,
-    "do_not_modify_protected_asus": "Until approved bounded update with backup and rollback; protection is not a permanent ban on upgrades",
+    "do_not_modify_protected_asus": true,
     "ci_matrix": [
       "ubuntu-latest",
       "windows-latest"
@@ -193,7 +193,8 @@
     "asus_first_rollout_conditions": "Successful owner-accepted scoped ASUS field QA + cumulative CI + focused change diff and dependencies + backup and rollback + explicit approval for the concrete promotion. Other profiles remain pending (not auto-certified).",
     "feature_promotion_rule": "A validated individual feature graduates into a candidate update to the original LUMIA; branches are temporary experiments, never permanent product copies",
     "specific_promotion_approval_required": true,
-    "rollout_metadata_for_untested_profiles": "Explicit validated_profiles, pending_profiles, reason and followup_qa; all on same repository/tag/commit, no per-hardware code forks"
+    "rollout_metadata_for_untested_profiles": "Explicit validated_profiles, pending_profiles, reason and followup_qa; all on same repository/tag/commit, no per-hardware code forks",
+    "original_asus_update_policy": "Protected by default; after owner explicitly approves a scoped update and rollback, it may be updated safely. This is not a permanent feature freeze."
   },
   "safety_and_privacy": {
     "camera_off_by_default": true,
