@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - 'LUMIA_NEXT_MANIFEST.json'
+      - 'LUMIA_PLATFORM_MATRIX.json'
+      - 'README.md'
+      - 'docs/lumia-convergence/41-LUMIA-UNIFICADA-TRES-ENTORNOS-20261124.md'
+      - 'scripts/certify-lumia-platform-matrix.mjs'
       - 'INICIAR_LUMIA_ASUS_NEXT_QA.cmd'
       - 'scripts/lumia-next-local-voice-qa.mjs'
       - 'scripts/certify-lumia-next-integration.mjs'
@@ -50,6 +54,7 @@ jobs:
       # no-CUDA path ONLY here. ASUS / original runtime remain untouched.
       - run: npm ci --onnxruntime-node-install-cuda=skip
       - run: node scripts/certify-lumia-next-integration.mjs
+      - run: node scripts/certify-lumia-platform-matrix.mjs
       - run: node scripts/certify-lumia-vision040a-wasm-route.mjs
       - run: npx tsx scripts/certify-lumia-vq04-natural-face.ts
       - run: npx tsx scripts/certify-lumia-vq05-speech-expressions.ts
