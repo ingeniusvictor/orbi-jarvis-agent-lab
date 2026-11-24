@@ -85,6 +85,12 @@
       "capability": "Explicit opt-in, independent CPU PoseLandmarker Lite worker on authorized camera; 2.5 s cadence; raised/down/unclear arms; two-sample confirmation; no Qwen automation, identities or image persistence",
       "qa": "Static+unit CI pending; physical ASUS QA pending; local task model installed separately and verified SHA256",
       "source_issue": 80
+    },
+    {
+      "module": "VI-05A.1",
+      "capability": "Nonidentifying pose diagnostics for not-detected, out-of-frame, low-confidence or ambiguous shoulder/elbow/wrist; explicit stabilization label; no landmark coords are shown or logged",
+      "qa": "User screenshot 2026-11-24 shows both arms indeterminate at 405 ms. Diagnose first; no change to thresholds or Qwen, MediaPipe face, Whisper, Kokoro; physical ASUS check pending",
+      "source_issue": 80
     }
   ],
   "excluded_from_production": [
@@ -95,7 +101,7 @@
     "automatic merge to main/ASUS",
     "VI-05A live pose until CPU/accuracy/privacy QA on ASUS and separate owner approval"
   ],
-  "next_gate": "VI-05A ASUS physical QA: install pinned pose_landmarker_lite.task ONLY in NEXT; enable camera and new 'Activar postura CPU' button; raise one arm / lower / occlude wrist / stop vision; measure CPU inference and keep existing VI-04.2B.3 exact-JPEG 1-vs-2 face tests unmodified",
+  "next_gate": "ASUS VI-05A.1 diagnostic QA: with body and both hands fully inside camera preview, hold right arm raised for >=5s then lower for >=5s; inspect panel and [lumia:vision-vi05a] reasons; ensure faceCount still 1 and that pausing/closing camera stops worker; avoid changing thresholds before knowing which landmark fails.",
   "promotion_policy": "Change NEXT only after review/CI/owner QA; promote to protected production only with separate explicit owner approval and rollback evidence",
   "qa_observations_20261114": [
     {
@@ -173,6 +179,20 @@
       "evidence": "owner F12 20:43 and 20:45",
       "observation": "Exact-JPEG CPU faceCount 2 then 1, status matched, sameJpeg true and Qwen responses count 2 then 1; actual 768x432 stills and active camera",
       "scope": "face count in prompt is advisory not independent people count; arm/torso detection physical QA positive earlier; model latency first text 11.30s then 5.71s"
+    }
+  ],
+  "qa_observations_20261124": [
+    {
+      "module": "VI-05A",
+      "evidence": "owner screenshot 2026-11-24 13:07 CLST",
+      "observation": "FaceDetector displays one face and about 265 ms, Pose Lite displays CPU ~405ms, both arm states 'indeterminado' even when owner tried raising arm",
+      "scope": "screen preview shows head/shoulders/partial upper body but not full wrists/hands; cannot distinguish crop vs confidence vs angle from the screenshot alone"
+    },
+    {
+      "module": "VI-05A.1",
+      "evidence": "engineering change",
+      "observation": "Show reason per arm, distinguish missing, outside, low confidence and ambiguous; keep same arm thresholds and debounce",
+      "scope": "CI + physical ASUS QA required"
     }
   ]
 }

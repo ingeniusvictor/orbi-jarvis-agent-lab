@@ -21,7 +21,7 @@ import {FaceCountGate,FACE_DETECTOR_INTERVAL_MS,FACE_DETECTOR_MAX_WIDTH,FACE_DET
 import type {VisionFaceSample} from '../lib/vision-audit-vi041'
 import {makeSameFrameFaceEvidence,SAME_FRAME_AUDIT_TIMEOUT_MS,type SameFrameFaceEvidence} from '../lib/vision-same-frame-vi042a'
 import {BodyPoseGate,POSE_VI05_INTERVAL_MS,POSE_VI05_MAX_WIDTH,POSE_VI05_MAX_HEIGHT,
-  POSE_VI05_RESPONSE_TIMEOUT_MS,type BodyPoseSummary} from '../lib/vision-pose-vi05'
+  POSE_VI05_RESPONSE_TIMEOUT_MS,poseDiagnosticText,type BodyPoseSummary} from '../lib/vision-pose-vi05'
 
 // Pilot is explicit NEXT-only, and also requires pressing a separate control.
 const VI05A_POSE_AVAILABLE=import.meta.env.VITE_LUMIA_VISION_POSE_VI05A==='1'
@@ -510,12 +510,14 @@ export function LumiaCameraViewfinder({
         if(message.sequence!==sequence||!message.pose)return
         const stable=gate.observe(message.pose)
         setPoseSummary(stable)
-        const fingerprint=[stable.found,stable.leftArm,stable.rightArm,stable.shouldersVisible].join(':')
+        const fingerprint=[stable.found,stable.leftArm,stable.rightArm,stable.shouldersVisible,
+          stable.leftDiagnostic,stable.rightDiagnostic,stable.stabilizing].join(':')
         if(fingerprint!==previousLog){
           previousLog=fingerprint
           console.info('[lumia:vision-vi05a]',JSON.stringify({
             poseFound:stable.found,leftArm:stable.leftArm,rightArm:stable.rightArm,
-            shouldersVisible:stable.shouldersVisible,
+            leftDiagnostic:stable.leftDiagnostic,rightDiagnostic:stable.rightDiagnostic,
+            stabilizing:stable.stabilizing,shouldersVisible:stable.shouldersVisible,
             inferenceMs:stable.inferenceMs,processor:'cpu',identity:false,
           }))
         }
@@ -760,7 +762,8 @@ export function LumiaCameraViewfinder({
                 :poseStatus==='loading'?'Cargando Pose Lite local…'
                 :poseStatus==='error'?'Error de modelo corporal'
                 :!poseSummary?'Analizando postura…'
-                :!poseSummary.found?'No hay postura corporal fiable'
+                :!poseSummary.found?'No se detecta una postura corporal completa'
+                :poseSummary.stabilizing?'Confirmando postura con otra muestra…'
                 :'Izquierdo: '+(poseSummary.leftArm==='raised'?'levantado':poseSummary.leftArm==='down'?'abajo':'indeterminado')+
                   ' · Derecho: '+(poseSummary.rightArm==='raised'?'levantado':poseSummary.rightArm==='down'?'abajo':'indeterminado')}
             </span>
@@ -769,8 +772,18 @@ export function LumiaCameraViewfinder({
             poseSummary?.inferenceMs!==undefined&&(
               <small>Pose Landmarker Lite CPU · {poseSummary.inferenceMs} ms · máximo 1 postura</small>
             )}
+          {poseSummary?.found&&!poseSummary.stabilizing&&
+            (poseSummary.leftArm==='unclear'||poseSummary.rightArm==='unclear')&&(
+              <small>Diagnóstico: {poseSummary.leftArm==='unclear'
+                ? 'izquierdo: '+poseDiagnosticText(poseSummary.leftDiagnostic)
+                : 'izquierdo: detectado'}
+                {' · '}{poseSummary.rightArm==='unclear'
+                ? 'derecho: '+poseDiagnosticText(poseSummary.rightDiagnostic)
+                : 'derecho: detectado'}
+              </small>
+            )}
           {poseError&&<p role="alert" className="lumia-face-detector-error">{poseError}</p>}
-          <small>Sin identidad ni grabación · no envía poses a Qwen · se detiene al cerrar la cámara o expirar la sesión.</small>
+          <small>Encuadra hombros, codos y ambas muñecas. El modelo usa izquierda/derecha anatómica, no la posición en pantalla. Sin identidad ni grabación · no envía poses a Qwen.</small>
         </div>
       )}
       <div className="lumia-camera-source">
