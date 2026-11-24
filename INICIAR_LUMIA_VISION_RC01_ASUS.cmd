@@ -7,6 +7,13 @@ if /I "%CD%"=="%USERPROFILE%\LUMIA-ASUS" (
   echo ERROR: RC01 must not run from the protected LUMIA-ASUS original.
   exit /b 4
 )
+rem Do not silently fall back to an old GLB when private VRM/R8 clips are absent.
+node "%~dp0scripts\lumia-private-avatar-assets-rc01.mjs" --require
+if errorlevel 1 (
+  echo ERROR: faltan archivos locales VRM/R8 para este checkout QA.
+  echo Consulte instrucciones RC01 y ejecute copia local explicita si desea continuar.
+  exit /b 3
+)
 rem These flags only affect the process spawned in this terminal.
 rem Existing original 2B local/Whisper/Kokoro/VRM stay unchanged.
 set "VITE_LUMIA_VISION_QA_VI041=1"
