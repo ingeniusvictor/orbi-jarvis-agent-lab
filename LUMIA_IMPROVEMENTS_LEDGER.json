@@ -29,8 +29,16 @@
       "passed",
       "failed"
     ],
-    "release_gate": "releases require owner approval, a single SHA, CI passed, and field_qa passed on all three profiles (or written owner-approved exception). A feature in a draft PR is not released.",
-    "release_transition_policy": "LUMIA NEXT = QA histórica temporal; tras un corte certificado y aprobado, main contiene la línea estable y las mejoras posteriores son actualizaciones incrementales, no ramas paralelas del producto."
+    "release_gate": "A feature that the owner accepts in physical QA must be prepared promptly for a scoped update of the ORIGINAL LUMIA. Release requires CI passed, approved bounded code diff, same Git SHA, backup/rollback, explicit authorization for that update and physical QA passed on deployed profile(s). Other profiles may remain pending with documented staged rollout, NOT falsely marked certified.",
+    "release_transition_policy": "LUMIA NEXT = QA histórica temporal; tras un corte certificado y aprobado, main contiene la línea estable y las mejoras posteriores son actualizaciones incrementales, no ramas paralelas del producto.",
+    "promotion_stages": [
+      "experiment_branch",
+      "scoped_qa_accepted",
+      "bounded_update_candidate",
+      "owner_approved_promotion",
+      "original_updated_and_verified"
+    ],
+    "staged_rollout_policy": "Can release to validated ASUS first without blocking on untested HP/CPU, provided per-profile rollout metadata records validated and pending devices, reason, follow-up QA. Code/version shared; not different product branches."
   },
   "protected_baseline": {
     "asus_local": "LUMIA-ASUS",
@@ -41,7 +49,9 @@
     "current_shared_release": null,
     "three_profile_parity_certified": false,
     "owner_authorization": false,
-    "comment": "Las mejoras y el documento son PRs DRAFT; no existe una versión final certificada en los tres perfiles."
+    "comment": "Las mejoras y el documento son PRs DRAFT; no existe una versión final certificada en los tres perfiles.",
+    "rollout_status": "no_shared_release_yet",
+    "allowed_first_profile": "asus-gpu4_after_scoped_acceptance_and_safe_owner_authorized_update"
   },
   "items": [
     {
@@ -507,9 +517,14 @@
           "date": "2026-11-24",
           "type": "source_review",
           "detail": "GitHub compare main...PR#95: 1483 commits ahead, 0 behind; QA física y seguridad no permiten asumir aprobación implícita de fusionar todo a main."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "owner_decision",
+          "detail": "Propietario confirma ramas para experimentar, pero exige que cada función que cierre pruebas con resultado aceptado se convierta en actualización de LUMIA ORIGINAL, no siga eternamente en NEXT."
         }
       ],
-      "next": "Auditar stack PRs, fijar SHA candidato, probar ASUS y perfiles, preparar rollback y solicitar permiso explícito antes de promover main o reemplazar instalación diaria."
+      "next": "Preparar primer paquete mínimo basado en funciones ASUS concretamente aprobadas: inventariar dependencias, CI+QA de regresión, backup y rollback, revisión de diff y aprobación del cambio específico. No fusionar 1483 commits en bloque; permitir despliegue ASUS primero con HP/CPU pendientes claramente registrados."
     }
   ]
 }
