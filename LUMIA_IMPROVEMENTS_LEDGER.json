@@ -29,7 +29,8 @@
       "passed",
       "failed"
     ],
-    "release_gate": "releases require owner approval, a single SHA, CI passed, and field_qa passed on all three profiles (or written owner-approved exception). A feature in a draft PR is not released."
+    "release_gate": "releases require owner approval, a single SHA, CI passed, and field_qa passed on all three profiles (or written owner-approved exception). A feature in a draft PR is not released.",
+    "release_transition_policy": "LUMIA NEXT = QA histórica temporal; tras un corte certificado y aprobado, main contiene la línea estable y las mejoras posteriores son actualizaciones incrementales, no ramas paralelas del producto."
   },
   "protected_baseline": {
     "asus_local": "LUMIA-ASUS",
@@ -473,6 +474,42 @@
       ],
       "release_status": "not_released",
       "owner_production_approved": false
+    },
+    {
+      "id": "LUM-RELEASE-TRANSITION",
+      "title": "Promover LUMIA NEXT a actualizaciones de una única LUMIA estable",
+      "area": "release",
+      "implementation": "specified",
+      "ci": "pending",
+      "field_qa": {
+        "asus-gpu4": "not_tested",
+        "hp-gpu6": "not_tested",
+        "cpu-only": "not_tested"
+      },
+      "profiles": [
+        "asus-gpu4",
+        "hp-gpu6",
+        "cpu-only"
+      ],
+      "release_status": "not_released",
+      "owner_production_approved": false,
+      "links": [
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/pull/95",
+        "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/80"
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-24",
+          "type": "owner_decision",
+          "detail": "LUMIA NEXT debe dejar de ser rama experimental permanente: el usuario ya considera LUMIA funcional y quiere actualizaciones sucesivas sobre el mismo producto."
+        },
+        {
+          "date": "2026-11-24",
+          "type": "source_review",
+          "detail": "GitHub compare main...PR#95: 1483 commits ahead, 0 behind; QA física y seguridad no permiten asumir aprobación implícita de fusionar todo a main."
+        }
+      ],
+      "next": "Auditar stack PRs, fijar SHA candidato, probar ASUS y perfiles, preparar rollback y solicitar permiso explícito antes de promover main o reemplazar instalación diaria."
     }
   ]
 }
