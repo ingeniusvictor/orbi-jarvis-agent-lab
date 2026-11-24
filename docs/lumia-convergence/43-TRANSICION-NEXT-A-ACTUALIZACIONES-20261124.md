@@ -62,13 +62,42 @@ Revisión de GitHub el 24-11-2026:
 
 **No más conversaciones como única memoria del proyecto**: cada desarrollo modifica `LUMIA_IMPROVEMENTS_LEDGER.json`, el manifiesto del release y el issue #80. En cada sesión se recupera ese estado antes de proponer nuevos cambios.
 
+### 3.1. Principio de promoción continua: no más funciones terminadas abandonadas en ramas
+
+**Confirmación adicional del propietario (24-11-2026):** «Experimentar en ramas está bien; cuando una función se prueba y sus resultados son buenos, debe pasar a ser una actualización de la LUMIA original». Las ramas cumplen un propósito temporal: probar con seguridad. No deben convertirse en una excusa para postergar indefinidamente una mejora validada.
+
+**Flujo por cada capacidad:**
+```text
+      ORIGINAL LUMIA (funcionando)
+                  ↓
+           RAMA DE EXPERIMENTO
+                  ↓
+           PR + CI + QA REAL
+                  ↓
+     USUARIO CONFIRMA QUE FUNCIONÓ
+                  ↓
+      PAQUETE MÍNIMO DE ACTUALIZACIÓN
+       (código + dependencias + rollback)
+                  ↓
+       AUTORIZACIÓN DE ESA PROMOCIÓN
+                  ↓
+          LUMIA ORIGINAL ACTUALIZADA
+             misma app, nueva versión
+```
+
+**Actualizaciones pequeñas y frecuentes:** no esperar a que toda VI-05, todas las cámaras o todos los modelos locales estén listos. Ejemplo: las respuestas visuales con el mismo JPEG y conteo 1/2 de VI-04.2A pueden entrar en una revisión acotada si cumplen la regresión final; la clasificación de brazos elevados de VI-05A.1 puede entrar como función limitada, sin inventar que se validó detectar brazos abajo fuera de cuadro ni postura «sentado». No incluir funcionalidades de identidad no autorizadas.
+
+**Despliegue escalonado que no sacrifica una sola LUMIA:** un paquete ya certificado en ASUS puede actualizar primero la ASUS. No exigir que un equipo sin GPU, que aún no está disponible o no tiene QA, bloquee esa actualización. El repositorio y código de la versión **siguen siendo los mismos** para HP/CPU. Las otras máquinas figuran «pendiente de validación/despliegue», no «incompatibles» por presunción ni «validadas» sin pruebas.
+
+**Importante:** «la prueba salió bien» aprueba el comportamiento observado, no concede permiso de mover 1.483 commits a producción. Antes de alterar `main` o reemplazar `LUMIA-ASUS`, el paquete específico se revisa, respalda, autoriza y comprueba al instalar; esa precaución permite mantener actualizaciones frecuentes sin perder la versión funcional.
+
 ## 4. Primer corte de estabilización («LUMIA NEXT» → LUMIA estable)
 
 No ejecutar una fusión al instante. Procedimiento:
 1. **Congelar un SHA candidato** a partir de la punta acumulativa revisada; documentar qué contiene y qué laboratorios están expresamente fuera de producción. Inventariar PR #74–#95 relacionados, especialmente experimentos sin validación de consentimiento e identidad. Un branch con 1.483 commits desde `main` no se promueve sólo por poder hacer fast-forward.
 2. **Revisión de seguridad y flags:** comprobar que cámara/micrófono y reconocimiento por identidad permanecen desactivados por defecto, que no se exponen claves o assets privados y que herramientas de escritura tienen permisos adecuados; enumerar riesgos bloqueantes.
 3. **Regresión completa de CI y ASUS física:** voz Whisper/Kokoro y navegador, avatar VRM y expresiones, JPEG exacto con conteo 1/2 rostros, VI-05A.1 manos arriba, postura sentada con extremidades fuera del cuadro como indeterminadas, apagado y expiración. Registrar resultados de campo en `LUMIA_IMPROVEMENTS_LEDGER.json`.
-4. **Preparar instaladores por perfil sin replicar proyecto:** lanzar el MISMO SHA en una carpeta de QA HP 6 GB y CPU, no copiar/modificar `LUMIA-ASUS` como mecanismo de despliegue. Priorizar HP Qwen3.5 4B y 2B; CPU 0.8B necesita el ensayo real. No afirmar paridad hasta confirmarla. Si primer corte sólo ASUS está listo, pedir **excepción escrita de rollout escalonado**, marcando HP/CPU «no certificados aún».
+4. **Preparar actualización segura de ASUS primero cuando corresponda, sin duplicar proyecto:** validar el SHA candidato en una carpeta de QA ASUS, con backup y rollback del original. Para HP 6 GB y CPU, usar **la misma revisión Git** en entornos QA cuando estén disponibles; registrar `no probado/no desplegado` mientras falte verificación. El usuario permite **despliegue escalonado** de funciones ya validadas en ASUS, con alcance documentado y autorización de la actualización concreta. No bloquear por HP/CPU, ni afirmar paridad inexistente.
 5. **Antes de tocar `main`:** mostrar el diff de promoción y lista de PR/commits; tener backup y rollback, tag candidato e informe de validación. Solicitar al propietario **aprobación expresa de esa promoción concreta**. La aprobación general de «trabajar con actualizaciones» no significa permiso para ejecutar una fusión de 1.483 commits o sustituir el original.
 6. **Tras promoción autorizada:** `main` y la versión/tag se convierten en referencia del producto, lanzar una actualización opt-in hacia el dispositivo, verificar inicio y funcionalidad. El antiguo nombre NEXT pasa a histórico/documentación y se archivan las ramas/PRs ya integradas, sin borrar evidencia.
 7. **En adelante:** cada nueva mejora parte de la última versión estable; pasa CI, QA y actualización con versión incremental. No recrear otra rama troncal permanentemente experimental.
