@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "architecture_id": "LUMIA-ONE-CORE-THREE-RUNTIMES",
+  "record_date": "2026-11-24",
+  "decision": "Un mismo código, interfaz y contrato funcional; tres perfiles de ejecución local definidos por hardware. Una sola versión/commit por release certificada. No crear forks por equipo.",
+  "canonical_repository": "ingeniusvictor/orbi-jarvis-agent-lab",
+  "development_baseline": {
+    "branch": "feat/lumia-next-vi05a1-pose-diagnostics-20261124",
+    "sha": "6d2d40437a039d7d144500e665f52fb3ee755900",
+    "pull_request": 93,
+    "status": "stacked-draft-cumulative-asus-qa",
+    "canonical_local_integration_branch": "integration/lumia-asus-next-20261114",
+    "not_yet_production": true
+  },
+  "protected_asus_production": {
+    "checkout": "LUMIA-ASUS",
+    "expected_sha": "1580a5182eba540893e35e37065be77da4ed014c",
+    "do_not_change_without_explicit_owner_approval": true
+  },
+  "same_across_profiles": {
+    "app_code": true,
+    "ui": true,
+    "avatar_contract": true,
+    "voice_stt_tts_contract": true,
+    "vision_contract": true,
+    "tool_and_permissions_contract": true,
+    "feature_flags_defined_centrally": true,
+    "qa_spec": true,
+    "release_semver_and_git_sha": true
+  },
+  "variable_by_profile": [
+    "ollama_model_exact_installed_tag",
+    "runtime_device_cpu_or_gpu",
+    "context_and_batch_sized_for_available_memory",
+    "image_input_resolution_when_hardware_requires",
+    "sampling_frequency_with_bounded_cpu",
+    "measured_latency",
+    "optional_device_capability_and_peripheral_availability"
+  ],
+  "profiles": [
+    {
+      "id": "asus-gpu4",
+      "label": "ASUS TUF — GPU 4 GiB",
+      "hardware": {
+        "cpu": "Intel Core i5-10300H",
+        "ram_gb": 32,
+        "gpu": "NVIDIA GTX 1650 Ti",
+        "gpu_vram_gib": 4
+      },
+      "brain": {
+        "primary_exact_local_tag": "qwen3.5:2b-q4_K_M",
+        "status": "user-validated-local-daily",
+        "alternates": [],
+        "selection": "explicit-profile-default-not-auto-upgrade"
+      },
+      "current_runtime": {
+        "local_asus": "validated",
+        "unified_cross_host_launcher": "pending"
+      },
+      "notes": "El 2B funciona diariamente y cuenta con pruebas visuales reales; no reemplazarlo de forma silenciosa por 4B.",
+      "priority": "compatibilidad-y-rapidez"
+    },
+    {
+      "id": "hp-gpu6",
+      "label": "HP Pavilion Gaming — GPU 6 GiB",
+      "hardware": {
+        "cpu": "Intel Core i7-10750H",
+        "ram_gb": 32,
+        "gpu": "NVIDIA RTX 2060 Max-Q",
+        "gpu_vram_gib": 6
+      },
+      "brain": {
+        "proposed_primary_exact_local_tag": "qwen3.5:4b-q4_K_M",
+        "fallback_exact_local_tag": "qwen3.5:2b-q4_K_M",
+        "additional_candidate_exact_local_tag": "hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M",
+        "selection": "owner-controlled-benchmark-gated",
+        "status": "models-and-gpu-measured;end-to-end-lumia-validation-pending",
+        "caution": "No extrapolar compatibilidad visual con Nemotron del rendimiento textual; solo el cuantizado específico probado entra en ~6 GiB."
+      },
+      "benchmarks": {
+        "ollama_version": "0.40.17",
+        "qwen_2b_vs_4b_cohort": {
+          "conditions": "Mismo prompt, think=false, num_ctx=4096, num_predict=200, temperature=0.2, keep_alive=0, Q4_K_M; resultados reales de esa cohorte",
+          "qwen2b": {
+            "total_seconds": 4.13,
+            "generation_tps": 98.48,
+            "generated_tokens": 115,
+            "full_gpu": true
+          },
+          "qwen4b": {
+            "total_seconds": 4.62,
+            "generation_tps": 55.95,
+            "generated_tokens": 86,
+            "full_gpu": true
+          },
+          "qwen4b_vram_used_mib": 3739
+        },
+        "qwen_2b_vs_nemotron_cohort": {
+          "conditions": "Mismo equipo HP, API Ollama, modelos separados, precalentamiento, 3 repeticiones, think=false, num_ctx=4096, num_predict=160, temperature=0; no comparar TPS con la cohorte previa",
+          "qwen2b": {
+            "mean_seconds": 4.31,
+            "generation_tps": 19.74,
+            "generated_tokens": 83,
+            "full_gpu": true,
+            "ollama_size_gb": 1.6
+          },
+          "nemotron_e4b": {
+            "mean_seconds": 11,
+            "generation_tps": 8.9,
+            "generated_tokens": 96,
+            "full_gpu": true,
+            "ollama_size_gb": 3.3
+          },
+          "observation": "Con este protocolo Qwen 2B fue más veloz. La diferencia con 98.48 TPS en otra sesión aún no tiene causa demostrada."
+        }
+      },
+      "priority": "razonamiento-y-vision-con-respuesta-utilizable"
+    },
+    {
+      "id": "cpu-only",
+      "label": "CPU — sin VRAM dedicada",
+      "hardware": {
+        "cpu": "variable",
+        "ram_gb": null,
+        "gpu": "none-required",
+        "gpu_vram_gib": 0
+      },
+      "brain": {
+        "proposed_primary_ollama_tag": "qwen3.5:0.8b",
+        "status": "official-model-exists;local-CPU-and-full-LUMIA-QA-not-yet-validated",
+        "selection": "explicit-profile-default",
+        "model_quantization": "pending-pin-and-test"
+      },
+      "current_runtime": {
+        "cpu_model": "untested-in-owner-devices",
+        "stt_tts_and_avatar": "untested-on-target-host"
+      },
+      "priority": "funcionalidad-hasta-donde-el-equipo-lo-permita;sin-inventar-visibilidad-o-tiempos"
+    }
+  ],
+  "canonical_feature_ledger": [
+    {
+      "id": "VI-04.2B.3",
+      "status": "asus-user-qa-positive",
+      "evidence": "Brazo elevado/torso y conteo 2/1 rostros con sameJpeg:true (2026-11-21)"
+    },
+    {
+      "id": "VI-05A.1",
+      "status": "asus-user-qa-partial-positive",
+      "evidence": "Izquierdo arriba, derecho arriba, ambos arriba correctos según usuario; en reposo brazos fuera de encuadre, no inferir abajo (2026-11-24)"
+    },
+    {
+      "id": "VI-05B",
+      "status": "specification",
+      "evidence": "Perfil Escritorio sentado como contexto de uso principal; no es clasificador visual de sentado"
+    },
+    {
+      "id": "Eufy-Multicam",
+      "status": "backlog",
+      "evidence": "Dueño tiene Eufy C220 y E220; E220 soporte RTSP/NAS documentado; C220 confirmar en app; ubicación por modelo sin identificar"
+    }
+  ],
+  "source_of_truth": {
+    "architecture": "docs/lumia-convergence/41-LUMIA-UNIFICADA-TRES-ENTORNOS-20261124.md",
+    "inventory_this_file": "LUMIA_PLATFORM_MATRIX.json",
+    "legacy_asus_continuity": "docs/lumia-convergence/39-VISION04-CONTINUIDAD-20261109.md",
+    "live_qa_manifest": "LUMIA_NEXT_MANIFEST.json",
+    "issue": "https://github.com/ingeniusvictor/orbi-jarvis-agent-lab/issues/80"
+  },
+  "release_policy": {
+    "one_release_sha_for_all_devices": true,
+    "allow_model_specific_adapters_only_not_code_forks": true,
+    "do_not_merge_experimental_stack_to_main_automatically": true,
+    "do_not_modify_protected_asus": true,
+    "ci_matrix": [
+      "ubuntu-latest",
+      "windows-latest"
+    ],
+    "field_qa_required": [
+      "asus-gpu4",
+      "hp-gpu6",
+      "cpu-only"
+    ],
+    "no_claim_of_validated_parity_until_all_gates_pass": true,
+    "record_capability_not_supported_instead_of_silent_change": true
+  },
+  "safety_and_privacy": {
+    "camera_off_by_default": true,
+    "requires_explicit_session_consent": true,
+    "camera_session_max_seconds": 180,
+    "no_recognition_of_identity_by_default": true,
+    "no_image_keypoints_or_rtsp_secrets_in_repo_logs": true,
+    "eufy_lan_only_if_supported": true,
+    "room_source_per_session_authorization": true
+  },
+  "external_sources": [
+    "https://ollama.com/library/qwen3.5",
+    "https://www.eufy.com/us/products/t8410121",
+    "https://service.eufy.com/article-description/Device-NAS-RTSP-Configuration-Guide",
+    "https://research.nvidia.com/labs/nemotron/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB/"
+  ]
+}
