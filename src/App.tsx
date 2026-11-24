@@ -37,7 +37,7 @@ import { shouldProtectWhisperCommandAtExpiry } from './lib/complex-voice-turn'
 import { remainingLongQuestionWindow } from './lib/long-question'
 import { createSpeaker, cycleVoice, currentVoiceName, diag as ttsDiag, ECHO_TAIL_MS } from './lib/tts'
 import { portalSpeechStart, portalSpeechPhrase, portalSpeechEnd, portalSpeechInterrupt } from './scene/lumia-head/portal-speech-events'
-import { parseLumiaAvatarAction, parseLumiaFaceActionVQ051, respondToLumiaAvatarAction } from './scene/lumia-motion-r8/avatar-presence-ph04'
+import { parseLumiaAvatarAction, respondToLumiaAvatarAction } from './scene/lumia-motion-r8/avatar-presence-ph04'
 import { LUMIA_GUIDED_DEMO_STEPS, beginGuidedDemo, cancelGuidedDemo, cueGuidedDemoPhrase, cueGuidedDemoStage, endGuidedDemo, checkGuidedDemoAssets, guidedDemoScript, guidedDemoSnapshot, waitForGuidedDemoClip } from './scene/lumia-motion-r8/avatar-demo-ph045'
 import { LumiaDemoIndicator } from './ui/LumiaDemoIndicator'
 
@@ -566,9 +566,7 @@ export default function App() {
       }
       if(visualImage) activeVisualReply.current=turnId
       const avatarAction = AVATAR_PH04_ENABLED && !visualImage && !captureFailure
-        ? (import.meta.env.VITE_LUMIA_FACE_DIRECT_VQ051 === '1'
-          ? parseLumiaFaceActionVQ051(said) : null) ?? parseLumiaAvatarAction(said)
-        : null
+        ? parseLumiaAvatarAction(said) : null
       const { text } = contextualReply
         ? {text:contextualReply}
         : captureFailure
