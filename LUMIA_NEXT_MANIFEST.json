@@ -194,5 +194,37 @@
       "observation": "Show reason per arm, distinguish missing, outside, low confidence and ambiguous; keep same arm thresholds and debounce",
       "scope": "CI + physical ASUS QA required"
     }
-  ]
+  ],
+  "unified_platform_architecture": {
+    "decision_date": "2026-11-24",
+    "one_product_one_repo_one_release": true,
+    "profiles_file": "LUMIA_PLATFORM_MATRIX.json",
+    "primary_doc": "docs/lumia-convergence/41-LUMIA-UNIFICADA-TRES-ENTORNOS-20261124.md",
+    "profiles": [
+      "asus-gpu4",
+      "hp-gpu6",
+      "cpu-only"
+    ],
+    "brain_defaults_target": {
+      "asus-gpu4": "qwen3.5:2b-q4_K_M",
+      "hp-gpu6": "qwen3.5:4b-q4_K_M (CANDIDATE)",
+      "cpu-only": "qwen3.5:0.8b (UNTESTED)"
+    },
+    "release_parity_status": "not_yet_implemented_or_physically_certified_across_all_profiles",
+    "policy": "This manifest is historical ASUS QA. The system-level source of truth for all three computers is LUMIA_PLATFORM_MATRIX.json. Do not fork apps per machine.",
+    "production_asus_still_protected": true
+  },
+  "latest_owner_observations_20261124": {
+    "vi05a1_seated": "With standard webcam and desktop seated posture user reports correct left-raised, right-raised, both-raised. Both-down indeterminate because wrists/elbows are out of frame. No observed seated-classifier.",
+    "eufy_models": [
+      "Indoor Cam C220",
+      "Indoor Cam E220"
+    ],
+    "eufy_rooms": "One in living room and one in bedroom; exact model-to-room mapping not supplied",
+    "hp_hw": "HP Gaming i7-10750H / RTX 2060 Max-Q 6GB VRAM / 32GB RAM",
+    "hp_benchmarks": "Qwen 2B / Qwen 4B GPU measured, Nemotron E4B quantized measured in distinct protocol; integrated LUMIA HP not certified",
+    "cpu_profile": "Qwen3.5 0.8B requested as future no-VRAM variant, not yet tested",
+    "primary_architecture_requirement": "Three runtime profiles MUST use same app version/commit, sharing voice/vision/avatar/UX features; model configurations vary"
+  },
+  "multi_platform_next_gate": "Define/implement opt-in universal launcher and per-device capability checks without altering protected ASUS; field-validate HP 4B/2B/Nemotron and CPU 0.8B before claiming shared release parity."
 }
