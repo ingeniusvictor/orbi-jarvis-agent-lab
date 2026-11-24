@@ -22,6 +22,6 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci
+      - run: npm ci --onnxruntime-node-install-cuda=skip
       - run: npx tsx scripts/certify-lumia-vision031-active-session.ts
       - run: npm run build
