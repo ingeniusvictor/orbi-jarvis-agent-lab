@@ -1,0 +1,45 @@
+name: LUMIA RC02 - pose CPU staged promotion over RC01
+on:
+  pull_request:
+    paths:
+      - 'src/ui/LumiaCameraViewfinder.tsx'
+      - 'src/lib/vision-pose-vi05.ts'
+      - 'src/lib/vision-pose-worker-vi05.ts'
+      - 'scripts/certify-lumia-vision05a-pose.ts'
+      - 'scripts/certify-lumia-vision05a1-pose-diagnostics.ts'
+      - 'scripts/instalar-modelo-pose-rc02.ps1'
+      - 'INICIAR_LUMIA_VISION_RC02_ASUS.cmd'
+      - '.github/workflows/lumia-vision-rc02-pose.yml'
+      - 'docs/lumia-releases/RC02-VISION-05A1-ASUS-20261124.md'
+      - '.gitignore'
+  workflow_dispatch:
+jobs:
+  verify:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --onnxruntime-node-install-cuda=skip
+      - name: VI-05A CPU posture
+        run: npx tsx scripts/certify-lumia-vision05a-pose.ts
+      - name: VI-05A.1 wrist and elbow visibility diagnostics
+        run: npx tsx scripts/certify-lumia-vision05a1-pose-diagnostics.ts
+      - name: RC01 no regressions in image-based behavior
+        run: npx tsx scripts/certify-lumia-vision-update-rc01.ts
+      - name: RC01 visual voice regressions
+        run: npx tsx scripts/certify-lumia-vision032b-fresh-voice.ts
+      - name: RC01 private avatar assets
+        run: node scripts/certify-lumia-private-assets-rc01.mjs
+      - name: Build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
