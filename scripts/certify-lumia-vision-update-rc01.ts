@@ -63,6 +63,8 @@ const assets=read('scripts/lumia-private-avatar-assets-rc01.mjs')
 assert.match(assets,/COPYFILE_EXCL/)
 assert.match(assets,/SOURCE_EQUALS_TARGET/)
 assert.match(assets,/DESTINATION_NOT_RC01_WORKTREE/)
+assert.match(assets,/join\(destination,'INICIAR_LUMIA_VISION_RC01_ASUS\.cmd'\)/)
+assert.doesNotMatch(assets,/INICIAR_LUMIA_ASUS_VISION_AUDITORIA_RC01\.cmd/)
 assert.match(launch,/lumia-private-avatar-assets-rc01\.mjs/)
 
 assert.doesNotMatch(original,/VITE_LUMIA_VISION_SAME_FRAME_VI042A|VITE_LUMIA_VISION_COUNT_GROUNDING_VI042B/)
