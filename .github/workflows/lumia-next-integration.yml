@@ -4,6 +4,10 @@ on:
     paths:
       - 'LUMIA_NEXT_MANIFEST.json'
       - 'LUMIA_PLATFORM_MATRIX.json'
+      - 'LUMIA_IMPROVEMENTS_LEDGER.json'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - 'docs/lumia-convergence/42-LUMIA-CONTROL-MEJORAS-20261124.md'
+      - 'scripts/certify-lumia-improvements-ledger.mjs'
       - 'README.md'
       - 'docs/lumia-convergence/41-LUMIA-UNIFICADA-TRES-ENTORNOS-20261124.md'
       - 'scripts/certify-lumia-platform-matrix.mjs'
@@ -55,6 +59,7 @@ jobs:
       - run: npm ci --onnxruntime-node-install-cuda=skip
       - run: node scripts/certify-lumia-next-integration.mjs
       - run: node scripts/certify-lumia-platform-matrix.mjs
+      - run: node scripts/certify-lumia-improvements-ledger.mjs
       - run: node scripts/certify-lumia-vision040a-wasm-route.mjs
       - run: npx tsx scripts/certify-lumia-vq04-natural-face.ts
       - run: npx tsx scripts/certify-lumia-vq05-speech-expressions.ts
