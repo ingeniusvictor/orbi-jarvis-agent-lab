@@ -39,7 +39,7 @@ const ids=new Set()
 const required=[
   'LUM-VI-04.2A','LUM-VI-04.2B.3','LUM-VI-05A.1','LUM-VI-05B',
   'LUM-CORE-3HW','LUM-BRAIN-HP6','LUM-BRAIN-CPU0',
-  'LUM-LAUNCHER-UNIFIED','LUM-VI-MULTICAM',
+  'LUM-LAUNCHER-UNIFIED','LUM-VI-MULTICAM','LUM-RELEASE-TRANSITION',
 ]
 for(const row of ledger.items){
   assert.match(row.id,/^LUM-[A-Z0-9][A-Z0-9.-]*$/)
@@ -79,6 +79,14 @@ for(const id of required)assert.ok(ids.has(id),'Missing critical milestone '+id)
 assert.match(doc,/PR DE IMPLEMENTACIÓN/)
 assert.match(doc,/no se convierte en «funciona en todos los equipos»/)
 assert.match(readme,/42-LUMIA-CONTROL-MEJORAS-20261124\.md/)
+assert.match(readme,/43-TRANSICION-NEXT-A-ACTUALIZACIONES-20261124\\.md/)
+const transition=read('docs/lumia-convergence/43-TRANSICION-NEXT-A-ACTUALIZACIONES-20261124.md')
+assert.match(transition,/1\\.483 commits/)
+assert.match(transition,/NO.*promover|no se promueve/i)
+assert.match(transition,/aprobaci[oó]n expresa/i)
+assert.match(matrix.release_policy.current_release_transition,/no_main_merge/)
+assert.equal(ledger.items.find(x=>x.id==='LUM-RELEASE-TRANSITION')?.implementation,'specified')
+
 assert.match(workflow,/node scripts\/certify-lumia-improvements-ledger\.mjs/)
 assert.ok(existsSync(join(root,'LUMIA_PLATFORM_MATRIX.json')))
 console.log('LUMIA LEDGER PASS: '+ledger.items.length+' distinct initiatives; physical QA tracked by 3 hardware profiles; protected original; no unapproved common release')
