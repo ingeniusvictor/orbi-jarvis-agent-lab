@@ -42,17 +42,30 @@ Una prueba parcial positiva **no se rebautiza** como validación integral. Ejemp
 
 **Regla de modelo:** no escoger el cerebro por número de parámetros; comparar respuestas y latencia en un protocolo idéntico. Los ensayos HP de 98,48 vs 19,74 tok/s para el mismo Qwen 2B proceden de protocolos diferentes; la causa de discrepancia no está establecida y no debe inventarse.
 
-## 4. Criterio de lanzamiento de una única versión
+## 4. Regla principal: función validada → actualización de LUMIA ORIGINAL
 
-**Gate estándar:** una función puede marcarse `released` solo con:
-1. PR revisado y CI acumulativa aprobada;
-2. evidencia explícita `passed` en ASUS, HP y CPU **para el contrato funcional correspondiente**, con el mismo SHA (o excepción explícita y escrita que identifique la capacidad no disponible y su comportamiento honesto);
-3. autorización de promoción del propietario y rollback documentado;
-4. una sola etiqueta/tag y mismo código para los tres, con diferencias de runtime parametrizadas.
+**Decisión explícita del propietario (24-11-2026):** las ramas son áreas de experimentación, **no el destino final de una mejora**. Cuando una capacidad queda acotada, pasa las pruebas relevantes y el propietario confirma que se comporta correctamente, **se prepara como actualización incremental de la LUMIA original**, sin esperar a acumular cinco, diez o veinte mejoras en una rama NEXT.
 
-**Hoy:** ningún elemento experimental del inventario está marcado como `released` en la versión unificada. El PR #94 de arquitectura y el #93 del centinela siguen en borrador. El uso habitual ASUS protegido no se modifica y no debe considerarse sustituido.
+### Dos etapas diferentes que NO deben confundirse
 
-El gate sintético `scripts/certify-lumia-improvements-ledger.mjs` impide registros duplicados, estados no permitidos, pérdida de perfiles, evidencias vacías y declaraciones de «released» sin validación. **No reemplaza** la decisión del propietario ni valida físicamente los equipos.
+1. **Aceptación funcional:** el propietario comprueba un comportamiento concreto en su ASUS (por ejemplo, distinguir brazo izquierdo y derecho levantados) y confirma el éxito. Se documentan evidencias, alcance exacto y posibles limitaciones: `passed` para lo que realmente quedó validado, o `partial` para una función más amplia. Esta confirmación **habilita preparar el paquete de actualización**; no autoriza por sí sola copiar todos los commits históricos a `main`.
+2. **Promoción segura a original:** para la función aceptada, se identifica el **diff mínimo y sus dependencias**, se corren las regresiones, se prepara snapshot/backup de la original, se comprueba que voz, avatar, cerebro, cámara y permisos no cambian indebidamente, y se obtiene autorización del propietario para **ese paquete concreto**. Entonces se integra en la línea estable y se actualiza la instalación original con rollback. **El estado `released` solo se usa después de confirmar que la actualización quedó aplicada y funciona**.
+
+**No bloquear las actualizaciones de ASUS porque aún no hemos probado CPU 0.8B o HP 4B dentro de LUMIA.** Se permite **despliegue escalonado ASUS primero** una vez aprobada la funcionalidad y superados sus controles. El mismo código/versión debe continuar disponible para HP y CPU; registrar `pending` o `not_tested` por equipo, y prohibido declarar que esos dispositivos funcionan hasta comprobarlo. Nunca crear una variante de código diferente para permitir el despliegue.
+
+### Requisitos mínimos por actualización
+
+1. Una función/paquete acotado, con ID, criterio de éxito, dependencias y versión SHA; PR revisado y CI acumulativa aprobada.
+2. **QA física `passed` en el equipo destino**, con el alcance explícito. No publicar como «detección corporal completa» cuando solo aprobaron los brazos elevados: publicar la función limitada como tal o completar pruebas.
+3. Copia de seguridad y procedimiento de revertir que deje **exactamente** la última LUMIA original operativa; sin sobrescribir perfiles de Whisper/Kokoro, modelos, clips privados o datos del usuario.
+4. El propietario conoce y autoriza **la promoción concreta**, y verificamos arranque real tras actualizar. Su aprobación funcional de una prueba puede contarse como aceptación del comportamiento, **no como permiso para un merge masivo** de todas las ramas.
+5. Una sola línea de producto y una versión Git por release. Si HP/CPU quedan sin validar, declarar **despliegue escalonado** con `rollout.validated_profiles`, `rollout.pending_profiles`, motivo y plan de QA. No mentir sobre paridad entre los tres.
+
+**Gate de publicación:** `released` requiere CI `passed`, aprobación de promoción, SHA de versión, QA `passed` en todo perfil donde realmente se desplegó, ausencia de perfiles sin clasificar y, si queda alguno por probar, excepción explícita de despliegue escalonado. La matriz de QA se mantiene completa para ASUS/HP/CPU, aunque no se obligue a esperar a todos para actualizar primero la ASUS.
+
+**Hoy:** ningún elemento experimental del inventario está marcado como `released` en la LUMIA unificada. El uso habitual ASUS original permanece intacto mientras preparamos el primer paquete real; los PR #93–#95 siguen siendo borradores.
+
+El gate `scripts/certify-lumia-improvements-ledger.mjs` exige evidencia y protege frente a falsos releases. **No reemplaza** la decisión del propietario ni valida físicamente los equipos.
 
 ## 5. Una sola línea de mejoras, sin perder nada
 
